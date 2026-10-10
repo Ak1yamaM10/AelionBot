@@ -20,6 +20,8 @@ const usage = `用法: aelion-headless [任务] [选项]
       --base-url <url>     API 地址（或 AELION_BASE_URL，默认 https://api.openai.com/v1）
       --protocol <p>       chat | responses | anthropic | gemini（或 AELION_PROTOCOL）
       --context <tokens>   模型上下文窗口（或 AELION_CONTEXT_TOKENS）
+      --web-search         使用服务端网页搜索，仅 responses / anthropic 协议（或 AELION_HOSTED_WEB_SEARCH=1）
+      --disable-tools <a,b> 不向模型提供这些工具，逗号分隔（或 AELION_DISABLED_TOOLS）
       --timeout <seconds>  超时后停止任务
       --json               输出一个 JSON 结果对象
   -q, --quiet              不输出工具进度
@@ -53,6 +55,8 @@ async function main() {
         'base-url': { type: 'string' },
         protocol: { type: 'string' },
         context: { type: 'string' },
+        'web-search': { type: 'boolean' },
+        'disable-tools': { type: 'string' },
         timeout: { type: 'string' },
         json: { type: 'boolean' },
         quiet: { type: 'boolean', short: 'q' },
@@ -103,6 +107,10 @@ async function main() {
   const result = await runHeadless({
     prompt,
     permission,
+    disabledTools: (values['disable-tools'] || env.AELION_DISABLED_TOOLS || '')
+      .split(',')
+      .map((name) => name.trim())
+      .filter(Boolean),
     workspaceDir: resolve(values.workspace || process.cwd()),
     dataDir: resolve(values['data-dir'] || env.AELION_HEADLESS_DATA_DIR || join(homedir(), '.aelion', 'headless')),
     botId: values.bot,
@@ -119,6 +127,7 @@ async function main() {
             protocol,
             contextTokens,
             reasoningEffort: env.AELION_REASONING_EFFORT,
+            hostedWebSearch: values['web-search'] || env.AELION_HOSTED_WEB_SEARCH === '1',
           },
         }
       : {}),

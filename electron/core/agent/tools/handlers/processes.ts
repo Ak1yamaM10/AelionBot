@@ -3,9 +3,17 @@ import { toolLocation } from '../../../tools/approval-reason';
 import type { ToolHandler } from '../context';
 import { requiredText } from '../validation';
 import { execPatch } from './files';
+import { MAX_YIELD_MS } from '../../../tools/foundation-tools';
 
+// A wait longer than the cap is shortened rather than refused: the model only wants to wait a while.
 const yieldOf = (value: unknown, fallback: number) =>
-  boundedInteger(value === undefined ? fallback : value, fallback, 0, 30000, 'yieldTimeMs');
+  boundedInteger(
+    typeof value === 'number' && value > MAX_YIELD_MS ? MAX_YIELD_MS : value === undefined ? fallback : value,
+    fallback,
+    0,
+    MAX_YIELD_MS,
+    'yieldTimeMs',
+  );
 
 export const EXEC_HANDLERS: Record<string, ToolHandler> = {
   exec_command: async (ctx) => {

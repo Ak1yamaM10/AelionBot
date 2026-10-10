@@ -273,6 +273,12 @@ export class Harness {
   private headless = false;
   setHeadless(value: boolean) {
     this.headless = value;
+    this.terminals.keepServices = value;
+  }
+  // Tools a headless caller rules out for its task; the prompt stops mentioning them as well.
+  private disabledTools = new Set<string>();
+  setDisabledTools(names: Iterable<string>) {
+    this.disabledTools = new Set(names);
   }
   private groupActive = new Map<string, ActiveRuntime>();
   /** Keyed by lane (see runLane): a Bot runs its main chat and each work session at the same time. */
@@ -856,8 +862,9 @@ export class Harness {
           design: Boolean(this.design && this.host && this.interactions) && !this.headless,
           peers: Boolean(this.peers),
           groups: Boolean(this.groups),
-          chatPin: !options.peerOrigin && !options.groupOrigin,
-          history: Boolean(cognition),
+          chatPin: !options.peerOrigin && !options.groupOrigin && !this.disabledTools.has('chat_pin'),
+          history: Boolean(cognition) && !this.disabledTools.has('history_search'),
+          web: !this.disabledTools.has('web_read'),
           privateMessage: Boolean(privateSessionId && options.peerOrigin?.kind !== 'peer_summary'),
         }),
     };
@@ -2024,6 +2031,7 @@ export class Harness {
     const availableTools = baseTools.filter(
       (t) =>
         !hiddenHosted.has(t.function.name) &&
+        !this.disabledTools.has(t.function.name) &&
         (!this.headless || !HEADLESS_HIDDEN_TOOLS.has(t.function.name)) &&
         (t.function.name !== 'video_frames' || Boolean(this.video)) &&
         (t.function.name !== 'open_preview' || Boolean(this.previews)) &&

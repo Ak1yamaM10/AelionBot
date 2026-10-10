@@ -378,6 +378,10 @@ test('pipe terminals accept continued input, enforce ownership, and approve ever
     signal(),
     f.dir,
   );
+  // Still running: the result says for how long, and that quiet does not mean stuck.
+  assert.equal(opened.status, 'running');
+  assert.ok(typeof opened.elapsedMs === 'number' && opened.elapsedMs >= 0);
+  assert.ok(opened.note);
   await assert.rejects(sessions.input('b', 'r', { id: opened.id, chars: 'wrong' }, signal()), {
     code: 'TERMINAL_NOT_FOUND',
   });

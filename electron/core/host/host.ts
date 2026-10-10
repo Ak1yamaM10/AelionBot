@@ -66,6 +66,8 @@ function aborted(signal: AbortSignal) {
 }
 export class HostComputer {
   private executions = new Map<number, () => void>();
+  /** Content hash of what file_write/file_patch last wrote to each path, so a patch can follow the Bot's own edit. */
+  private lastWritten = new Map<string, string>();
   private workspaceOverride?: string;
   private readonly settingsFile: string;
   private readonly defaultWorkspaceDir: string;
@@ -531,11 +533,19 @@ export class HostComputer {
         this.redact(original.toString('utf8')) !== original.toString('utf8')
       )
         throw Error('不能用凭据占位符替换原文件，请只修改未脱敏的片段');
-      const result = editText(original, edit);
+      // A hash older than this Bot's own last write is not an outside change: the write itself was checked against
+      // the hash the model had read, so the file is that content plus the Bot's edits. Two patches that were sent
+      // together carry the same hash and the second one lands here. oldText must still match what is on disk now.
+      const current = createHash('sha256').update(original).digest('hex'),
+        followsOwnWrite = edit.expectedSha256 !== current && this.lastWritten.get(path) === current,
+        result = editText(original, followsOwnWrite ? { ...edit, expectedSha256: current } : edit);
       return {
         ...this.commitFile(botId, runId, path, result.content, stamp, signal),
         replacements: result.replacements,
         ...(result.matchStrategy ? { matchStrategy: result.matchStrategy } : {}),
+        ...(followsOwnWrite
+          ? { note: '传入的 sha256 早于你自己的上一次修改，已按当前内容应用；后续请使用返回的新 sha256' }
+          : {}),
       };
     } catch (error) {
       throw filesystemError(error, path);
@@ -574,12 +584,16 @@ export class HostComputer {
       } catch {}
     }
     this.options.afterWrite?.(checkpoint, path, content);
+    const sha256 = createHash('sha256').update(content, 'utf8').digest('hex');
+    this.lastWritten.delete(path);
+    this.lastWritten.set(path, sha256);
+    if (this.lastWritten.size > 256) this.lastWritten.delete(this.lastWritten.keys().next().value!);
     return {
       path,
       location: 'host',
       bytes: Buffer.byteLength(content, 'utf8'),
       written: true,
-      sha256: createHash('sha256').update(content, 'utf8').digest('hex'),
+      sha256,
     };
   }
   async listDirectory(

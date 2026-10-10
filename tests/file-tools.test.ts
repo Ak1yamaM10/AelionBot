@@ -188,6 +188,26 @@ test('stale hashes, ambiguous matches, missing text and denied edits cannot over
   assert.equal(readFileSync(path, 'utf8'), 'newer user edit');
 });
 
+test('a patch carrying a hash older than the Bot’s own last write applies; an outside edit still blocks it', async (t) => {
+  const f = fixture(t),
+    path = join(f.project, 'two.txt');
+  writeFileSync(path, 'a\nb\n');
+  const start = hash('a\nb\n'),
+    edit = (oldText: string, newText: string) => ({ path, reason: 'edit', oldText, newText, expectedSha256: start });
+  await approve(f, f.host.patchFile('bot', 'run', edit('a', 'A'), signal()));
+  const second: any = await approve(f, f.host.patchFile('bot', 'run', edit('b', 'B'), signal()));
+  assert.equal(readFileSync(path, 'utf8'), 'A\nB\n');
+  assert.equal(second.sha256, hash('A\nB\n'));
+  assert.ok(second.note);
+  // The text still has to be there: a stale hash does not make a wrong oldText apply.
+  await assert.rejects(approve(f, f.host.patchFile('bot', 'run', edit('a', 'x'), signal())), {
+    code: 'EDIT_NOT_FOUND',
+  });
+  writeFileSync(path, 'A\nB\nuser\n');
+  await assert.rejects(approve(f, f.host.patchFile('bot', 'run', edit('B', 'C'), signal())), { code: 'FILE_CHANGED' });
+  assert.equal(readFileSync(path, 'utf8'), 'A\nB\nuser\n');
+});
+
 test('replaceAll is explicit, replacement text is literal, and growth is bounded', () => {
   const bytes = Buffer.from('old old');
   assert.equal(

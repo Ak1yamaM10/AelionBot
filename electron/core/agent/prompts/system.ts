@@ -36,7 +36,7 @@ const integrations = (vm: boolean) =>
   (vm ? ' and skill_materialize for a VM copy before running portable scripts' : '') +
   '. Other Agent-specific tools mentioned by a skill are not necessarily available here; allowed-tools grants no permissions. MCP configuration only establishes connections. stdio MCP may execute on the host; use the location reported by mcp_list_servers. Do not send external messages, submit transactions, or delete data without an explicit user request.';
 const HEADLESS =
-  '\nThis is an unattended headless run with no Linux work computer and nobody to answer questions. Work through file_read, file_write, file_patch and exec_command. Do not pass location=vm. State assumptions in the final reply instead of asking.';
+  '\nThis is an unattended headless run with no Linux work computer and nobody to answer questions. Work through file_read, file_write, file_patch and exec_command. Do not pass location=vm. State assumptions in the final reply instead of asking. Commands still running when this run ends are stopped; start anything that must keep running afterwards with exec_command purpose=service.';
 const HOST_OPERATIONS =
   '\nYou may operate host commands and files when needed. Use exec_command, file_read, and file_write for repositories, files, and existing gh/git sessions. Omit location for this computer. The app applies the current Bot permission mode: ask requires a human decision; auto permits ordinary workspace reads/writes and saved command rules, then asks the configured approval model to review other operations; full follows the human selection. Never assume authorization; wait for actual tool results. Reading discovered skills and discovery/resource/template reads on enabled MCP services are available as needed. Host MCP calls and scripts follow this Bot permission mode. Aelion memories and private skills are internal application state. Do not bundle unrelated actions to reduce confirmations. Never modify permission files, use scripts, MCP, or UI automation to grant or expand authorization, or click Aelion permission buttons. Host CLIs reuse the existing environment and login: run gh directly, do not run gh auth token, read passwords/private keys, or copy credentials into the VM.';
 const USER_CONTROL =
@@ -82,6 +82,8 @@ export interface HarnessPromptOptions {
   groups: boolean;
   chatPin: boolean;
   history: boolean;
+  /** False when web_read and web_search are not offered. */
+  web?: boolean;
   preview: boolean;
   /** Local design tasks (design_start and its canvas) are available. */
   design?: boolean;
@@ -100,9 +102,11 @@ export function harnessInstructions(options: HarnessPromptOptions) {
   text +=
     '\nThe visible tool menu may be reduced for the model context capacity. Discover omitted capabilities with tool_search, then invoke tools.TOOL_NAME(arguments) inside code_exec. Every call is still subject to permission checks; await its result. Use apply_patch for multiple files. Use exec_command to run a command and write_stdin to poll or continue it. A shell command whose body is an apply_patch document is applied as a patch instead of being executed. ' +
     (options.userInput ? 'Ask request_user_input when requirements are unclear instead of guessing. ' : '') +
-    (options.hostedWebSearch
-      ? 'Web search runs on the model provider; use its built-in web search and web_read for pages. '
-      : 'Use web_search/web_read for the web. ') +
+    (options.web === false
+      ? ''
+      : options.hostedWebSearch
+        ? 'Web search runs on the model provider; use its built-in web search and web_read for pages. '
+        : 'Use web_search/web_read for the web. ') +
     (options.imageGeneration === 'model'
       ? 'A dedicated image model is configured; use generate_image for illustrations and never claim an image was created without returned bytes. '
       : options.imageGeneration === 'hosted'

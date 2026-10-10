@@ -1,8 +1,10 @@
 import { randomUUID } from 'node:crypto';
 import { createRequire } from 'node:module';
 import { spawn } from 'node:child_process';
-import { existsSync, realpathSync, statSync } from 'node:fs';
+import { closeSync, existsSync, mkdtempSync, openSync, readSync, realpathSync, statSync } from 'node:fs';
+import { tmpdir } from 'node:os';
 import { join, posix } from 'node:path';
+import { StringDecoder } from 'node:string_decoder';
 import { stripVTControlCharacters } from 'node:util';
 import type { HostComputer } from '../host/host';
 import type { Interactions } from '../agent/interactions';
@@ -11,6 +13,7 @@ import { hostEnvironment, hostShell, stopHostProcess } from '../host/host-platfo
 import { approvalReason } from './approval-reason';
 import { boundedInteger, FileToolError, textPage } from './file-text';
 import { backoff } from '../model/model';
+import { MAX_YIELD_MS } from './foundation-tools';
 export interface TerminalDriver {
   write: (text: string) => void;
   kill: () => void;
@@ -51,9 +54,13 @@ interface Session {
   createdAt: string;
   exitCode?: number;
   closed: boolean;
+  /** Runs on without this process: dispose leaves it alone. */
+  detached?: boolean;
 }
 export class TerminalSessions {
   private sessions = new Map<string, Session>();
+  /** Headless: a host service must outlive the CLI, so it writes to a log file instead of pipes that close on exit. */
+  keepServices = false;
   constructor(
     private vm: VmController,
     private host: HostComputer | undefined,
@@ -78,7 +85,8 @@ export class TerminalSessions {
       cols = boundedInteger(args.cols, 100, 20, 300, 'cols'),
       rows = boundedInteger(args.rows, 30, 5, 100, 'rows');
     let cwd = workspace || '',
-      driver: TerminalDriver;
+      driver: TerminalDriver,
+      detached = false;
     if (location === 'host') {
       if (!this.host || !this.interactions) throw Error('本机终端不可用');
       if (typeof args.stdin === 'string' && args.stdin.length > 262144) throw Error('stdin 过长');
@@ -178,6 +186,49 @@ export class TerminalSessions {
             }
           },
         };
+      } else if (this.keepServices && args.purpose === 'service' && !args.stdin) {
+        const log = join(mkdtempSync(join(tmpdir(), 'aelion-service-')), 'output.log'),
+          out = openSync(log, 'a');
+        const child = spawn(shell.executable, shellArgs, {
+          cwd,
+          env,
+          windowsHide: true,
+          detached: true,
+          stdio: ['ignore', out, out],
+        });
+        closeSync(out);
+        await new Promise<void>((resolve, reject) => {
+          child.once('spawn', resolve);
+          child.once('error', reject);
+        });
+        child.unref();
+        detached = true;
+        const reader = openSync(log, 'r'),
+          decoder = new StringDecoder('utf8'),
+          chunk = Buffer.alloc(65536);
+        let position = 0,
+          emit = (_text: string) => {};
+        const pump = () => {
+          for (let size: number; (size = readSync(reader, chunk, 0, chunk.length, position)) > 0; position += size)
+            emit(decoder.write(chunk.subarray(0, size)));
+        };
+        const timer = setInterval(pump, 100);
+        timer.unref();
+        driver = {
+          write: () => {},
+          onData: (fn) => {
+            emit = fn;
+          },
+          onExit: (fn) => {
+            child.on('close', (code) => {
+              clearInterval(timer);
+              pump();
+              closeSync(reader);
+              fn(code ?? -1);
+            });
+          },
+          kill: () => stopHostProcess(child, env),
+        };
       } else {
         const child = spawn(shell.executable, shellArgs, {
           cwd,
@@ -227,6 +278,7 @@ export class TerminalSessions {
       baseOffset: 0,
       createdAt: new Date().toISOString(),
       closed: false,
+      detached,
     };
     this.sessions.set(session.id, session);
     driver.onData((text) => {
@@ -252,7 +304,7 @@ export class TerminalSessions {
         botId,
         session.id,
         signal,
-        boundedInteger(args.yieldTimeMs, 1000, 0, 30000, 'yieldTimeMs'),
+        boundedInteger(args.yieldTimeMs, 1000, 0, MAX_YIELD_MS, 'yieldTimeMs'),
         0,
       );
     } catch (error) {
@@ -266,9 +318,18 @@ export class TerminalSessions {
   }
   async input(botId: string, runId: string, args: Record<string, unknown>, signal: AbortSignal) {
     const session = this.get(botId, String(args.id));
-    if (session.closed) throw Error('终端已退出');
     if (typeof args.chars !== 'string' || args.chars.length > 16000) throw Error('输入必须是最多 16000 字符的文本');
     const chars = args.chars;
+    // Polling a command that has finished returns its remaining output and exit code.
+    if (session.closed && !chars)
+      return this.read(
+        botId,
+        session.id,
+        signal,
+        0,
+        boundedInteger(args.offset, 0, 0, Number.MAX_SAFE_INTEGER, 'offset'),
+      );
+    if (session.closed) throw Error('终端已退出');
     if (chars && session.location === 'host') {
       if (!this.interactions) throw Error('本机终端不可用');
       await this.interactions.permission(
@@ -297,7 +358,7 @@ export class TerminalSessions {
       botId,
       session.id,
       signal,
-      boundedInteger(args.yieldTimeMs, 250, 0, 30000, 'yieldTimeMs'),
+      boundedInteger(args.yieldTimeMs, 250, 0, MAX_YIELD_MS, 'yieldTimeMs'),
       boundedInteger(args.offset, 0, 0, Number.MAX_SAFE_INTEGER, 'offset'),
     );
   }
@@ -305,9 +366,12 @@ export class TerminalSessions {
     const session = this.get(botId, id),
       until = Date.now() + waitMs,
       start = session.baseOffset + session.output.length;
-    while (!session.closed && Date.now() < until && session.baseOffset + session.output.length === start) {
-      await backoff(Math.min(100, until - Date.now()), signal);
-    }
+    // A task yields when it exits or the time is up, not at its first output: a command that prints and then
+    // finishes a moment later would come back as still running with half its output. A service never exits, so its
+    // first output (usually the line saying it is listening) is the signal to hand control back.
+    const settled = () =>
+      session.closed || (session.purpose === 'service' && session.baseOffset + session.output.length !== start);
+    while (!settled() && Date.now() < until) await backoff(Math.min(100, until - Date.now()), signal);
     signal.throwIfAborted();
     const safe = this.host?.redact(session.output) || session.output,
       page = textPage(safe, { offset: Math.max(0, offset - session.baseOffset), maxChars: 16000 });
@@ -319,6 +383,14 @@ export class TerminalSessions {
       purpose: session.purpose,
       status: session.closed ? 'exited' : 'running',
       exitCode: session.exitCode,
+      // A command that has been quiet for a while is not necessarily stuck: say how long it has run, and where its
+      // output may have gone, so the model does not stop an install halfway.
+      ...(!session.closed && session.purpose === 'task'
+        ? {
+            elapsedMs: Date.now() - Date.parse(session.createdAt),
+            note: '命令仍在运行，没有输出不代表卡住。用 write_stdin 继续等待；若输出被重定向到文件，请读那个文件。不要停止仍在安装或构建的命令。',
+          }
+        : {}),
       output: stripVTControlCharacters(page.content),
       offset: session.baseOffset + page.offset,
       nextOffset: session.baseOffset + page.nextOffset,
@@ -408,7 +480,7 @@ export class TerminalSessions {
       }
   }
   dispose() {
-    for (const session of this.sessions.values()) if (!session.closed) session.driver.kill();
+    for (const session of this.sessions.values()) if (!session.closed && !session.detached) session.driver.kill();
     this.sessions.clear();
   }
 }

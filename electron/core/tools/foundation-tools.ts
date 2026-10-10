@@ -2,6 +2,9 @@ import type { ToolDefinition } from '../model/model';
 const text = { type: 'string' },
   id = { type: 'string', minLength: 1, maxLength: 100 };
 const integer = (min: number, max: number) => ({ type: 'integer', minimum: min, maximum: max });
+/** Longest a terminal call waits before handing control back; a larger yieldTimeMs is shortened to this. */
+export const MAX_YIELD_MS = 30000;
+const YIELD_SCHEMA_MAX = 3_600_000;
 const tool = (
   name: string,
   description: string,
@@ -28,7 +31,7 @@ export const FOUNDATION_TOOLS: ToolDefinition[] = [
   ),
   tool(
     'exec_command',
-    '执行一条命令，并在 yieldTimeMs（默认 10000）后交还控制权。location 省略表示用户本机，只有 vm 才在 Linux 工作电脑执行。命令结束会带 exitCode；仍在运行时用返回的 id 调用 write_stdin 继续输入或轮询，用 exec_stop 停止。取消轮询不会杀掉进程。tty 默认关闭。stdin 会在启动后写入。如果命令主体是 *** Begin Patch 补丁，会直接应用补丁而不是交给 shell。Windows 本机优先 PowerShell 7，否则是 Windows PowerShell 5.1，5.1 不支持 && 与 ||。',
+    '执行一条命令，并在 yieldTimeMs（默认 10000，最长 30000，更大的值按 30000 处理）后交还控制权。location 省略表示用户本机，只有 vm 才在 Linux 工作电脑执行。命令结束会带 exitCode；仍在运行时返回 status=running 和已运行时长，用返回的 id 调用 write_stdin 继续输入或轮询，不要重复启动同一命令。取消轮询不会杀掉进程。命令输出被重定向到文件时这里看不到进展，请读那个文件。tty 默认关闭。stdin 会在启动后写入。如果命令主体是 *** Begin Patch 补丁，会直接应用补丁而不是交给 shell。Windows 本机优先 PowerShell 7，否则是 Windows PowerShell 5.1，5.1 不支持 && 与 ||。',
     {
       command: { ...text, minLength: 1, maxLength: 6000 },
       location: { type: 'string', enum: ['host', 'vm'] },
@@ -38,18 +41,18 @@ export const FOUNDATION_TOOLS: ToolDefinition[] = [
       purpose: { type: 'string', enum: ['task', 'service'] },
       cols: integer(20, 300),
       rows: integer(5, 100),
-      yieldTimeMs: integer(0, 30000),
+      yieldTimeMs: integer(0, YIELD_SCHEMA_MAX),
     },
     ['command'],
   ),
   tool(
     'write_stdin',
-    '向 exec_command 返回的会话写入 chars；chars 省略或为空时只轮询新输出。yieldTimeMs 到点后返回，不结束进程。offset 用上次 nextOffset。本机非空输入会重新审批。不要输入或索取密码、私钥。',
+    '向 exec_command 返回的会话写入 chars；chars 省略或为空时只轮询新输出。yieldTimeMs 到点后返回，不结束进程，最长 30000，更大的值按 30000 处理。offset 用上次 nextOffset。本机非空输入会重新审批。不要输入或索取密码、私钥。',
     {
       id,
       chars: { ...text, maxLength: 16000 },
       offset: integer(0, Number.MAX_SAFE_INTEGER),
-      yieldTimeMs: integer(0, 30000),
+      yieldTimeMs: integer(0, YIELD_SCHEMA_MAX),
       cols: integer(20, 300),
       rows: integer(5, 100),
     },
@@ -57,7 +60,7 @@ export const FOUNDATION_TOOLS: ToolDefinition[] = [
   ),
   tool(
     'exec_stop',
-    '停止自己启动的命令会话及其子进程。结果以实际退出状态为准，不会按其他 Bot 的 ID 停止进程。',
+    '停止自己启动的命令会话及其子进程。结果以实际退出状态为准，不会按其他 Bot 的 ID 停止进程。没有输出不等于卡住：不要停止仍在运行的 apt、dpkg、pip、npm、编译等安装或构建命令，强行终止会留下半装状态（如 dpkg 被中断），先用 write_stdin 继续等待，或读它的日志文件。',
     { id },
     ['id'],
   ),

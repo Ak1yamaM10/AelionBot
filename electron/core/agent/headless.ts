@@ -14,6 +14,7 @@ import { join, resolve } from 'node:path';
 import { Store, type StoredProvider } from '../storage/store';
 import { ModelProviders } from '../model/model-providers';
 import { ModelClient } from '../model/model';
+import { headlessImages } from '../image/headless-images';
 import { CommandPermissions } from '../host/command-permissions';
 import { Interactions } from './interactions';
 import { HostComputer, redactHost } from '../host/host';
@@ -25,7 +26,7 @@ import { Harness } from './harness';
 import { RunPolicy } from './runtime-policy';
 import type { ApprovalAssessment, HostPermissionRequest } from '../host/host-approval-types';
 import type { HostPermissionMode } from '../../../shared/types/permission-types';
-import type { ModelProtocol } from '../../../shared/types/model-types';
+import { hostedSearchProtocol, type ModelProtocol } from '../../../shared/types/model-types';
 import type { RunRecord } from '../../../shared/types/core';
 import type { VmController } from '../vm/vm';
 import { AppError } from '../../../shared/errors';
@@ -39,6 +40,7 @@ interface HeadlessModel {
   protocol?: ModelProtocol;
   contextTokens?: number;
   reasoningEffort?: string;
+  hostedWebSearch?: boolean;
 }
 export interface HeadlessOptions {
   prompt: string;
@@ -48,6 +50,8 @@ export interface HeadlessOptions {
   model?: HeadlessModel;
   botId?: string;
   permission?: HeadlessPermission;
+  /** Tool names withheld from the model for this run. */
+  disabledTools?: string[];
   timeoutMs?: number;
   homeDir?: string;
   configDir?: string;
@@ -141,6 +145,7 @@ function configureModel(store: Store, model: HeadlessModel, botId: string) {
     baseUrl: model.baseUrl.trim(),
     models: [{ id: model.model.trim(), contextTokens }],
     ...(model.protocol ? { protocol: model.protocol } : {}),
+    ...(model.hostedWebSearch && hostedSearchProtocol(model.protocol) ? { hostedWebSearch: true } : {}),
   };
   const selection = {
     providerId: HEADLESS_PROVIDER,
@@ -260,6 +265,7 @@ export async function runHeadless(options: HeadlessOptions): Promise<HeadlessRes
       commands,
     );
     cleanup.push(() => interactions.dispose());
+    const images = headlessImages(join(dataDir, 'screenshots'));
     host = new HostComputer(
       {
         dataDir,
@@ -268,6 +274,7 @@ export async function runHeadless(options: HeadlessOptions): Promise<HeadlessRes
         runtimeDir: options.runtimeDir,
         env,
         secrets: () => (key ? [key] : []),
+        imagePreview: images.preview,
       },
       interactions,
     );
@@ -285,7 +292,7 @@ export async function runHeadless(options: HeadlessOptions): Promise<HeadlessRes
       new ModelClient(
         (id) => store.modelFor(id),
         () => key,
-        undefined,
+        images.resolve,
         () => new RunPolicy(store).settings(),
         usage,
       );
@@ -347,6 +354,7 @@ export async function runHeadless(options: HeadlessOptions): Promise<HeadlessRes
       cognition,
     );
     harness.setHeadless(true);
+    harness.setDisabledTools(options.disabledTools || []);
     cleanup.push(
       () => harness.disposeTools(),
       () => harness.closeProcesses(),
