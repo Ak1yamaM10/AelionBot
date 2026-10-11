@@ -10,9 +10,18 @@ import { commandResultFailed, executionBlocksCompletion } from '../../execution-
 import { InteractionDenied } from '../../interactions';
 import { RunPolicy } from '../../runtime-policy';
 import { WorkItems, PLANNING_TOOLS } from '../../work-items';
-import type { ToolHandler } from '../context';
+import type { ToolDeps, ToolHandler } from '../context';
 import { TOOLS } from '../index';
 import { requiredText } from '../validation';
+
+/** A batch step may only use a tool this run could call directly, so hidden or disabled tools stay out of reach. */
+function batchTools(deps: ToolDeps, runId: string): ReadonlySet<string> | undefined {
+  const planning =
+    new WorkItems(deps.store).forRun(deps.store.data.runs.find((run) => run.id === runId)!)?.status === 'planning';
+  const callable = deps.callableTools(runId);
+  if (!callable) return planning ? PLANNING_TOOLS : undefined;
+  return new Set(callable.map((tool) => tool.function.name).filter((name) => !planning || PLANNING_TOOLS.has(name)));
+}
 
 export const MISC_HANDLERS: Record<string, ToolHandler> = {
   tool_search: ({ args, signal, runId, deps }) =>
@@ -87,10 +96,7 @@ export const MISC_HANDLERS: Record<string, ToolHandler> = {
       },
       {
         stopOnError: (error) => error instanceof InteractionDenied,
-        allowedTools:
-          new WorkItems(deps.store).forRun(deps.store.data.runs.find((run) => run.id === runId)!)?.status === 'planning'
-            ? PLANNING_TOOLS
-            : undefined,
+        allowedTools: batchTools(deps, runId),
       },
     ),
   read_result: ({ bot, args, options, deps }) =>

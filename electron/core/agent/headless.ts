@@ -181,7 +181,8 @@ export async function runHeadless(options: HeadlessOptions): Promise<HeadlessRes
   if (!statSync(workspaceDir).isDirectory()) throw Error('工作目录不存在');
   const dataDir = resolve(options.dataDir),
     homeDir = options.homeDir || homedir(),
-    env = { ...(options.env || process.env) },
+    // Nobody can answer an installer prompt (tzdata asks for a time zone), so apt must never wait for one.
+    env: NodeJS.ProcessEnv = { DEBIAN_FRONTEND: 'noninteractive', ...(options.env || process.env) },
     permission = options.permission || 'workspace';
   const release = acquireHeadlessLock(dataDir);
   const store = new Store(dataDir, { incremental: true });

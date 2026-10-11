@@ -168,7 +168,17 @@ test('cancellation stops queued reads and is forwarded to running reads', async 
   assert.ok(started.includes('a'));
 });
 
-function fixture(t: test.TestContext, mode: 'ask' | 'auto' | 'full') {
+const readSteps = ['README.md', 'go.mod', 'main.go'].map((path, index) => ({
+  id: 'read_' + index,
+  tool: 'file_read',
+  args: { path, reason: '读取项目资料' },
+}));
+function fixture(
+  t: test.TestContext,
+  mode: 'ask' | 'auto' | 'full',
+  steps: unknown[] = readSteps,
+  disabled: string[] = [],
+) {
   const parent = realpathSync.native(tmpdir()),
     root = mkdtempSync(join(parent, 'aelion-batch-')),
     project = join(root, 'project'),
@@ -212,13 +222,7 @@ function fixture(t: test.TestContext, mode: 'ask' | 'auto' | 'full') {
                 type: 'function',
                 function: {
                   name: 'tools_batch',
-                  arguments: JSON.stringify({
-                    steps: ['README.md', 'go.mod', 'main.go'].map((path, index) => ({
-                      id: 'read_' + index,
-                      tool: 'file_read',
-                      args: { path, reason: '读取项目资料' },
-                    })),
-                  }),
+                  arguments: JSON.stringify({ steps }),
                 },
               },
             ],
@@ -237,8 +241,26 @@ function fixture(t: test.TestContext, mode: 'ask' | 'auto' | 'full') {
     host,
     interactions,
   );
+  harness.setDisabledTools(disabled);
   return { store, project, host, interactions, harness, reviews: () => reviews, modelCalls: () => modelCalls };
 }
+test('a batch step cannot reach a tool the run has disabled', async (t) => {
+  const f = fixture(
+    t,
+    'full',
+    [...readSteps, { id: 'search', tool: 'web_search', args: { query: 'anything', reason: '搜索' } }],
+    ['web_search'],
+  );
+  await f.harness.run(f.store.data.bots[0].id, '阅读本机项目文件', { workspaceDir: f.project });
+  const run = f.store.data.runs[0];
+  assert.equal(run.status, 'completed');
+  assert.deepEqual(
+    (run.executions || []).map((entry) => entry.tool),
+    ['tools_batch'],
+  );
+  const batch = f.store.data.messages.find((message) => message.role === 'tool' && message.tool === 'tools_batch');
+  assert.match(String(batch?.content), /search.*web_search/);
+});
 for (const mode of ['auto', 'full'] as const)
   test(`real host batch reads inherit ${mode} permissions and keep execution evidence`, async (t) => {
     const f = fixture(t, mode);

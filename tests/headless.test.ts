@@ -146,6 +146,37 @@ test('full permission runs host commands and a timeout stops a run that never fi
   assert.ok(Date.now() - started < 20000);
 });
 
+test('headless commands never wait for an installer prompt unless the caller chose otherwise', async (t) => {
+  const f = fixture(t);
+  const show = async (env: NodeJS.ProcessEnv) => {
+    const { baseUrl } = await modelServer(t, (messages) => {
+      const results = toolResults(messages);
+      return results.length
+        ? { text: results[0] }
+        : {
+            tool: {
+              name: 'exec_command',
+              args: { command: 'node -p "process.env.DEBIAN_FRONTEND"', reason: 'check env' },
+            },
+          };
+    });
+    return runHeadless({
+      prompt: '看环境变量',
+      workspaceDir: f.workspace,
+      dataDir: join(f.root, 'data-' + Math.random().toString(36).slice(2)),
+      homeDir: f.home,
+      configDir: join(f.home, '.aelion'),
+      env,
+      permission: 'full',
+      model: { baseUrl, model: 'fake-model' },
+    });
+  };
+  const plain: NodeJS.ProcessEnv = { ...f.env };
+  delete plain.DEBIAN_FRONTEND;
+  assert.match((await show(plain)).reply, /noninteractive/);
+  assert.match((await show({ ...plain, DEBIAN_FRONTEND: 'readline' })).reply, /readline/);
+});
+
 test('one headless run owns a data directory at a time and a stale lock is replaced', (t) => {
   const f = fixture(t),
     release = acquireHeadlessLock(f.data);
