@@ -14,7 +14,28 @@ export function Select({ className = '', onKeyDown, ...props }: SelectHTMLAttrib
     button.tabIndex = -1;
     button.append(content);
     select.prepend(button);
-    return () => button.remove();
+    // Chromium copies the selected option into <selectedcontent> once. A later
+    // text change, such as a translation, updates the open list but not that copy.
+    let updating = false;
+    const sync = () => {
+      if (updating) return;
+      const selected = select.selectedOptions[0];
+      updating = true;
+      content.replaceChildren(...(selected ? [...selected.childNodes].map((node) => node.cloneNode(true)) : []));
+      updating = false;
+    };
+    const observer = new MutationObserver((records) => {
+      if (records.every((record) => button.contains(record.target as Node))) return;
+      sync();
+    });
+    observer.observe(select, { subtree: true, childList: true, characterData: true });
+    select.addEventListener('change', sync);
+    sync();
+    return () => {
+      observer.disconnect();
+      select.removeEventListener('change', sync);
+      button.remove();
+    };
   }, []);
   return (
     <select
