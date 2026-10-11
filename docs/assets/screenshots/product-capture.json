@@ -1,7 +1,6 @@
 {
   "source": "Production App React components with fictional read-only example data",
-  "sourceRevision": "5b3c111046eac3188255065294d24362fb616405",
-  "applicationVersion": "0.27.9",
+  "applicationVersion": "0.42.2",
   "viewport": {
     "width": 1400,
     "height": 900
@@ -10,124 +9,214 @@
   "vmConnected": false,
   "files": [
     {
-      "name": "workspace-zh-CN.png",
-      "bytes": 104347,
-      "sha256": "9ba8edddac23846d2ee57ff4e8ce783f7d8559497e70a3c0fce478403f094cbe"
-    },
-    {
-      "name": "conversation-zh-CN.png",
-      "bytes": 103797,
-      "sha256": "b5f401a3108d6dd7325b92e194089819b7b24a7e20efc30b5e4b94a20a70ed67"
-    },
-    {
-      "name": "collaboration-zh-CN.png",
-      "bytes": 107881,
-      "sha256": "bf8191f9197f72b2eb3e91b3d3b0d1f7e8f265f92ea0c3e39a4784ee3116d6eb"
-    },
-    {
-      "name": "studio-zh-CN.png",
-      "bytes": 92251,
-      "sha256": "9cc1cf67ebde5a925b5dc9973c264f648f3578220de23aa9a295561272486767"
-    },
-    {
-      "name": "computer-zh-CN.png",
-      "bytes": 99816,
-      "sha256": "56f35a047b8e16d54e41a979fc20b6961fb4a0011fba98708f0a1880bbcd25fb"
-    },
-    {
-      "name": "handoff-zh-CN.png",
-      "bytes": 79465,
-      "sha256": "074c471ab9d910984c2b1e670b02d0baa74043dbb33e85d5878a5a9c74fce34f"
-    },
-    {
-      "name": "rhythm-zh-CN.png",
-      "bytes": 122908,
-      "sha256": "34150c2fc9d0455e9b246ed48da563db9cfea110b19abb259adf6e36345ace2f"
-    },
-    {
-      "name": "designer-zh-CN.png",
-      "bytes": 265282,
-      "sha256": "4b52cf98ac341bf415d7d2060ead3374c66b5f56990e765102a30adfdb067e08"
-    },
-    {
-      "name": "workspace-zh-TW.png",
-      "bytes": 107076,
-      "sha256": "2745b46a1cc9205c3702c608d8b2ce1c6cebaec09abd8825e349a094ae629417"
-    },
-    {
-      "name": "conversation-zh-TW.png",
-      "bytes": 106808,
-      "sha256": "ebf41afe7a623943e3eec0ed62518381087bfaa67a4cf7555286883b34ae05fa"
-    },
-    {
-      "name": "collaboration-zh-TW.png",
-      "bytes": 111079,
-      "sha256": "d155754d7721d3f55b47b669e2310a60b5104ba735548c51108d58294b8a7a5a"
-    },
-    {
-      "name": "studio-zh-TW.png",
-      "bytes": 95325,
-      "sha256": "51358834ea8beb34198b740b48f9b447910a3bf97447c3f8eded8cae60acfe54"
-    },
-    {
-      "name": "computer-zh-TW.png",
-      "bytes": 103309,
-      "sha256": "a4aa96be896547824bc6c5827fc180ea02641633db48c820129f13e05a73952a"
-    },
-    {
-      "name": "handoff-zh-TW.png",
-      "bytes": 80296,
-      "sha256": "52fc6ad5a55aba626bab3645fba83197e39667b70d01590ca283766635252d92"
-    },
-    {
-      "name": "rhythm-zh-TW.png",
-      "bytes": 124986,
-      "sha256": "5349f373df5208a651195d69d46b27e42ed700d49a5ff47f38e50df843e77fab"
-    },
-    {
-      "name": "designer-zh-TW.png",
-      "bytes": 266214,
-      "sha256": "f3d5a97d31c35bfb862303e0c54b87fbec161b13d8892b08479f213ba96f9c50"
-    },
-    {
       "name": "workspace-en.png",
-      "bytes": 104877,
-      "sha256": "8c916a893e63edb561276d1ee08fc8bb9170f3e03d93772cc6d1b9a647e48c1f"
+      "bytes": 166170,
+      "sha256": "7428c48b140675efdf6cf07477aaad8bb46ce2947f1fd844b212b996597fa92f"
+    },
+    {
+      "name": "workspace-dark-en.png",
+      "bytes": 171323,
+      "sha256": "4d2900527dc4d60370f1c2fb3dfb9ad2bc5c5150de8347b34d2fdcb0956c3401"
+    },
+    {
+      "name": "research-en.png",
+      "bytes": 177607,
+      "sha256": "cddf082f6609af1d72b18f5b190e65023ea3f0174dddcf86c2cd99b680dfc7a8"
     },
     {
       "name": "conversation-en.png",
-      "bytes": 105290,
-      "sha256": "b767c14e773a93f962c656478b2453855c50888d9ead24a4aad74eb39441196a"
+      "bytes": 169865,
+      "sha256": "9432e7e50a41aed3ffc6c7889d6b0475b8c2501e8fda50baad9514fb18a4966f"
     },
     {
       "name": "collaboration-en.png",
-      "bytes": 111298,
-      "sha256": "59529e81651cc8a19a5dbb209da2ef4fbc298d537fe67cf862286e89ac56a013"
-    },
-    {
-      "name": "studio-en.png",
-      "bytes": 94215,
-      "sha256": "e66fe6cfda9e8bac80133d7214a88e432f239473a5737b0e1121f87789ea94e6"
-    },
-    {
-      "name": "computer-en.png",
-      "bytes": 107995,
-      "sha256": "6cffc530d2c5b944480e62b97ca735b4f2e75764696cdd80f0f53d29bfc917fb"
+      "bytes": 155248,
+      "sha256": "9ebc75314bde360e445e2d8c9c6c4e400dc985f1efd7685dea5d3258915cd873"
     },
     {
       "name": "handoff-en.png",
-      "bytes": 81225,
-      "sha256": "f7c33d0b38851bb49b63499e8f28e1c426021233089ca75a0ca638a3f016aa2c"
+      "bytes": 131130,
+      "sha256": "dae4f098d459a631da8629cadfc718ae9f7a594e2d5d7f273f6c70046a9256b6"
     },
     {
-      "name": "rhythm-en.png",
-      "bytes": 127248,
-      "sha256": "3f91527d95bb92167b65896e1a0cb8e408250127caa2edee0d2db31d43e9dec6"
+      "name": "studio-en.png",
+      "bytes": 145599,
+      "sha256": "442835bac5ed05a313f0d80293efff14e8381ebe4a81ef40298b937f8b55899d"
     },
     {
-      "name": "designer-en.png",
-      "bytes": 267257,
-      "sha256": "db3b24accc3da64bba1fbe6747ee9d71f0393cb6c55f702a1f197023b35ea986"
+      "name": "computer-en.png",
+      "bytes": 125855,
+      "sha256": "ff186218a5065842f3d9294f2154ea085e9259520f2ceb7c65931079cb396e59"
+    },
+    {
+      "name": "design-en.png",
+      "bytes": 158546,
+      "sha256": "84a8ea79de55d6167a6dde32fb571ed0b6ffb10e3efcc369b42df835ef604d86"
+    },
+    {
+      "name": "design-systems-en.png",
+      "bytes": 142643,
+      "sha256": "c7b03f2af752ba8810a6cde0451e350490eb822dbf7b1293842fbcccf055a7c1"
+    },
+    {
+      "name": "approval-en.png",
+      "bytes": 166291,
+      "sha256": "94aa39a63d82505173658bfa241951b2583a85bde0019f805fc86346a646e0b9"
+    },
+    {
+      "name": "plugins-en.png",
+      "bytes": 115429,
+      "sha256": "b60571935d6ab3c57514dcdf06892163e5d70502ddd7ed2305831778de2324c9"
+    },
+    {
+      "name": "game-en.png",
+      "bytes": 180051,
+      "sha256": "3ff5c8a3bba41db38c99ee16a9ecc28302d1365b3abd3128e251d52fe1b825fb"
+    },
+    {
+      "name": "profile-en.png",
+      "bytes": 186023,
+      "sha256": "f3c8b63944c6e9704081bd4dcef66b7844da30572b0c240ce02ff356bd40b78a"
+    },
+    {
+      "name": "workspace-zh-CN.png",
+      "bytes": 158229,
+      "sha256": "0af4314589a9927b144c3acb68ac2231f6191b48cf2faf43d3673b6351a3ec24"
+    },
+    {
+      "name": "workspace-dark-zh-CN.png",
+      "bytes": 161550,
+      "sha256": "c2494330daa6e1b16430d153ac4b02e50269542d0a867910eb380086d02cd2d6"
+    },
+    {
+      "name": "research-zh-CN.png",
+      "bytes": 177308,
+      "sha256": "b6e9c6e7e769aaba47a6fd04d601ee69112e6ce2df14ef95108e0db7dca0adc8"
+    },
+    {
+      "name": "conversation-zh-CN.png",
+      "bytes": 175266,
+      "sha256": "14212b411369334b0d1ef384c54082d1496e3def762e910d1abe409ad3b0917c"
+    },
+    {
+      "name": "collaboration-zh-CN.png",
+      "bytes": 160371,
+      "sha256": "ade1508b9f74d8fec92c800f3e82b0c0e3bb46bd03bd54fc3441dfc2ee3ad67a"
+    },
+    {
+      "name": "handoff-zh-CN.png",
+      "bytes": 139406,
+      "sha256": "dc71cd796d92c937cde55bc27dc081e461cb43b14fcf4116267d0b85e7e0ab76"
+    },
+    {
+      "name": "studio-zh-CN.png",
+      "bytes": 150359,
+      "sha256": "25243ad20c68be1c8d97ad0282b58563df4aa55d3a71d04433f82d8de1aac424"
+    },
+    {
+      "name": "computer-zh-CN.png",
+      "bytes": 118832,
+      "sha256": "ef92e4e7c758faadec34f80ab655b9b244f55692e09f10e81a50fd7148ed3bc9"
+    },
+    {
+      "name": "design-zh-CN.png",
+      "bytes": 159916,
+      "sha256": "7617035ff6e43d44e45e1ee12e1c94122cc5798e7f0127ad53dccc95580c7cf8"
+    },
+    {
+      "name": "design-systems-zh-CN.png",
+      "bytes": 139712,
+      "sha256": "41c1d7049cc70f3b9f601c9888b1d23db1a7c389bb4b9ec8a7906338f48b4d57"
+    },
+    {
+      "name": "approval-zh-CN.png",
+      "bytes": 153845,
+      "sha256": "57a33b1da1129e50017930857bc5d01e8946742fea0ea70e816e074eebf9cf68"
+    },
+    {
+      "name": "plugins-zh-CN.png",
+      "bytes": 113563,
+      "sha256": "0e4bd0eb75f28ccecaf945c971a21773d5a007b35d96a0311e86eb5ab3e491ce"
+    },
+    {
+      "name": "game-zh-CN.png",
+      "bytes": 174434,
+      "sha256": "74dd695b18f8a69795e7c9118e09ca3f032fa05bdb19423f524395222dddbfd8"
+    },
+    {
+      "name": "profile-zh-CN.png",
+      "bytes": 182984,
+      "sha256": "dbc1dd3ce7490fa62e4febe533ad942aa31ce862c22b1dfc3859696444765a03"
+    },
+    {
+      "name": "workspace-zh-TW.png",
+      "bytes": 165368,
+      "sha256": "2883ba2dc3b251b511004bf2a53fa13e28488a8d9ae10d2e756bc4f3d21a1871"
+    },
+    {
+      "name": "workspace-dark-zh-TW.png",
+      "bytes": 168339,
+      "sha256": "217b76dad89dc24dc5605250264c2a888c6f8d5f116097186e8ebc252166eb76"
+    },
+    {
+      "name": "research-zh-TW.png",
+      "bytes": 184659,
+      "sha256": "3f8efb7aeb4cad7946d2e1e081994973d7dfade2a037024af29505f603fc9bc1"
+    },
+    {
+      "name": "conversation-zh-TW.png",
+      "bytes": 184918,
+      "sha256": "b886049ce0c87e1c581002802ff0bcedc18992024d5b0d679849b3cdfb73392d"
+    },
+    {
+      "name": "collaboration-zh-TW.png",
+      "bytes": 166887,
+      "sha256": "bb2bbbf1375f02da7e669580456f1b22641332edccc209263b6bcda967355679"
+    },
+    {
+      "name": "handoff-zh-TW.png",
+      "bytes": 143758,
+      "sha256": "f3658d2fefcb5fa9ab4546bf933ae18acb0d7c56b6fe1b2466c01b2cbb515159"
+    },
+    {
+      "name": "studio-zh-TW.png",
+      "bytes": 156880,
+      "sha256": "4db54535cb4be46a497cadc36b35f320bd44844e21e39ba22b9160a2a8c6a86e"
+    },
+    {
+      "name": "computer-zh-TW.png",
+      "bytes": 123432,
+      "sha256": "a485e6a630ef4c570b862cc07690baf10171606a39f6494485a17972af92c301"
+    },
+    {
+      "name": "design-zh-TW.png",
+      "bytes": 165968,
+      "sha256": "46569f31390fcd5930287cc924cf63614610046a8d17f907e0a9ffd06d5de3dd"
+    },
+    {
+      "name": "design-systems-zh-TW.png",
+      "bytes": 141698,
+      "sha256": "32bbcc7857d65e5a9ff99eed63449b0300eff09e8a72d702142e009c5dd884df"
+    },
+    {
+      "name": "approval-zh-TW.png",
+      "bytes": 158772,
+      "sha256": "e16d9926c6d135e166727b3013d202f688ebe95f449791ae55fea7730a1ceb76"
+    },
+    {
+      "name": "plugins-zh-TW.png",
+      "bytes": 118507,
+      "sha256": "68e9b4e663472c7decdf96fe9a70fb28e30123ab0416e32d55016a199aeb3e3f"
+    },
+    {
+      "name": "game-zh-TW.png",
+      "bytes": 178429,
+      "sha256": "e652ed4f71f9679af371cfcb12eef17bf4d69b2128643fa43e36f4cfe28ef1aa"
+    },
+    {
+      "name": "profile-zh-TW.png",
+      "bytes": 188214,
+      "sha256": "2ac17cbdace800450c389eafd83c05ae707ef89e4f109acaba559817dd82e7e4"
     }
   ]
 }

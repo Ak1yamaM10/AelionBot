@@ -14,17 +14,17 @@ interface CapabilityCopy {
 }
 export const capabilityCopy: Record<SiteLanguage, CapabilityCopy> = {
   'zh-CN': {
-    nav: ['多 Agent 协作', '工作电脑', '专业设计'],
+    nav: ['多 Agent 协作', '工作电脑', '内置设计'],
     design: {
-      kicker: '03 / 专业角色 · 设计师',
-      title: '设计师与设计系统',
-      description: '设计师按独立任务制作网页原型、可编辑 PPT 和网站复刻，可选择 152 套预装设计系统。',
+      kicker: '03 / 设计 · 每个 Bot',
+      title: '内置设计系统',
+      description: '任何 Bot 都能制作网页原型、可编辑 PPT 和网站复刻，152 套设计系统与字体库随应用预装。',
       points: [
-        '每套设计系统包含配色、字体、布局与组件参考。',
-        '每个任务独立选择设计系统，停止任务后可以更改，也可以不指定。',
-        '一边对话一边预览，框选、标注，或直接修改网页元素与源码。',
+        '每套设计系统包含配色、字体、布局与组件参考，设置里可以搜索、筛选，也能导入自己的。',
+        'Bot 按需求选择设计系统和字体，也可以不用；拿不准时会先问你。',
+        '设计稿显示在对话旁的画布卡片里：一边对话一边预览，框选、标注，或直接修改网页元素与源码。',
       ],
-      note: '设计师在默认工作目录的 designers 下工作，无需启动 VM。设计系统参考来自 OpenDesign，保留来源与许可；品牌风格参考不代表官方合作。',
+      note: '设计任务在默认工作目录的 designers 下进行，无需启动 VM，也不用换 Bot。设计系统参考来自 OpenDesign，保留来源与许可；品牌风格参考不代表官方合作。',
     },
     vm: {
       kicker: '02 / Linux VM',
@@ -50,17 +50,17 @@ export const capabilityCopy: Record<SiteLanguage, CapabilityCopy> = {
     },
   },
   'zh-TW': {
-    nav: ['多 Agent 協作', '工作電腦', '專業設計'],
+    nav: ['多 Agent 協作', '工作電腦', '內建設計'],
     design: {
-      kicker: '03 / 專業角色 · 設計師',
-      title: '設計師與設計系統',
-      description: '設計師以獨立工作製作網頁原型、可編輯 PPT 與網站複刻，可選擇 152 套預裝設計系統。',
+      kicker: '03 / 設計 · 每個 Bot',
+      title: '內建設計系統',
+      description: '任何 Bot 都能製作網頁原型、可編輯 PPT 與網站複刻，152 套設計系統與字型庫隨應用預裝。',
       points: [
-        '每套設計系統包含配色、字型、版面與元件參考。',
-        '每個工作獨立選擇設計系統，停止工作後可以更改，也可以不指定。',
-        '一邊對話一邊預覽，框選、標註，或直接修改網頁元素與原始碼。',
+        '每套設計系統包含配色、字型、版面與元件參考，設定裡可以搜尋、篩選，也能匯入自己的。',
+        'Bot 依需求選擇設計系統與字型，也可以不用；拿不準時會先問你。',
+        '設計稿顯示在對話旁的畫布卡片裡：一邊對話一邊預覽，框選、標註，或直接修改網頁元素與原始碼。',
       ],
-      note: '設計師在預設工作目錄的 designers 下工作，無需啟動 VM。設計系統參考來自 OpenDesign，保留來源與授權；品牌風格參考不代表官方合作。',
+      note: '設計工作在預設工作目錄的 designers 下進行，無需啟動 VM，也不用換 Bot。設計系統參考來自 OpenDesign，保留來源與授權；品牌風格參考不代表官方合作。',
     },
     vm: {
       kicker: '02 / Linux VM',
@@ -86,18 +86,18 @@ export const capabilityCopy: Record<SiteLanguage, CapabilityCopy> = {
     },
   },
   en: {
-    nav: ['Multi-agent teamwork', 'Work computer', 'Design role'],
+    nav: ['Multi-agent teamwork', 'Work computer', 'Built-in design'],
     design: {
-      kicker: '03 / SPECIALIST ROLE · DESIGNER',
-      title: 'Designer and design systems',
+      kicker: '03 / DESIGN · EVERY BOT',
+      title: 'Built-in design systems',
       description:
-        'Designers create web prototypes, editable presentations and website clones as separate tasks, with a choice of 152 bundled design systems.',
+        'Any Bot can create web prototypes, editable presentations and website clones, with 152 design systems and a font library bundled in the app.',
       points: [
-        'Each design system includes color, typography, layout and component references.',
-        'Choose a system for each task, change it while the task is stopped, or leave it unspecified.',
-        'Preview alongside the conversation. Mark a region, annotate, or edit webpage elements and source.',
+        'Each design system includes color, typography, layout and component references. Search, filter or import your own in Settings.',
+        'The Bot picks a system and fonts that fit the request, or none, and asks when unsure.',
+        'The design shows in a canvas card beside the chat. Preview as you talk, mark a region, annotate, or edit webpage elements and source.',
       ],
-      note: 'Designers work locally under designers in your default workspace, without starting a VM. References come from OpenDesign with source and license notices retained; brand-inspired styles do not imply endorsement.',
+      note: 'Design tasks run locally under designers in your default workspace, without starting a VM or switching Bots. References come from OpenDesign with source and license notices retained; brand-inspired styles do not imply endorsement.',
     },
     vm: {
       kicker: '02 / LINUX VM',

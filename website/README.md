@@ -16,17 +16,17 @@ pnpm run site:preview
 
 静态构建输出到 `website/dist/`，版本号取自根目录 `package.json`。首页及博客界面默认英文，可切换简体、繁体中文；语言会保存在本机，`?lang=en` / `?lang=zh-CN` / `?lang=zh-TW` 链接优先于保存的选择。博客正文保留作者撰写的语言。
 
-README 英文入口为根目录 `README.md`，中文为 `README.zh-CN.md`。产品画面使用 `docs/assets/screenshots/` 中的实际前端截图：8 个界面、三种语言，共 24 张。截图环境在 `tools/product-capture/`，直接导入当前 App 组件，使用只读示例数据，不读取真实会话、不连接模型或 VM。页面注明“当前界面截图 · 示例数据”。旧矢量界面不再用于首页和 README 的产品展示。
+README 英文入口为根目录 `README.md`，中文为 `README.zh-CN.md`，两份 README 分别引用对应语言界面的截图。产品画面使用 `docs/assets/screenshots/` 中的实际前端截图：14 个界面、三种语言，共 42 张，拍摄清单记在 `product-capture.json`。截图环境在 `tools/product-capture/`：`preview.tsx` 直接导入当前 App 组件，`scene.ts` 提供三种语言的虚构示例数据（对话、群聊、计划、设计任务、狼人杀对局等），不读取真实会话、不连接模型或 VM。页面注明“当前界面截图 · 示例数据”。旧矢量界面不再用于首页和 README 的产品展示。
 
-更新截图时，启动 `pnpm run site:dev`，再通过 Playwright CLI 的 `run-code --filename=website/tools/capture-screens.cjs` 运行截图脚本。截图尺寸为 1400×900。截图是完整组件渲染结果，不手工重绘按钮、布局或桌面内容。
+更新截图时，启动 `pnpm run site:dev`，再运行 `node website/tools/capture-screens.mjs`（`--lang en,zh-CN`、`--shots workspace,design` 可以只拍一部分，`--out` 指定输出目录）。截图尺寸为 1400×900。截图是完整组件渲染结果，不手工重绘按钮、布局或桌面内容。App 的接口或状态结构变化后，先打开 `tools/product-capture/?lang=en&shot=workspace` 确认页面能渲染，再补 `scene.ts` 里缺的数据。
 
 Bot 主视觉和成果插画由网页直接绘制，滚动动效遵循系统的减少动态效果设置。下载、代码与反馈入口指向项目的 GitHub 页面。
 
 ## 首页功能介绍
 
-首页以通用多 Agent 系统为主定位，先展示完整工作台、群聊分工与 Linux VM，再介绍设计师等专业角色。三种语言文案位于 `src/capability-content.ts`，展示组件是 `src/CapabilitySections.tsx`；主标题、FAQ 和下载文案在 `src/site-i18n.ts`。设计系统、工作电脑和群聊均使用真实组件截图，可点击放大。官网不打包完整设计资源库。
+首页以通用多 Agent 系统为主定位，先展示完整工作台、群聊分工与 Linux VM，再介绍每个 Bot 都内置的设计能力，最后是 Terminal-Bench 评测成绩。三种语言文案位于 `src/capability-content.ts`，展示组件是 `src/CapabilitySections.tsx`；评测区块的文案在 `src/benchmark-content.ts`，组件是 `src/BenchmarkSection.tsx`；主标题、FAQ 和下载文案在 `src/site-i18n.ts`；截图列表和界面功能标签在 `src/product-scenes.ts`。设计系统、工作电脑和群聊均使用真实组件截图，可点击放大。官网不打包完整设计资源库。
 
-更新文案时同步维护根目录的英文和中文 README。区分通用 Bot 的 VM 与设计师的本机 `designers` 目录；不要将群聊描述成自动切换 Bot 类型，也不要承诺默认读取无关私聊。设计系统数量和来源以 `assets/design-systems/catalog.json` 为准。
+更新文案时同步维护根目录的英文和中文 README。设计不再是单独的 Bot 类型：每个 Bot 都能做设计，设计任务在本机 `designers` 目录进行，不需要 VM；不要将群聊描述成自动切换 Bot 类型，也不要承诺默认读取无关私聊。设计系统数量和来源以 `assets/design-systems/catalog.json` 为准。评测成绩只引用 `docs/terminal-bench.md` 里写明的数字和条件，榜单数字更新时同步修改官网和两份 README。
 
 ## 写技术博客
 

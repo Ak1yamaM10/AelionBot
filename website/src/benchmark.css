@@ -1,0 +1,150 @@
+.benchmark-section {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.05fr);
+  align-items: center;
+  gap: 80px;
+  padding-block: 110px;
+  scroll-margin-top: 90px;
+  color: #25222d;
+}
+.benchmark-copy h2 {
+  font-size: clamp(34px, 3.6vw, 50px);
+  line-height: 1.2;
+  letter-spacing: -0.045em;
+  font-weight: 650;
+  max-width: 520px;
+  margin: 0 0 24px;
+}
+.benchmark-description {
+  font-size: 16px;
+  color: #746d7e;
+  line-height: 1.9;
+  margin: 0 0 27px;
+}
+.benchmark-copy ul {
+  list-style: none;
+  padding: 0;
+  margin: 0 0 28px;
+  display: grid;
+  gap: 12px;
+}
+.benchmark-copy li {
+  position: relative;
+  padding-left: 22px;
+  font-size: 15px;
+  line-height: 1.7;
+}
+.benchmark-copy li::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 0.72em;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #a98bd0;
+}
+.benchmark-chart {
+  margin: 0;
+  padding: 30px 32px 22px;
+  border: 1px solid #e8e5ed;
+  border-radius: 24px;
+  background: #fbfaff;
+}
+.benchmark-chart figcaption {
+  font: 11px var(--font-code, monospace);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #928799;
+  margin-bottom: 22px;
+}
+.benchmark-chart ol {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: grid;
+  gap: 28px;
+}
+.benchmark-row-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 16px;
+  font-size: 15px;
+  margin-bottom: 10px;
+}
+.benchmark-row-head strong {
+  font-size: 26px;
+  font-weight: 650;
+  letter-spacing: -0.03em;
+}
+.benchmark-row-head small {
+  font-size: 13px;
+  font-weight: 500;
+  color: #746d7e;
+}
+.benchmark-track {
+  position: relative;
+  height: 16px;
+  border-radius: 8px;
+  background: #ece8f3;
+}
+.benchmark-fill {
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: var(--value);
+  border-radius: 8px;
+  background: #b9aac9;
+}
+.is-ours .benchmark-fill {
+  background: linear-gradient(90deg, #8d6bb8, #76559b);
+}
+/* The leaderboard's error margin as a whisker around the bar's end. */
+.benchmark-margin {
+  position: absolute;
+  top: 50%;
+  left: var(--low);
+  width: var(--span);
+  height: 2px;
+  background: #25222d;
+  transform: translateY(-50%);
+}
+.benchmark-margin::before,
+.benchmark-margin::after {
+  content: '';
+  position: absolute;
+  top: -5px;
+  width: 2px;
+  height: 12px;
+  background: #25222d;
+}
+.benchmark-margin::before {
+  left: 0;
+}
+.benchmark-margin::after {
+  right: 0;
+}
+.benchmark-chart li > p {
+  margin: 9px 0 0;
+  font-size: 13px;
+  color: #746d7e;
+}
+.benchmark-axis {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 26px;
+  padding-top: 10px;
+  border-top: 1px solid #e8e5ed;
+  font: 11px var(--font-code, monospace);
+  color: #928799;
+}
+@media (max-width: 900px) {
+  .benchmark-section {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 44px;
+    padding-block: 72px;
+  }
+  .benchmark-chart {
+    padding: 24px 20px 18px;
+  }
+}

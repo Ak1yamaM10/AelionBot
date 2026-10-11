@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from 'react';
 import logoLight from '../../docs/assets/logo-light.svg';
 import logoDark from '../../docs/assets/logo-dark.svg';
+import { BenchmarkSection } from './BenchmarkSection';
 import { CapabilitySections } from './CapabilitySections';
 import { capabilityCopy } from './capability-content';
 import { productScenes, sceneCopy, teamShowcaseCopy } from './product-scenes';
@@ -544,6 +545,8 @@ export default function App() {
         </section>
 
         <CapabilitySections language={language} part="design" onOpen={setShot} />
+
+        <BenchmarkSection language={language} methodUrl={`${site.repository}/blob/main/docs/terminal-bench.md`} />
 
         <section className="questions-section section-shell" id="questions">
           <h2 data-reveal>{copy.questionsTitle}</h2>

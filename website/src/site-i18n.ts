@@ -113,7 +113,7 @@ export const siteCopy: Record<
     productCaption: '当前版本界面 · 示例任务',
     makingKicker: '文件与应用',
     makingTitle: ['调研、计算', '与文件', '处理'],
-    makingDescription: ['查资料、处理文件、使用应用。', '通用 Bot 使用 VM，设计师在本机创作。'],
+    makingDescription: ['查资料、处理文件、使用应用。', '需要时使用 Linux VM，设计任务直接在本机完成。'],
     paperBack: '调研资料',
     paperOverline: '讲稿提纲',
     paperTitle: ['产品调研', '分享讲稿'],
@@ -184,7 +184,7 @@ export const siteCopy: Record<
     productCaption: '目前版本介面 · 範例工作',
     makingKicker: '檔案與應用程式',
     makingTitle: ['調研、計算', '與檔案', '處理'],
-    makingDescription: ['查資料、處理檔案、使用應用程式。', '通用 Bot 使用 VM，設計師在本機創作。'],
+    makingDescription: ['查資料、處理檔案、使用應用程式。', '需要時使用 Linux VM，設計工作直接在本機完成。'],
     paperBack: '調研資料',
     paperOverline: '講稿大綱',
     paperTitle: ['產品調研', '分享講稿'],
@@ -255,7 +255,10 @@ export const siteCopy: Record<
     productCaption: 'Current interface · Example task',
     makingKicker: 'FILES AND APPS',
     makingTitle: ['Research,', 'calculate,', 'create files.'],
-    makingDescription: ['Research, handle files, use apps.', 'General Bots use a VM; Designers work locally.'],
+    makingDescription: [
+      'Research, handle files, use apps.',
+      'Use the Linux VM when needed; design work happens locally.',
+    ],
     paperBack: 'Research notes',
     paperOverline: 'Talk outline',
     paperTitle: ['Product research', 'presentation'],
@@ -410,14 +413,14 @@ export const siteQuestions: Record<SiteLanguage, ReadonlyArray<{ question: strin
         '把职责不同的 Bot 加入同一个群，分享目标和材料，或 @ 指定伙伴接手。研究、代码、分析与写作可以沿着同一项任务协作；伙伴也能通过私信交换与任务有关的文件。分工和参与者由你决定。',
     },
     {
-      question: '通用 Bot 和设计师有什么区别？',
+      question: '做设计需要单独的设计师 Bot 吗？',
       answer:
-        '通用 Bot 负责调研、文件处理、代码和桌面操作，可以使用 Linux VM；设计师按独立任务制作网页原型、可编辑 PPT 和网站复刻，在本机 designers 目录工作。新建时选择类型，也可以在资料里更改；更改类型需要确认清空该 Bot 的上下文。',
+        '不需要。每个 Bot 都能做设计：要原型、PPT 或网站复刻时，它会在当前对话里建立设计任务，设计稿显示在对话旁的画布卡片里。设计任务在本机 designers 目录进行，不用启动 VM，也不用换 Bot。',
     },
     {
       question: '设计系统需要另外安装吗？',
       answer:
-        '不需要。152 套设计系统随应用预装，参考文件可以离线读取。每个任务独立选择，停止后可更改；也可以不指定。模型服务与外部素材仍可能需要联网。',
+        '不需要。152 套设计系统随应用预装，参考文件可以离线读取。用哪一套由 Bot 按需求决定，也可以不用；设置里可以搜索、筛选和导入。模型服务与外部素材仍可能需要联网。',
     },
     {
       question: '定时工作需要一直开着应用吗？',
@@ -444,14 +447,14 @@ export const siteQuestions: Record<SiteLanguage, ReadonlyArray<{ question: strin
         '把職責不同的 Bot 加入同一個群組，分享目標和資料，或 @ 指定夥伴接手。研究、程式、分析與寫作可以圍繞同一項工作協作；夥伴也能透過私訊交換與工作有關的檔案。分工和參與者由你決定。',
     },
     {
-      question: '通用 Bot 和設計師有什麼差別？',
+      question: '做設計需要單獨的設計師 Bot 嗎？',
       answer:
-        '通用 Bot 負責調研、檔案處理、程式碼與桌面操作，可以使用 Linux VM；設計師以獨立工作製作網頁原型、可編輯 PPT 和網站複刻，在本機 designers 目錄工作。建立時選擇類型，也能在資料中更改；更改類型需要確認清空該 Bot 的上下文。',
+        '不需要。每個 Bot 都能做設計：要原型、PPT 或網站複刻時，它會在目前對話裡建立設計工作，設計稿顯示在對話旁的畫布卡片裡。設計工作在本機 designers 目錄進行，不用啟動 VM，也不用換 Bot。',
     },
     {
       question: '設計系統需要另外安裝嗎？',
       answer:
-        '不需要。152 套設計系統隨應用程式預裝，參考檔案可離線讀取。每個工作獨立選擇，停止後可更改，也可以不指定。模型服務與外部素材仍可能需要連線。',
+        '不需要。152 套設計系統隨應用程式預裝，參考檔案可離線讀取。用哪一套由 Bot 依需求決定，也可以不用；設定裡可以搜尋、篩選和匯入。模型服務與外部素材仍可能需要連線。',
     },
     {
       question: '排程工作需要一直開著應用程式嗎？',
@@ -479,14 +482,14 @@ export const siteQuestions: Record<SiteLanguage, ReadonlyArray<{ question: strin
         'Add Bots with different responsibilities, share the goal and materials, or @ a partner to take the next step. Research, code, analysis and writing can contribute to the same task. Partners can also exchange task-related files privately. You choose the participants and their roles.',
     },
     {
-      question: 'How are General Bots and Designers different?',
+      question: 'Do I need a separate designer Bot for design work?',
       answer:
-        'General Bots handle research, files, code and desktop work, with access to a Linux VM. Designers create web prototypes, editable presentations and website clones as separate tasks in your local designers folder. Choose a type at creation or change it in the profile; switching requires confirmation that the Bot’s context will be cleared.',
+        'No. Every Bot can do design. Ask for a prototype, a presentation or a website clone and it starts a design task in the same conversation; the design shows in a canvas card beside the chat. Design tasks run locally in your designers folder, without starting a VM or switching Bots.',
     },
     {
       question: 'Do design systems need a separate installation?',
       answer:
-        'No. All 152 systems come bundled, and their reference files can be read offline. Each task has its own selection, which can be changed while stopped or left unspecified. Model services and external assets may still require an internet connection.',
+        'No. All 152 systems come bundled, and their reference files can be read offline. The Bot chooses one to fit the request, or none; browse, filter and import in Settings. Model services and external assets may still require an internet connection.',
     },
     {
       question: 'Does scheduled work require the app to stay open?',
