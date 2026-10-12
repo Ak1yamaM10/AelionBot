@@ -38,6 +38,8 @@ export interface GameHooks {
   /** Personality of member Bots for a new match (§9.2), keyed by botId; seats without one keep the MBTI preset. */
   personas?: (bots: { botId: string; mbti?: string }[], members: string[]) => Record<string, PersonaSeed>;
 }
+/** Requests per pending action before the match pauses; format slips and transient provider errors are retried. */
+const MODEL_ATTEMPTS = 3;
 export class GameRuntime {
   private timer: ReturnType<typeof setInterval>;
   private closed = false;
@@ -475,8 +477,16 @@ export class GameRuntime {
         pending.deadlineAt = Date.now() + this.timing.aiTimeoutMs;
         this.commit(dispatched, false);
         let retryFeedback: string | undefined;
-        for (let attempt = 1; attempt <= 2; attempt++) {
+        for (let attempt = 1; attempt <= MODEL_ATTEMPTS; attempt++) {
           signal.throwIfAborted();
+          if (attempt > 1) {
+            // Each retry gets the full response budget, so a slow first attempt does not leave the retry to time out.
+            const renewed = structuredClone(this.state(id)),
+              open = renewed.requests.find((p) => p.id === r.id);
+            if (!open || renewed.status !== 'running') return;
+            open.deadlineAt = Date.now() + this.timing.aiTimeoutMs;
+            this.commit(renewed, false);
+          }
           const started = Date.now();
           this.annotate(id, 'model_started', {
             requestId: r.id,
@@ -574,19 +584,27 @@ export class GameRuntime {
               });
             if (validating || (e instanceof GameModelError && e.code === 'format'))
               retryFeedback = (e as Error).message;
-            if (signal.aborted || attempt === 2) throw e;
-            const left = (this.state(id).requests.find((p) => p.id === r.id)?.deadlineAt || 0) - Date.now();
-            if (left < 15000) throw e;
-            if (e instanceof GameModelError && /HTTP (429|5\d\d)/.test(e.message))
+            if (signal.aborted || attempt === MODEL_ATTEMPTS) throw e;
+            const status = e instanceof GameModelError ? Number(/HTTP (\d{3})/.exec(e.message)?.[1]) : NaN;
+            // Other 4xx replies (bad key, unsupported parameter, context overflow) repeat identically.
+            if (status >= 400 && status < 500 && ![408, 409, 429].includes(status)) throw e;
+            const transient =
+              status >= 400 ||
+              (e instanceof GameModelError && e.code === 'network') ||
+              (e as Error)?.name === 'TimeoutError';
+            if (transient)
               await new Promise<void>((resolve, reject) => {
                 const abort = () => {
                   clearTimeout(timer);
                   reject(signal.reason);
                 };
-                const timer = setTimeout(() => {
-                  signal.removeEventListener('abort', abort);
-                  resolve();
-                }, 1500);
+                const timer = setTimeout(
+                  () => {
+                    signal.removeEventListener('abort', abort);
+                    resolve();
+                  },
+                  2000 * 2 ** (attempt - 1),
+                );
                 signal.addEventListener('abort', abort, { once: true });
                 if (signal.aborted) {
                   signal.removeEventListener('abort', abort);

@@ -179,3 +179,32 @@ test('transport errors explain DNS/connection failures without leaking raw error
     globalThis.fetch = original;
   }
 });
+
+test('HTTP errors carry the provider message without credentials, and non-JSON bodies are reported', async () => {
+  const original = globalThis.fetch;
+  const s = createWerewolf('http-test', players, undefined, 'guard12');
+  const request = s.requests[0];
+  try {
+    globalThis.fetch = async () =>
+      new Response('{"error":{"message":"Unsupported parameter: reasoning.effort for key sk-abcdefgh12345678"}}', {
+        status: 400,
+      });
+    await assert.rejects(
+      registry().decide(players[0], view(s, request.seatId), request, new AbortController().signal),
+      (error: any) => {
+        assert.equal(error.code, 'http');
+        assert.equal(error.reason, 'game.http_400');
+        assert.match(error.message, /HTTP 400（.*Unsupported parameter: reasoning\.effort/);
+        assert.ok(!error.message.includes('abcdefgh12345678'));
+        return true;
+      },
+    );
+    globalThis.fetch = async () => new Response('<html>502 Bad Gateway</html>', { status: 200 });
+    await assert.rejects(
+      registry().decide(players[0], view(s, request.seatId), request, new AbortController().signal),
+      { code: 'network', reason: 'game.bad_response' },
+    );
+  } finally {
+    globalThis.fetch = original;
+  }
+});

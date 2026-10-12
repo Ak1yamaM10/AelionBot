@@ -198,7 +198,53 @@ function jsonObjects(text: string) {
   }
   return spans;
 }
-export function parseGameAction(text: string, kind?: GameRequest['kind'], request?: GameRequest): GameAction {
+/** Field limits of the action contract; longer values are cut instead of failing the whole action. */
+const TEXT_LIMITS: Record<string, number> = { text: 800, note: 500, personalityNote: 200 };
+/**
+ * Repair the slips models make most often so one stray field does not fail a request: drop fields this
+ * action does not have, cut overlong text, read "true"/"false" strings, map a seat number or player name
+ * to the target id, and drop a target that save/skip never takes. Returns what was changed.
+ */
+function repairAction(
+  parsed: Record<string, any>,
+  request: GameRequest,
+  seats?: Pick<GameView['seats'][number], 'id' | 'name'>[],
+) {
+  const fixes: string[] = [];
+  const allowed = actionContract(request).properties as Record<string, unknown>;
+  const dropped = Object.keys(parsed).filter((key) => !(key in allowed));
+  for (const key of dropped) delete parsed[key];
+  if (dropped.length) fixes.push('忽略了本轮不需要的字段 ' + dropped.join('、'));
+  for (const [key, max] of Object.entries(TEXT_LIMITS))
+    if (typeof parsed[key] === 'string' && parsed[key].length > max) {
+      parsed[key] = parsed[key].slice(0, max);
+      fixes.push(`${key} 超过 ${max} 字，已截断`);
+    }
+  for (const key of ['choice', 'skip'])
+    if (parsed[key] === 'true' || parsed[key] === 'false') parsed[key] = parsed[key] === 'true';
+  if (parsed.skip === false && 'target' in parsed) delete parsed.skip;
+  if (request.kind === 'witch' && parsed.potion !== 'poison' && 'target' in parsed) {
+    delete parsed.target;
+    fixes.push('save/skip 不带目标，已忽略 target');
+  }
+  const target = parsed.target;
+  if ((typeof target === 'string' || typeof target === 'number') && !request.targets.includes(String(target))) {
+    const raw = String(target).trim();
+    const number = /^(\d{1,2})\s*号?(?:玩家)?$/.exec(raw);
+    const seat = number ? seats?.[Number(number[1]) - 1] : seats?.find((p) => p.name && p.name === raw);
+    if (seat && request.targets.includes(seat.id)) {
+      parsed.target = seat.id;
+      fixes.push(`target「${raw}」按座位映射为对应 id`);
+    }
+  }
+  return fixes;
+}
+export function parseGameAction(
+  text: string,
+  kind?: GameRequest['kind'],
+  request?: GameRequest,
+  seats?: Pick<GameView['seats'][number], 'id' | 'name'>[],
+): GameAction {
   const clean = text
     .trim()
     .replace(/^```(?:json)?\s*/, '')
@@ -233,6 +279,8 @@ export function parseGameAction(text: string, kind?: GameRequest['kind'], reques
     formatNote = '模型将发言方向写入 choice，已按原值映射到 direction。';
   }
   if (request) {
+    const fixes = repairAction(parsed, request, seats);
+    if (fixes.length) formatNote = [formatNote, ...fixes].filter(Boolean).join('；');
     try {
       checkActionContract(parsed, request);
     } catch (e) {

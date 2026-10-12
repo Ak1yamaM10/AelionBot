@@ -28,24 +28,39 @@ test('replies that wrap the action in prose or a fenced block still parse, and t
     (e: any) => e.message === '模型输出不是有效 JSON' && e.output === '我觉得应该刀 3 号，他发言很像预言家。',
   );
 });
-test('per-action contracts reject unrelated fields and enforce actual legal targets', () => {
+test('per-action contracts enforce the action shape and actual legal targets', () => {
   assert.equal(parse('sheriff_join', { choice: true }).choice, true);
   assert.throws(() => parse('sheriff_join', { direction: 'clockwise' }));
   assert.equal(parse('sheriff_order', { choice: 'counterclockwise' }).direction, 'counterclockwise');
   assert.throws(() => parse('vote', { target: 'not-visible' }));
   assert.throws(() => parse('vote', { target: 'b', skip: true }));
   assert.equal(parse('vote', { skip: true }).skip, true);
-  assert.throws(() => parse('speak', { text: 'x'.repeat(801) }));
   assert.throws(() => parse('speak', { text: '   ' }));
-  assert.throws(() => parse('speak', { text: 'a', note: 'x'.repeat(501) }));
   assert.equal(parse('witch', { potion: 'poison', target: 'b' }).target, 'b');
   assert.throws(() => parse('witch', { potion: 'save' }));
-  assert.throws(() => parse('witch', { potion: 'skip', target: 'b' }));
-  assert.throws(() => parse('kill', { type: 'kill', target: 'b' }), {
-    code: 'format',
-    reason: 'game.field_not_allowed',
-  });
   assert.throws(() => parse('witch', { potion: 'poison' }), { code: 'format', reason: 'game.target_required' });
+});
+test('common model slips are repaired instead of failing the action', () => {
+  const seats = [
+    { id: 'a', name: '甲' },
+    { id: 'b', name: '乙' },
+  ];
+  const kill = { ...r('kill'), targets: ['b'] };
+  const repaired = parseGameAction(JSON.stringify({ type: 'kill', reason: '像预言家', target: 'b' }), 'kill', kill);
+  assert.equal(repaired.target, 'b');
+  assert.match(repaired.formatNote || '', /type、reason/);
+  for (const target of ['2', '2号', '2号玩家', 2, '乙'])
+    assert.equal(parseGameAction(JSON.stringify({ target }), 'kill', kill, seats).target, 'b', String(target));
+  // A seat number that is not a legal target still fails, and the own seat is never substituted.
+  assert.throws(() => parseGameAction(JSON.stringify({ target: '1' }), 'kill', kill, seats));
+  assert.throws(() => parseGameAction(JSON.stringify({ target: '9号' }), 'kill', kill, seats));
+  assert.equal(parse('speak', { text: 'x'.repeat(801) }).text?.length, 800);
+  assert.equal(parse('speak', { text: 'a', note: 'x'.repeat(501) }).note?.length, 500);
+  assert.equal(parse('speak', { text: 'a', personalityNote: 'x'.repeat(201) }).personalityNote?.length, 200);
+  assert.equal(parse('witch', { potion: 'skip', target: 'b' }).target, undefined);
+  assert.equal(parse('sheriff_join', { choice: 'false' }).choice, false);
+  assert.equal(parse('vote', { target: 'b', skip: false }).target, 'b');
+  assert.equal(parse('vote', { skip: 'true' }).skip, true);
 });
 test('kill and witch schemas separate the shapes models confuse', () => {
   const kill = actionContract(r('kill'));

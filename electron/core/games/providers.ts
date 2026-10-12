@@ -19,7 +19,8 @@ function outputLimit(model: GameProviderConfig, prompt: string) {
   const ceiling = model.maxOutputTokens ?? DEFAULT_RUNTIME.maxOutputTokens;
   const capacity = model.contextTokens || 32768;
   const available = Math.floor(capacity - textTokens(prompt) - contextBudget(capacity).safety);
-  return Math.max(256, Math.min(ceiling, available));
+  // Below ~1k tokens even a short reply plus a little reasoning is cut off, which only fails the action again.
+  return Math.max(Math.min(1024, ceiling), Math.min(ceiling, available));
 }
 export function gameProviders(
   config: Omit<GameProviderConfig, 'id' | 'name'> & { additionalProviders?: GameProviderConfig[] },
@@ -138,9 +139,31 @@ export function gameProviders(
                   : ['network_failed', '无法连接模型服务，请检查网络或稍后重试'];
         throw new GameModelError('network', failure[1], 'game.' + failure[0]);
       }
-      if (!response.ok) throw new GameModelError('http', p.name + ' 请求失败：HTTP ' + response.status);
+      if (!response.ok) {
+        // The provider's own message (unsupported parameter, context overflow, quota) is what explains a 4xx.
+        const detail = (await response.text().catch(() => ''))
+          .replace(/\s+/g, ' ')
+          .replace(/(?:sk|key|token)[-_][A-Za-z0-9_-]{8,}/gi, '***')
+          .trim()
+          .slice(0, 300);
+        throw new GameModelError(
+          'http',
+          p.name + ' 请求失败：HTTP ' + response.status + (detail ? '（' + detail + '）' : ''),
+          'game.http_' + response.status,
+        );
+      }
       const headersMs = Date.now() - start;
-      const result = (await response.json()) as any;
+      let result: any;
+      try {
+        result = await response.json();
+      } catch (error) {
+        if (signal.aborted || (error as Error)?.name === 'TimeoutError') throw error;
+        throw new GameModelError(
+          'network',
+          p.name + ' 返回的不是有效 JSON 响应，可能是网关或代理错误',
+          'game.bad_response',
+        );
+      }
       options?.onResponse({
         httpStatus: response.status,
         headersMs,
@@ -174,7 +197,7 @@ export function gameProviders(
           'game.output_truncated',
         );
       if (typeof text !== 'string' || !text.trim()) throw new GameModelError('empty', p.name + ' 没有返回行动');
-      return parseGameAction(text, request.kind, request);
+      return parseGameAction(text, request.kind, request, context.seats);
     },
   };
 }
