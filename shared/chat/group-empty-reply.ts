@@ -3,10 +3,16 @@ const QUIET_CN =
   '保持(?:沉默|静默|安静)|沉默|静默|潜水|' +
   '不(?:再|多)?(?:发言|说话|出声|吭声|插话|接话|回复|回应|作答|打扰|重复|赘述|补充|说了|回了|接了)|' +
   '(?:无需|不(?:需要|用|必))我?(?:发言|回复|回应|作答|补充)|' +
-  '(?:没有|暂无|无)(?:新的?|其他|更多|别的|要|可以)?(?:补充|要说的|可说的)';
+  '(?:没有|暂无|无)(?:新的?|其他|更多|别的|要|可以)?(?:补充|要说的|可说的)|' +
+  // "本轮无新增内容", "无新信息", "没有新内容可补", "无内容需要发言"
+  '(?:没有|暂无|无)(?:任何)?(?:新增|新的?|其他|更多)?(?:内容|信息|观点|意见)(?:需要|要|可|可以)?(?:发言|补充?|说)?|' +
+  '(?:本轮|这轮|此轮)结束';
 const QUIET_EN =
   "(?:i(?:['’]m| am|['’]ll| will)? )?(?:stay(?:s|ing)? (?:quiet|silent)|remain(?:s|ing)? silent|silent|silence|" +
-  'not (?:speaking|replying|responding|commenting)|no (?:reply|response|comment|need to reply)|nothing (?:new )?to add)';
+  'not (?:speaking|replying|responding|commenting)|no (?:reply|response|comment|need to reply)|nothing (?:new )?to add|' +
+  'no (?:new )?(?:content|text|info|information|input)|nothing new|no (?:reply|response) (?:needed|required|necessary))';
+// "No response needed — these messages aren't addressed to me": an English declaration followed by its reason.
+const DECLARATION_EN = new RegExp(`^\\[?(?:${QUIET_EN})\\]?(?:\\s*[—–]|\\s+-\\s|\\.\\s|[.!]?$)`, 'i');
 // A declaration clause: optional subject, time or connective words, the quiet phrase, optional particles.
 const DECLARATION = new RegExp(
   '^(?:(?:我|本\\s*bot|这次|这轮|本轮|此轮|这里|此处|暂时|目前|先|就|也|那|那么|所以|因此|还是|继续|选择|决定|[，,\\s])*' +
@@ -25,6 +31,10 @@ const ADDS_SOMETHING = /[?？@]|但|不过|只是|然而|提醒|注意|建议|�
 const TRAILING = /[\s。.!！~～…]+$/;
 const SELF = /我|决定|选择|就|先|也|这轮|本轮|此轮|这次|发言|说话|插话|接话|沉默|静默|出声|吭声|\bi\b/i;
 
+// A whole message in brackets is a stage direction; one that opens with "不发言" is silent whatever reason follows.
+const STAGE = /^[（(【[]\s*([^（）()【】[\]]{1,160}?)\s*[）)】\]][。.]?$/;
+// "无新增内容" is about the Bot's own reply even without a subject.
+const NOTHING_NEW = /^(?:本轮|这轮|此轮|我)*(?:没有|暂无|无)/;
 const strip = (clause: string) => clause.trim().replace(TRAILING, '');
 const directive = (clause: string): boolean => {
   const wrapped = WRAPPED.exec(clause.trim());
@@ -42,17 +52,36 @@ const clausesOf = (text: string) =>
  * declaration with a short "already covered" reason such as 决定不发言，B 已经回答了。
  */
 function announcesSilence(text: string): boolean {
-  if (!text || text.length > 80 || ADDS_SOMETHING.test(text)) return false;
+  if (!text || ADDS_SOMETHING.test(text)) return false;
+  const stage = STAGE.exec(text);
+  if (stage && directive(clausesOf(stage[1])[0] || '')) return true;
+  if (text.length <= 200 && /^[a-z[]/i.test(text) && DECLARATION_EN.test(text)) return true;
+  if (text.length > 80) return false;
   if (directive(text)) return true;
   const clauses = clausesOf(text);
   if (clauses.length < 2) return false;
   let declared = false;
   for (const clause of clauses) {
     // Next to other text, a bare quiet phrase must be about the Bot: "如果用户取消，不回复" stays visible.
-    if (directive(clause) && (WRAPPED.test(clause) || SELF.test(clause))) declared = true;
+    if (directive(clause) && (WRAPPED.test(clause) || SELF.test(clause) || NOTHING_NEW.test(clause))) declared = true;
     else if (!covered(clause)) return false;
   }
   return declared;
+}
+
+/** A group message record such as {"messageId":…,"sender":…} copied back from the model's input. */
+function echoedRecord(text: string) {
+  if (!/^[[{]/.test(text)) return false;
+  try {
+    const value = JSON.parse(text);
+    const records = Array.isArray(value) ? value : [value];
+    return (
+      records.length > 0 &&
+      records.every((r) => r && typeof r === 'object' && 'messageId' in r && ('sender' in r || 'seq' in r))
+    );
+  } catch {
+    return false;
+  }
 }
 
 /** Only whole-message control output is silent; explanations quoting these strings remain visible. */
@@ -62,6 +91,7 @@ export function isEmptyGroupReply(value: string) {
     !text ||
     /^(?:<\|(?:eos|eot_id|endoftext|im_end)\|>\s*)+$/i.test(text) ||
     /^(?:[（(]\s*)?空消息\s*[,，]\s*无需回[应复]\s*(?:[）)])?[。.!！]?$/.test(text) ||
-    announcesSilence(text)
+    announcesSilence(text) ||
+    echoedRecord(text)
   );
 }

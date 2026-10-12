@@ -75,3 +75,35 @@ test('real answers that mention silence or skipping stay visible', () => {
   ])
     assert.equal(isEmptyGroupReply(value), false, value);
 });
+
+test('placeholders that say there is nothing new, and echoed message records, are silent', () => {
+  for (const value of [
+    '（本轮无新增内容。）',
+    '（本轮无内容需要发言。）',
+    '（无新信息，本轮不发言。）',
+    '无新增内容，本轮不发言。',
+    '（本轮无新增内容，保持静默。）',
+    '（无新增内容，本轮结束。）',
+    '（本轮无补充，保持安静。）',
+    '（不发言：A 的批评针对的是 B，他已认错；我没有新信息可补。）',
+    '[No content]',
+    'No text.',
+    "No response needed — these messages aren't addressed to me and add nothing new.",
+    '{"messageId":"m1","seq":97,"sender":{"kind":"bot","id":"b","name":"B"},"kind":"message","content":"[No content]","attachments":[],"mentions":[],"mentioned":false}',
+    '[{"messageId":"m1","seq":1,"content":"x"}]',
+  ])
+    assert.equal(isEmptyGroupReply(value), true, value);
+  for (const value of [
+    '不给',
+    '无',
+    '结束',
+    '本轮结束了吗？',
+    '没有新增依赖，可以直接合并。',
+    '新版本无新增依赖。',
+    'No content-type header is set, so the upload fails.',
+    'No text is shown on the login page.',
+    '{"status":"ok","messageId":"m1"}',
+    '（无新增内容，但提醒一下 token 快过期了）',
+  ])
+    assert.equal(isEmptyGroupReply(value), false, value);
+});
