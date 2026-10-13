@@ -25,7 +25,10 @@ test('old profiles get appearance defaults and corrupted values stay bounded', (
     textScale: 0,
   });
   assert.equal(v.theme, 'system');
-  assert.equal(v.canvas, 'neutral');
+  assert.equal(v.canvas, 'white');
+  // A profile saved before the setting existed has no canvas at all.
+  assert.equal(normalizeAppearance({ theme: 'light', zoom: 110 }).canvas, 'white');
+  assert.equal(normalizeAppearance({ canvas: 'neutral' }).canvas, 'neutral');
   assert.equal(normalizeAppearance({ canvas: 'warm' }).canvas, 'warm');
   assert.equal(v.font, 'bundled');
   assert.equal(v.zoom, 200);

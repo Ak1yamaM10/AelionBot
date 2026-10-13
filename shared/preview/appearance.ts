@@ -20,7 +20,7 @@ export interface AppearanceSettings {
 }
 export const DEFAULT_APPEARANCE: AppearanceSettings = {
   theme: 'system',
-  canvas: 'neutral',
+  canvas: 'white',
   font: 'bundled',
   customFont: '',
   codeFont: 'bundled',
@@ -45,7 +45,7 @@ export function normalizeAppearance(value: unknown): AppearanceSettings {
       : (DEFAULT_APPEARANCE[key] as number);
   return {
     theme: choice('theme', ['system', 'light', 'dark'], 'system'),
-    canvas: choice('canvas', [...CANVAS_TONES], 'neutral'),
+    canvas: choice('canvas', [...CANVAS_TONES], DEFAULT_APPEARANCE.canvas),
     font: choice('font', ['bundled', 'system', 'custom'], 'bundled'),
     customFont: family(v.customFont),
     codeFont: choice('codeFont', ['bundled', 'system', 'custom'], 'bundled'),
