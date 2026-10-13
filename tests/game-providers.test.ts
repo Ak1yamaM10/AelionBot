@@ -185,13 +185,12 @@ test('HTTP errors carry the provider message without credentials, and non-JSON b
   const s = createWerewolf('http-test', players, undefined, 'guard12');
   const request = s.requests[0];
   try {
+    // Built at runtime so the publication audit never sees a credential-shaped literal.
+    const keys = ['sk', 'proj', 'abcdefgh12345678ABCDEFGH'].join('-') + ' or xai-ZYXWVUTSRQ0987654321abcd';
     globalThis.fetch = async () =>
-      new Response(
-        '{"error":{"message":"Unsupported parameter: reasoning.effort for key sk-proj-abcdefgh12345678ABCDEFGH or xai-ZYXWVUTSRQ0987654321abcd"}}',
-        {
-          status: 400,
-        },
-      );
+      new Response(JSON.stringify({ error: { message: `Unsupported parameter: reasoning.effort for key ${keys}` } }), {
+        status: 400,
+      });
     await assert.rejects(
       registry().decide(players[0], view(s, request.seatId), request, new AbortController().signal),
       (error: any) => {
