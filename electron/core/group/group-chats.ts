@@ -1777,6 +1777,35 @@ export class GroupChats implements GroupGateway {
           content: m.content.slice(0, 500),
         }));
     }
+    if (name === 'group_pass') {
+      const worker = this.workers.get(botId);
+      if (!options.groupOrigin || !worker || worker.runId !== runId || worker.groupId !== args.groupId)
+        throw new AppError('group.pass_scope', 'group_pass 只能结束当前这个群聊回合');
+      const room = this.room(worker.groupId);
+      this.member(room, botId);
+      const unanswered = worker.deliveries
+        .filter((delivery) => delivery.must)
+        .map((delivery) => room.messages.find((message) => message.id === delivery.messageId)!)
+        .filter((message) => message && !answerFrom(room, message, botId));
+      // Same one-time reminder as an empty final reply: answer, react, or pass again to stay quiet.
+      if (unanswered.length && !worker.noted.has('must')) {
+        worker.noted.add('must');
+        throw new AppError(
+          'group.answer_required',
+          groupMustAnswerNote(
+            unanswered.slice(-5).map((message) => ({
+              messageId: message.id,
+              from: message.sender.name,
+              content: groupReplyContent(
+                message.content,
+                message.sender.kind === 'bot' ? message.sender.id : undefined,
+              ).slice(0, 300),
+            })),
+          ),
+        );
+      }
+      return { passed: true, message: '本轮静默结束，不发送消息。' };
+    }
     if (name === 'group_react') {
       const room = this.room(required(args.groupId, '群聊 ID', 80));
       this.member(room, botId);

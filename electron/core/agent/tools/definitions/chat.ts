@@ -29,6 +29,12 @@ export const CHAT_TOOLS: ToolDefinition[] = [
     ['groupId', 'messageId', 'emoji'],
   ),
   tool(
+    'group_pass',
+    '本轮对群里没有要说的话时调用：本次群聊回合直接静默结束，不发任何消息、不叫醒任何人。不要再写“不发言”“无新增内容”之类的文字，调用它即可。有消息在等你回答（被 @、被回复或用户问全群）时不能用它代替回答；别人已经答过时用 group_react 表态。手上有未完成的工作时先完成工作。',
+    { groupId: string },
+    ['groupId'],
+  ),
+  tool(
     'groups_list',
     '列出自己已加入的群聊。私聊中只返回群 ID 和名称，可用于确定 group_send_message 的目标；群内还会返回成员和消息预览。',
     {},

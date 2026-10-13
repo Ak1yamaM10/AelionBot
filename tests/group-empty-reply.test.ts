@@ -107,3 +107,31 @@ test('placeholders that say there is nothing new, and echoed message records, ar
   ])
     assert.equal(isEmptyGroupReply(value), false, value);
 });
+
+test('a short message wholly inside <…>, […], 【…】 or *…* is a stage direction, whatever its words', () => {
+  for (const value of [
+    '<no further content>',
+    '<nothing to say>',
+    '<silence>',
+    '[pass]',
+    '[无]',
+    '【略】',
+    '*nods*',
+    'No further content.',
+  ])
+    assert.equal(isEmptyGroupReply(value), true, value);
+  for (const value of [
+    '<br>',
+    '<div>',
+    '[1]',
+    '[x]',
+    '[链接](https://example.com)',
+    '<需要我来做吗？>',
+    '[@B 你来]',
+    '<但是要注意兼容性>',
+    '**部署完成**',
+    '__已上线__',
+    '（补充：缓存失效时间是 5 分钟）',
+  ])
+    assert.equal(isEmptyGroupReply(value), false, value);
+});

@@ -10,7 +10,8 @@ const QUIET_CN =
 const QUIET_EN =
   "(?:i(?:['’]m| am|['’]ll| will)? )?(?:stay(?:s|ing)? (?:quiet|silent)|remain(?:s|ing)? silent|silent|silence|" +
   'not (?:speaking|replying|responding|commenting)|no (?:reply|response|comment|need to reply)|nothing (?:new )?to add|' +
-  'no (?:new )?(?:content|text|info|information|input)|nothing new|no (?:reply|response) (?:needed|required|necessary))';
+  'no (?:further |more |new |additional |other )?(?:content|text|info|information|input|message|output|update|comment)s?|' +
+  'nothing (?:new|further|more)|no (?:reply|response) (?:needed|required|necessary))';
 // "No response needed — these messages aren't addressed to me": an English declaration followed by its reason.
 const DECLARATION_EN = new RegExp(`^\\[?(?:${QUIET_EN})\\]?(?:\\s*[—–]|\\s+-\\s|\\.\\s|[.!]?$)`, 'i');
 // A declaration clause: optional subject, time or connective words, the quiet phrase, optional particles.
@@ -69,6 +70,26 @@ function announcesSilence(text: string): boolean {
   return declared;
 }
 
+/**
+ * The shape, not the wording: a short message wholly inside <…>, […], 【…】 or *…* (italics, not bold) is a stage direction such as
+ * <no further content>, whatever words a model invents. Parentheses are left to announcesSilence, since
+ * "（补充：缓存 5 分钟）" is a real aside. Questions, @ and links stay visible.
+ */
+const STAGE_DIRECTION = /^(?:<([^<>]{1,80})>|\[([^[\]]{1,80})\]|【([^【】]{1,80})】|(\*|_)([^*_]{1,80})\4)[。.!！]?$/;
+function stageDirection(text: string) {
+  const match = STAGE_DIRECTION.exec(text);
+  if (!match) return false;
+  const inner = (match[1] ?? match[2] ?? match[3] ?? match[5]).trim();
+  // <br>, <div>, [1], [x] and [ ] are markup, not narration.
+  if (
+    match[1] !== undefined &&
+    /^\/?(?:br|hr|p|div|span|b|i|u|em|strong|code|pre|img|a|ul|ol|li|h[1-6]|sup|sub)\b[^>]*$/i.test(inner)
+  )
+    return false;
+  if (/^[\dx ]{0,3}$/i.test(inner) || /[?？@]|https?:\/\//i.test(inner) || ADDS_SOMETHING.test(inner)) return false;
+  return true;
+}
+
 /** A group message record such as {"messageId":…,"sender":…} copied back from the model's input. */
 function echoedRecord(text: string) {
   if (!/^[[{]/.test(text)) return false;
@@ -92,6 +113,7 @@ export function isEmptyGroupReply(value: string) {
     /^(?:<\|(?:eos|eot_id|endoftext|im_end)\|>\s*)+$/i.test(text) ||
     /^(?:[（(]\s*)?空消息\s*[,，]\s*无需回[应复]\s*(?:[）)])?[。.!！]?$/.test(text) ||
     announcesSilence(text) ||
+    stageDirection(text) ||
     echoedRecord(text)
   );
 }

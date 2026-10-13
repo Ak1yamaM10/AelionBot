@@ -2057,3 +2057,28 @@ test('yielding to private chat retains the group inbox and resumes successful to
   assert.doesNotMatch(JSON.stringify(fx.store.data.groupContexts), /PRIVATE_QUESTION|PRIVATE_REPLY/);
   assert.doesNotMatch(JSON.stringify(fx.store.data.conversations[fx.a.id]), /群工作已完成/);
 });
+test('group_pass ends a turn silently; a Bot owing an answer is reminded once first', async (t) => {
+  const turns = new Map<string, number>();
+  const fx = fixture(t, (run, messages) => {
+    if (publishedMessages(messages).at(-1)?.event) return silent();
+    if (run.botId === fx.b.id) turns.set(run.id, (turns.get(run.id) || 0) + 1);
+    const groupId = run.groupOrigin!.groupId;
+    // Text written alongside the pass is never published, whatever the model calls it.
+    if (run.botId === fx.b.id) return { ...call('group_pass', { groupId }), content: '<no further content>' };
+    const reminded = messages.some((m) => m.role === 'tool' && /waiting for your answer/.test(m.content || ''));
+    return reminded ? answer('看了，是缓存没刷新。') : call('group_pass', { groupId });
+  });
+  const room = fx.groups.create({ name: '静默', botIds: [fx.a.id, fx.b.id] });
+  await until(fx.settled);
+  fx.groups.send({ id: room.id, message: '页面为什么没更新？' });
+  await until(fx.settled);
+  const bots = fx.store.data.groups[0].messages.filter((m) => m.sender.kind === 'bot' && m.kind === 'message');
+  assert.deepEqual(
+    bots.map((m) => [m.sender.id, m.content]),
+    [[fx.a.id, '看了，是缓存没刷新。']],
+  );
+  assert.ok(fx.store.data.runs.every((run) => run.status === 'completed'));
+  // B passed, was reminded once that the user asked everyone, passed again and stayed quiet; a later wake
+  // (A's answer) is a plain pass that needs no further model call.
+  assert.deepEqual([...turns.values()], [2, 1]);
+});
