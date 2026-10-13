@@ -197,11 +197,34 @@ test('HTTP errors carry the provider message without credentials, and non-JSON b
       (error: any) => {
         assert.equal(error.code, 'http');
         assert.equal(error.reason, 'game.http_400');
-        assert.match(error.message, /HTTP 400（.*Unsupported parameter: reasoning\.effort/);
+        assert.match(
+          error.message,
+          /^Grok 请求失败（HTTP 400：Unsupported parameter: reasoning\.effort for key \*\*\*/,
+        );
         assert.ok(!error.message.includes('abcdefgh12345678'));
         assert.ok(!error.message.includes('ZYXWVUTSRQ0987654321'));
         return true;
       },
+    );
+    globalThis.fetch = async () =>
+      new Response('{"error":{"message":"Service temporarily unavailable","type":"api_error"}}', {
+        status: 503,
+        headers: { 'retry-after': '7' },
+      });
+    await assert.rejects(
+      registry().decide(players[0], view(s, request.seatId), request, new AbortController().signal),
+      (error: any) => {
+        // Only the provider's message is shown, not the raw JSON body.
+        assert.equal(error.message, 'Grok 暂时不可用（HTTP 503：Service temporarily unavailable）');
+        assert.equal(error.reason, 'game.http_503');
+        assert.equal(error.retryAfterMs, 7000);
+        return true;
+      },
+    );
+    globalThis.fetch = async () => new Response('<html><body>502 Bad Gateway</body></html>', { status: 502 });
+    await assert.rejects(
+      registry().decide(players[0], view(s, request.seatId), request, new AbortController().signal),
+      { message: 'Grok 暂时不可用（HTTP 502：502 Bad Gateway）' },
     );
     globalThis.fetch = async () => new Response('<html>502 Bad Gateway</html>', { status: 200 });
     await assert.rejects(

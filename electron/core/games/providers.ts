@@ -22,6 +22,32 @@ function outputLimit(model: GameProviderConfig, prompt: string) {
   // Below ~1k tokens even a short reply plus a little reasoning is cut off, which only fails the action again.
   return Math.max(Math.min(1024, ceiling), Math.min(ceiling, available));
 }
+/** The provider's own explanation from an error body: error.message from JSON, else the text itself. */
+function providerMessage(body: string) {
+  let text = body;
+  try {
+    const parsed = JSON.parse(body);
+    const message = parsed?.error?.message ?? parsed?.message ?? parsed?.error;
+    if (typeof message === 'string') text = message;
+  } catch {
+    // Not JSON: a gateway page or plain text.
+  }
+  return (
+    text
+      .replace(/<[^>]+>/g, ' ')
+      .replace(/\s+/g, ' ')
+      // Any long token-like run could be a key echoed back by the provider or a proxy.
+      .replace(/[A-Za-z0-9_-]{24,}/g, '***')
+      .trim()
+      .slice(0, 300)
+  );
+}
+/** Retry-After in seconds or as an HTTP date. */
+function retryAfterMs(header: string | null) {
+  if (!header) return undefined;
+  const ms = /^\d+$/.test(header.trim()) ? Number(header) * 1000 : Date.parse(header) - Date.now();
+  return Number.isFinite(ms) ? Math.max(0, ms) : undefined;
+}
 export function gameProviders(
   config: Omit<GameProviderConfig, 'id' | 'name'> & { additionalProviders?: GameProviderConfig[] },
 ) {
@@ -140,17 +166,15 @@ export function gameProviders(
         throw new GameModelError('network', failure[1], 'game.' + failure[0]);
       }
       if (!response.ok) {
-        // The provider's own message (unsupported parameter, context overflow, quota) is what explains a 4xx.
-        const detail = (await response.text().catch(() => ''))
-          .replace(/\s+/g, ' ')
-          // Any long token-like run could be a key echoed back by the provider or a proxy.
-          .replace(/[A-Za-z0-9_-]{24,}/g, '***')
-          .trim()
-          .slice(0, 300);
+        const status = response.status,
+          detail = providerMessage(await response.text().catch(() => ''));
+        const summary = status === 429 ? ' 请求过于频繁' : status >= 500 ? ' 暂时不可用' : ' 请求失败';
         throw new GameModelError(
           'http',
-          p.name + ' 请求失败：HTTP ' + response.status + (detail ? '（' + detail + '）' : ''),
-          'game.http_' + response.status,
+          `${p.name}${summary}（HTTP ${status}${detail ? '：' + detail : ''}）`,
+          'game.http_' + status,
+          undefined,
+          retryAfterMs(response.headers.get('retry-after')),
         );
       }
       const headersMs = Date.now() - start;

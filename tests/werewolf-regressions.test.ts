@@ -270,15 +270,16 @@ test('human timers still freeze on pause and expire using game rules', async () 
     rmSync(dir, { recursive: true, force: true });
   }
 });
-test('rate-limited and rejected requests back off and retry before the match pauses', async () => {
+test('provider outages back off, honour Retry-After and retry up to four times before the match pauses', async () => {
   const dir = mkdtempSync(join(tmpdir(), 'wolf-retry-'));
   const calls = new Map<string, number>();
   const runtime = new GameRuntime(dir, async (_p, _v, r) => {
     const n = (calls.get(r.id) || 0) + 1;
     calls.set(r.id, n);
-    // Every request is refused twice before the provider answers.
-    if (n === 1) throw new GameModelError('http', 'Grok 请求失败：HTTP 429', 'game.http_429');
-    if (n === 2) throw new GameModelError('network', '无法连接模型服务', 'game.network_failed');
+    // Every request fails three times before the provider answers; Retry-After: 0 keeps the test fast.
+    if (n === 1) throw new GameModelError('network', '无法连接模型服务', 'game.network_failed');
+    if (n === 2) throw new GameModelError('http', 'Grok 暂时不可用（HTTP 503）', 'game.http_503', undefined, 0);
+    if (n === 3) throw new GameModelError('http', 'Grok 请求过于频繁（HTTP 429）', 'game.http_429', undefined, 0);
     return r.kind === 'wolf_plan' ? { text: '统一刀口。' } : { target: r.targets[0] };
   });
   try {
@@ -288,7 +289,7 @@ test('rate-limited and rejected requests back off and retry before the match pau
     });
     const trace = runtime.inspect(s.id);
     assert.equal(runtime.read('retry')?.status, 'running');
-    assert(trace.some((t) => t.type === 'model_started' && t.attempt === 3));
+    assert(trace.some((t) => t.type === 'model_started' && t.attempt === 4));
     assert(!trace.some((t) => t.type === 'failure_pause'));
   } finally {
     runtime.control(runtime.read('retry')!.id, 'stop');
@@ -310,6 +311,23 @@ test('a rejected request (HTTP 401) is not retried and pauses with the provider 
     assert.match(runtime.read('auth')?.error || '', /HTTP 401（invalid api key）/);
     // The first wolf proposal is asked once; repeating a refused key would only delay the pause.
     assert.equal(calls, 1);
+  } finally {
+    runtime.dispose();
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+test('a Retry-After longer than a minute pauses at once instead of holding the seat', async () => {
+  const dir = mkdtempSync(join(tmpdir(), 'wolf-retry-after-'));
+  let calls = 0;
+  const runtime = new GameRuntime(dir, async () => {
+    calls++;
+    throw new GameModelError('http', 'Grok 请求过于频繁（HTTP 429）', 'game.http_429', undefined, 600_000);
+  });
+  try {
+    runtime.create({ groupId: 'later', players });
+    await until(() => runtime.read('later')?.status === 'paused');
+    assert.equal(calls, 1);
+    assert.match(runtime.read('later')?.error || '', /HTTP 429/);
   } finally {
     runtime.dispose();
     rmSync(dir, { recursive: true, force: true });

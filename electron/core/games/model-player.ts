@@ -173,6 +173,8 @@ export class GameModelError extends Error {
     readonly reason?: string,
     /** Excerpt of the model's raw reply, kept for the run records when it could not be parsed. */
     readonly output?: string,
+    /** How long the provider asked us to wait before retrying (its Retry-After header). */
+    readonly retryAfterMs?: number,
   ) {
     super(message);
     this.name = 'GameModelError';
