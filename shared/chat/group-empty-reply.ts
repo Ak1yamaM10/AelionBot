@@ -10,10 +10,17 @@ const QUIET_CN =
 const QUIET_EN =
   "(?:i(?:['’]m| am|['’]ll| will)? )?(?:stay(?:s|ing)? (?:quiet|silent)|remain(?:s|ing)? silent|silent|silence|" +
   'not (?:speaking|replying|responding|commenting)|no (?:reply|response|comment|need to reply)|nothing (?:new )?to add|' +
-  'no (?:further |more |new |additional |other )?(?:content|text|info|information|input|message|output|update|comment)s?|' +
+  // Placeholder nouns only: "No update." or "No information." can be a real answer to a question.
+  'no (?:further |more |new |additional |other )?(?:content|text|input|output|message|comment)s?|' +
+  'no (?:new|further|more|additional) (?:info|information|updates?)|' +
   'nothing (?:new|further|more)|no (?:reply|response) (?:needed|required|necessary))';
-// "No response needed — these messages aren't addressed to me": an English declaration followed by its reason.
-const DECLARATION_EN = new RegExp(`^\\[?(?:${QUIET_EN})\\]?(?:\\s*[—–]|\\s+-\\s|\\.\\s|[.!]?$)`, 'i');
+// "No response needed — these messages aren't addressed to me": a declaration, then a reason that is only about
+// not being addressed or the point being covered. "No updates. CI is still red." is a real status and stays.
+const DECLARATION_EN = new RegExp(
+  `^\\[?(?:${QUIET_EN})\\]?(?:[.!]?$|(?:\\s*[—–]|\\s+-\\s|[.;:]\\s)` +
+    `[^.!?]{0,160}\\b(?:addressed|already (?:answered|covered|said)|nothing new|not (?:for|to|about) me)\\b[^.!?]{0,80}[.!]?$)`,
+  'i',
+);
 // A declaration clause: optional subject, time or connective words, the quiet phrase, optional particles.
 const DECLARATION = new RegExp(
   '^(?:(?:我|本\\s*bot|这次|这轮|本轮|此轮|这里|此处|暂时|目前|先|就|也|那|那么|所以|因此|还是|继续|选择|决定|[，,\\s])*' +
@@ -32,8 +39,9 @@ const ADDS_SOMETHING = /[?？@]|但|不过|只是|然而|提醒|注意|建议|�
 const TRAILING = /[\s。.!！~～…]+$/;
 const SELF = /我|决定|选择|就|先|也|这轮|本轮|此轮|这次|发言|说话|插话|接话|沉默|静默|出声|吭声|\bi\b/i;
 
-// A whole message in brackets is a stage direction; one that opens with "不发言" is silent whatever reason follows.
-const STAGE = /^[（(【[]\s*([^（）()【】[\]]{1,160}?)\s*[）)】\]][。.]?$/;
+// A whole message in parentheses that opens with "不发言" is silent whatever reason follows. Other brackets are
+// handled by shape in stageDirection.
+const STAGE = /^[（(]\s*([^（）()]{1,160}?)\s*[）)][。.]?$/;
 // "无新增内容" is about the Bot's own reply even without a subject.
 const NOTHING_NEW = /^(?:本轮|这轮|此轮|我)*(?:没有|暂无|无)/;
 const strip = (clause: string) => clause.trim().replace(TRAILING, '');
@@ -71,9 +79,9 @@ function announcesSilence(text: string): boolean {
 }
 
 /**
- * The shape, not the wording: a short message wholly inside <…>, […], 【…】 or *…* (italics, not bold) is a stage direction such as
- * <no further content>, whatever words a model invents. Parentheses are left to announcesSilence, since
- * "（补充：缓存 5 分钟）" is a real aside. Questions, @ and links stay visible.
+ * The shape, not the wording: a short message wholly inside <…>, […], 【…】 or *…* (italics, not bold) is a
+ * stage direction such as <no further content>, whatever words a model invents. Parentheses are left to
+ * announcesSilence, since "（补充：缓存 5 分钟）" is a real aside. Questions, @ and links stay visible.
  */
 const STAGE_DIRECTION = /^(?:<([^<>]{1,80})>|\[([^[\]]{1,80})\]|【([^【】]{1,80})】|(\*|_)([^*_]{1,80})\4)[。.!！]?$/;
 function stageDirection(text: string) {

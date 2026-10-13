@@ -143,7 +143,8 @@ export function gameProviders(
         // The provider's own message (unsupported parameter, context overflow, quota) is what explains a 4xx.
         const detail = (await response.text().catch(() => ''))
           .replace(/\s+/g, ' ')
-          .replace(/(?:sk|key|token)[-_][A-Za-z0-9_-]{8,}/gi, '***')
+          // Any long token-like run could be a key echoed back by the provider or a proxy.
+          .replace(/[A-Za-z0-9_-]{24,}/g, '***')
           .trim()
           .slice(0, 300);
         throw new GameModelError(

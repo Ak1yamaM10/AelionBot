@@ -202,13 +202,14 @@ function jsonObjects(text: string) {
 const TEXT_LIMITS: Record<string, number> = { text: 800, note: 500, personalityNote: 200 };
 /**
  * Repair the slips models make most often so one stray field does not fail a request: drop fields this
- * action does not have, cut overlong text, read "true"/"false" strings, map a seat number or player name
- * to the target id, and drop a target that save/skip never takes. Returns what was changed.
+ * action does not have, cut overlong text, read "true"/"false" strings, map a seat number ("3", "3号",
+ * "3号玩家", the names the prompt uses) to the target id, and drop a target that save/skip never takes.
+ * Returns what was changed.
  */
 function repairAction(
   parsed: Record<string, any>,
   request: GameRequest,
-  seats?: Pick<GameView['seats'][number], 'id' | 'name'>[],
+  seats?: Pick<GameView['seats'][number], 'id'>[],
 ) {
   const fixes: string[] = [];
   const allowed = actionContract(request).properties as Record<string, unknown>;
@@ -231,7 +232,7 @@ function repairAction(
   if ((typeof target === 'string' || typeof target === 'number') && !request.targets.includes(String(target))) {
     const raw = String(target).trim();
     const number = /^(\d{1,2})\s*号?(?:玩家)?$/.exec(raw);
-    const seat = number ? seats?.[Number(number[1]) - 1] : seats?.find((p) => p.name && p.name === raw);
+    const seat = number ? seats?.[Number(number[1]) - 1] : undefined;
     if (seat && request.targets.includes(seat.id)) {
       parsed.target = seat.id;
       fixes.push(`target「${raw}」按座位映射为对应 id`);
@@ -243,7 +244,7 @@ export function parseGameAction(
   text: string,
   kind?: GameRequest['kind'],
   request?: GameRequest,
-  seats?: Pick<GameView['seats'][number], 'id' | 'name'>[],
+  seats?: Pick<GameView['seats'][number], 'id'>[],
 ): GameAction {
   const clean = text
     .trim()

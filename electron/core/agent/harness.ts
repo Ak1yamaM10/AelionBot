@@ -100,6 +100,7 @@ import {
   GROUP_PLAN_INCOMPLETE,
   MEMORY_NEEDS_MAIN_TASK,
   MEMORY_NOT_SAVED,
+  PASS_NOT_COMPLETION,
   PIN_NOT_COMPLETION,
   PLAN_INCOMPLETE,
   PLAN_NOT_SAVED,
@@ -1910,17 +1911,20 @@ export class Harness {
         // Design-check findings from this batch's writes reach the next turn while the page is still being built.
         history.push(...observations, ...(this.design?.drainNotes(run.id) || []));
         this.store.save();
+        const record = this.store.data.runs.find((item) => item.id === run.id)!;
+        // A pass cannot drop unfinished work or files the run produced; those still need the final reply.
+        const passBlocked = passed && (hasUnfinishedGroupWork() || Boolean(record.attachments?.length));
         // group_pass ends the group turn without a reply; the model's text in that step is never published.
-        if ((passed || (pinned && standaloneReaction)) && !pendingFailures.size) {
+        if (((passed && !passBlocked) || (pinned && standaloneReaction)) && !pendingFailures.size) {
           visible.content = '';
-          const record = this.store.data.runs.find((item) => item.id === run.id)!;
           record.status = 'completed';
           record.endedAt = new Date().toISOString();
           this.store.save();
           this.changed();
           return;
         }
-        if (pinned && !standaloneReaction)
+        if (passBlocked) history.push({ role: 'system', content: PASS_NOT_COMPLETION });
+        else if (pinned && !standaloneReaction)
           history.push({
             role: 'system',
             content: PIN_NOT_COMPLETION,

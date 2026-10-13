@@ -135,3 +135,15 @@ test('a short message wholly inside <…>, […], 【…】 or *…* is a stage 
   ])
     assert.equal(isEmptyGroupReply(value), false, value);
 });
+
+test('English status replies that start like a placeholder stay visible', () => {
+  for (const value of [
+    'No updates. The deploy is still blocked by CI.',
+    'No update.',
+    'No information.',
+    'No reply needed - the fix is in main.',
+  ])
+    assert.equal(isEmptyGroupReply(value), false, value);
+  for (const value of ['No reply needed - already answered by B.', 'No new information.'])
+    assert.equal(isEmptyGroupReply(value), true, value);
+});

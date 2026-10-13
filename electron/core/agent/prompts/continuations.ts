@@ -32,5 +32,7 @@ export const mentionCheckFailed = (message: string) =>
 export const REACTION_NEEDS_REPLY =
   '用户新增的 emoji 是一次对你的发言，需要得到回应。请用 chat_pin 在原消息下回应，或根据表情给出简短自然的文字。不要返回静默标记。';
 export const DUPLICATE_REACTION = '这个表态已经存在，尚未回应本次新发言。请用简短文字回应用户。';
+export const PASS_NOT_COMPLETION =
+  'group_pass 没有生效：本轮还有未完成的工作或已生成待发布的文件。先完成工作，再用文字给出结果；文件会随最终答复一起发布。';
 export const PIN_NOT_COMPLETION =
   '表情已经添加，当前工作尚未因此完成。继续处理用户的任务，核对已有工具结果后给出最终答复，不要重复已经执行的操作。';

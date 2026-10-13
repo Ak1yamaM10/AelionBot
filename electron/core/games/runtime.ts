@@ -585,7 +585,7 @@ export class GameRuntime {
             if (validating || (e instanceof GameModelError && e.code === 'format'))
               retryFeedback = (e as Error).message;
             if (signal.aborted || attempt === MODEL_ATTEMPTS) throw e;
-            const status = e instanceof GameModelError ? Number(/HTTP (\d{3})/.exec(e.message)?.[1]) : NaN;
+            const status = e instanceof GameModelError ? Number(/^game\.http_(\d{3})$/.exec(e.reason || '')?.[1]) : NaN;
             // Other 4xx replies (bad key, unsupported parameter, context overflow) repeat identically.
             if (status >= 400 && status < 500 && ![408, 409, 429].includes(status)) throw e;
             const transient =

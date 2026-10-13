@@ -277,7 +277,7 @@ test('rate-limited and rejected requests back off and retry before the match pau
     const n = (calls.get(r.id) || 0) + 1;
     calls.set(r.id, n);
     // Every request is refused twice before the provider answers.
-    if (n === 1) throw new GameModelError('http', 'Grok 请求失败：HTTP 429');
+    if (n === 1) throw new GameModelError('http', 'Grok 请求失败：HTTP 429', 'game.http_429');
     if (n === 2) throw new GameModelError('network', '无法连接模型服务', 'game.network_failed');
     return r.kind === 'wolf_plan' ? { text: '统一刀口。' } : { target: r.targets[0] };
   });
@@ -302,7 +302,7 @@ test('a rejected request (HTTP 401) is not retried and pauses with the provider 
   let calls = 0;
   const runtime = new GameRuntime(dir, async () => {
     calls++;
-    throw new GameModelError('http', 'Grok 请求失败：HTTP 401（invalid api key）');
+    throw new GameModelError('http', 'Grok 请求失败：HTTP 401（invalid api key）', 'game.http_401');
   });
   try {
     runtime.create({ groupId: 'auth', players });

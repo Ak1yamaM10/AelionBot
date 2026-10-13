@@ -32,7 +32,7 @@ export const CHAT_TOOLS: ToolDefinition[] = [
     'group_pass',
     '本轮对群里没有要说的话时调用：本次群聊回合直接静默结束，不发任何消息、不叫醒任何人。不要再写“不发言”“无新增内容”之类的文字，调用它即可。有消息在等你回答（被 @、被回复或用户问全群）时不能用它代替回答；别人已经答过时用 group_react 表态。手上有未完成的工作时先完成工作。',
     { groupId: string },
-    ['groupId'],
+    [],
   ),
   tool(
     'groups_list',

@@ -49,7 +49,7 @@ test('common model slips are repaired instead of failing the action', () => {
   const repaired = parseGameAction(JSON.stringify({ type: 'kill', reason: '像预言家', target: 'b' }), 'kill', kill);
   assert.equal(repaired.target, 'b');
   assert.match(repaired.formatNote || '', /type、reason/);
-  for (const target of ['2', '2号', '2号玩家', 2, '乙'])
+  for (const target of ['2', '2号', '2号玩家', 2])
     assert.equal(parseGameAction(JSON.stringify({ target }), 'kill', kill, seats).target, 'b', String(target));
   // A seat number that is not a legal target still fails, and the own seat is never substituted.
   assert.throws(() => parseGameAction(JSON.stringify({ target: '1' }), 'kill', kill, seats));

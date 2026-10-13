@@ -2082,3 +2082,35 @@ test('group_pass ends a turn silently; a Bot owing an answer is reminded once fi
   // (A's answer) is a plain pass that needs no further model call.
   assert.deepEqual([...turns.values()], [2, 1]);
 });
+test('group_pass cannot drop an unfinished group plan', async (t) => {
+  const seen: string[] = [];
+  let question = '';
+  const fx = fixture(t, (run, messages) => {
+    if (run.botId !== fx.a.id) return silent();
+    const groupId = run.groupOrigin!.groupId;
+    seen.push(messages.at(-1)?.content || '');
+    if (seen.length === 1) {
+      // Acknowledge the request with a reaction and open a plan in the same step.
+      const plan = call('plan_update', {
+        revision: 0,
+        goal: '提交核对结果',
+        steps: [{ id: 'check', title: '核对材料', acceptance: '引用实际材料', status: 'pending', evidenceIds: [] }],
+      });
+      const react = call('group_react', { groupId, messageId: question, emoji: '👀' });
+      return { ...plan, calls: [...react.calls, ...plan.calls] };
+    }
+    if (seen.length === 2) return call('group_pass', { groupId });
+    return answer('还没核对完，材料缺第 3 页，需要你补一下。');
+  });
+  const room = fx.groups.create({ name: '不能跳过', botIds: [fx.a.id, fx.b.id] });
+  await until(fx.settled);
+  fx.ask(room.id, fx.a, '核对材料后提交正文');
+  question = fx.store.data.groups[0].messages.at(-1)!.id;
+  await until(fx.settled);
+  assert.match(seen[2], /group_pass 没有生效/);
+  assert.ok(
+    fx.store.data.groups[0].messages.some(
+      (m) => m.sender.id === fx.a.id && m.kind === 'message' && /缺第 3 页/.test(m.content),
+    ),
+  );
+});

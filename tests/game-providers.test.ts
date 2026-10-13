@@ -186,9 +186,12 @@ test('HTTP errors carry the provider message without credentials, and non-JSON b
   const request = s.requests[0];
   try {
     globalThis.fetch = async () =>
-      new Response('{"error":{"message":"Unsupported parameter: reasoning.effort for key sk-abcdefgh12345678"}}', {
-        status: 400,
-      });
+      new Response(
+        '{"error":{"message":"Unsupported parameter: reasoning.effort for key sk-proj-abcdefgh12345678ABCDEFGH or xai-ZYXWVUTSRQ0987654321abcd"}}',
+        {
+          status: 400,
+        },
+      );
     await assert.rejects(
       registry().decide(players[0], view(s, request.seatId), request, new AbortController().signal),
       (error: any) => {
@@ -196,6 +199,7 @@ test('HTTP errors carry the provider message without credentials, and non-JSON b
         assert.equal(error.reason, 'game.http_400');
         assert.match(error.message, /HTTP 400（.*Unsupported parameter: reasoning\.effort/);
         assert.ok(!error.message.includes('abcdefgh12345678'));
+        assert.ok(!error.message.includes('ZYXWVUTSRQ0987654321'));
         return true;
       },
     );
