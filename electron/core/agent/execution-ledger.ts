@@ -21,6 +21,7 @@ const controlTools = new Set([
   'skill_save',
   'chat_pin',
   'group_react',
+  'group_pass',
 ]);
 const COMMAND_RESULT_TOOLS = new Set([
   'exec_command',

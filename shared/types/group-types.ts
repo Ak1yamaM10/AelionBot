@@ -50,6 +50,7 @@ const conversationTools = new Set([
   'history_search',
   'history_read',
   'group_react',
+  'group_pass',
   'chat_pin',
   'group_outbox',
   // Legacy tool names that may still appear in stored execution records.

@@ -38,6 +38,13 @@ export interface GameHooks {
   /** Personality of member Bots for a new match (§9.2), keyed by botId; seats without one keep the MBTI preset. */
   personas?: (bots: { botId: string; mbti?: string }[], members: string[]) => Record<string, PersonaSeed>;
 }
+/** Requests per pending action before the match pauses when the model's reply is unusable. */
+const MODEL_ATTEMPTS = 3;
+/** A provider outage (429/5xx, network, timeout) gets one more attempt and longer waits between them. */
+const TRANSIENT_ATTEMPTS = 4;
+const TRANSIENT_BACKOFF_MS = [2000, 8000, 30000];
+/** Longest Retry-After honoured; anything longer pauses the match for the user to resume. */
+const MAX_RETRY_AFTER_MS = 60_000;
 export class GameRuntime {
   private timer: ReturnType<typeof setInterval>;
   private closed = false;
@@ -475,8 +482,18 @@ export class GameRuntime {
         pending.deadlineAt = Date.now() + this.timing.aiTimeoutMs;
         this.commit(dispatched, false);
         let retryFeedback: string | undefined;
-        for (let attempt = 1; attempt <= 2; attempt++) {
+        // Each retry and each backoff wait gets the full response budget, so waiting never trips the pause timer.
+        const renew = () => {
+          const renewed = structuredClone(this.state(id)),
+            open = renewed.requests.find((p) => p.id === r.id);
+          if (!open || renewed.status !== 'running') return false;
+          open.deadlineAt = Date.now() + this.timing.aiTimeoutMs;
+          this.commit(renewed, false);
+          return true;
+        };
+        for (let attempt = 1; attempt <= TRANSIENT_ATTEMPTS; attempt++) {
           signal.throwIfAborted();
+          if (attempt > 1 && !renew()) return;
           const started = Date.now();
           this.annotate(id, 'model_started', {
             requestId: r.id,
@@ -574,25 +591,38 @@ export class GameRuntime {
               });
             if (validating || (e instanceof GameModelError && e.code === 'format'))
               retryFeedback = (e as Error).message;
-            if (signal.aborted || attempt === 2) throw e;
-            const left = (this.state(id).requests.find((p) => p.id === r.id)?.deadlineAt || 0) - Date.now();
-            if (left < 15000) throw e;
-            if (e instanceof GameModelError && /HTTP (429|5\d\d)/.test(e.message))
+            if (signal.aborted) throw e;
+            const status = e instanceof GameModelError ? Number(/^game\.http_(\d{3})$/.exec(e.reason || '')?.[1]) : NaN;
+            // Other 4xx replies (bad key, unsupported parameter, context overflow) repeat identically.
+            if (status >= 400 && status < 500 && ![408, 409, 429].includes(status)) throw e;
+            const transient =
+              status >= 400 ||
+              (e instanceof GameModelError && e.code === 'network') ||
+              (e as Error)?.name === 'TimeoutError';
+            if (attempt >= (transient ? TRANSIENT_ATTEMPTS : MODEL_ATTEMPTS)) throw e;
+            if (transient) {
+              const retryAfter = e instanceof GameModelError ? e.retryAfterMs : undefined;
+              if (retryAfter !== undefined && retryAfter > MAX_RETRY_AFTER_MS) throw e;
+              if (!renew()) return;
               await new Promise<void>((resolve, reject) => {
                 const abort = () => {
                   clearTimeout(timer);
                   reject(signal.reason);
                 };
-                const timer = setTimeout(() => {
-                  signal.removeEventListener('abort', abort);
-                  resolve();
-                }, 1500);
+                const timer = setTimeout(
+                  () => {
+                    signal.removeEventListener('abort', abort);
+                    resolve();
+                  },
+                  retryAfter ?? TRANSIENT_BACKOFF_MS[attempt - 1],
+                );
                 signal.addEventListener('abort', abort, { once: true });
                 if (signal.aborted) {
                   signal.removeEventListener('abort', abort);
                   abort();
                 }
               });
+            }
             continue;
           }
           this.tick();

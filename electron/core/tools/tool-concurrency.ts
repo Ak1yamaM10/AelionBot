@@ -21,6 +21,7 @@ const EXCLUSIVE_TOOLS = new Set([
   'memory',
   'chat_pin',
   'group_react',
+  'group_pass',
   'bot_send_message',
   'bot_delegate_task',
   'group_send_message',

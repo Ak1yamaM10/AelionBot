@@ -5,6 +5,7 @@ import { mkdtempSync, readFileSync, writeFileSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { GameRuntime } from '../electron/core/games/runtime';
+import { GameModelError } from '../electron/core/games/model-player';
 import { createWerewolf, acceptAction } from '../electron/core/games/werewolf';
 const players = Array.from({ length: 7 }, (_, i) => ({ id: String(i), name: 'p' + i, human: false, color: '#887799' }));
 // The saved match, or undefined while the file is being replaced.
@@ -167,10 +168,10 @@ test('invalid model action records returned value, rejection reason and retry be
       'no invented action was applied',
     );
     assert.equal(paused.winner, undefined);
-    assert.equal(trace.filter((t) => t.type === 'model_failed').length, 2);
+    assert.equal(trace.filter((t) => t.type === 'model_failed').length, 3);
     assert(
       trace.some(
-        (t) => t.type === 'model_failed' && t.kind === 'wolf_plan' && t.attempt === 2 && t.detail?.includes('非法行动'),
+        (t) => t.type === 'model_failed' && t.kind === 'wolf_plan' && t.attempt === 3 && t.detail?.includes('非法行动'),
       ),
     );
     assert(trace.some((t) => t.type === 'model_returned' && t.action?.target === 'invalid'));
@@ -264,6 +265,69 @@ test('human timers still freeze on pause and expire using game rules', async () 
     const disk = saved(dir);
     assert(disk.accepted.includes('human-join'));
     assert(disk.trace.some((t: any) => t.type === 'timeout' && t.seatId === '0'));
+  } finally {
+    runtime.dispose();
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+test('provider outages back off, honour Retry-After and retry up to four times before the match pauses', async () => {
+  const dir = mkdtempSync(join(tmpdir(), 'wolf-retry-'));
+  const calls = new Map<string, number>();
+  const runtime = new GameRuntime(dir, async (_p, _v, r) => {
+    const n = (calls.get(r.id) || 0) + 1;
+    calls.set(r.id, n);
+    // Every request fails three times before the provider answers; Retry-After: 0 keeps the test fast.
+    if (n === 1) throw new GameModelError('network', '无法连接模型服务', 'game.network_failed');
+    if (n === 2) throw new GameModelError('http', 'Grok 暂时不可用（HTTP 503）', 'game.http_503', undefined, 0);
+    if (n === 3) throw new GameModelError('http', 'Grok 请求过于频繁（HTTP 429）', 'game.http_429', undefined, 0);
+    return r.kind === 'wolf_plan' ? { text: '统一刀口。' } : { target: r.targets[0] };
+  });
+  try {
+    const s = runtime.create({ groupId: 'retry', players });
+    await until(() => (runtime.inspect(s.id).filter((t) => t.type === 'action_accepted').length || 0) >= 1, {
+      timeoutMs: 20000,
+    });
+    const trace = runtime.inspect(s.id);
+    assert.equal(runtime.read('retry')?.status, 'running');
+    assert(trace.some((t) => t.type === 'model_started' && t.attempt === 4));
+    assert(!trace.some((t) => t.type === 'failure_pause'));
+  } finally {
+    runtime.control(runtime.read('retry')!.id, 'stop');
+    runtime.dispose();
+    await delay(10);
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+test('a rejected request (HTTP 401) is not retried and pauses with the provider reason', async () => {
+  const dir = mkdtempSync(join(tmpdir(), 'wolf-401-'));
+  let calls = 0;
+  const runtime = new GameRuntime(dir, async () => {
+    calls++;
+    throw new GameModelError('http', 'Grok 请求失败：HTTP 401（invalid api key）', 'game.http_401');
+  });
+  try {
+    runtime.create({ groupId: 'auth', players });
+    await until(() => runtime.read('auth')?.status === 'paused');
+    assert.match(runtime.read('auth')?.error || '', /HTTP 401（invalid api key）/);
+    // The first wolf proposal is asked once; repeating a refused key would only delay the pause.
+    assert.equal(calls, 1);
+  } finally {
+    runtime.dispose();
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+test('a Retry-After longer than a minute pauses at once instead of holding the seat', async () => {
+  const dir = mkdtempSync(join(tmpdir(), 'wolf-retry-after-'));
+  let calls = 0;
+  const runtime = new GameRuntime(dir, async () => {
+    calls++;
+    throw new GameModelError('http', 'Grok 请求过于频繁（HTTP 429）', 'game.http_429', undefined, 600_000);
+  });
+  try {
+    runtime.create({ groupId: 'later', players });
+    await until(() => runtime.read('later')?.status === 'paused');
+    assert.equal(calls, 1);
+    assert.match(runtime.read('later')?.error || '', /HTTP 429/);
   } finally {
     runtime.dispose();
     rmSync(dir, { recursive: true, force: true });

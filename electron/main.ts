@@ -592,7 +592,7 @@ async function initialize() {
           cacheScope: context.id + ':' + player.id,
         },
       );
-      return parseGameAction(result.content || '', request.kind, request);
+      return parseGameAction(result.content || '', request.kind, request, context.seats);
     },
     (players) => {
       for (const p of players.filter((p) => !p.human)) {

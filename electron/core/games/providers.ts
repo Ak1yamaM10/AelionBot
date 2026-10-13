@@ -19,7 +19,34 @@ function outputLimit(model: GameProviderConfig, prompt: string) {
   const ceiling = model.maxOutputTokens ?? DEFAULT_RUNTIME.maxOutputTokens;
   const capacity = model.contextTokens || 32768;
   const available = Math.floor(capacity - textTokens(prompt) - contextBudget(capacity).safety);
-  return Math.max(256, Math.min(ceiling, available));
+  // Below ~1k tokens even a short reply plus a little reasoning is cut off, which only fails the action again.
+  return Math.max(Math.min(1024, ceiling), Math.min(ceiling, available));
+}
+/** The provider's own explanation from an error body: error.message from JSON, else the text itself. */
+function providerMessage(body: string) {
+  let text = body;
+  try {
+    const parsed = JSON.parse(body);
+    const message = parsed?.error?.message ?? parsed?.message ?? parsed?.error;
+    if (typeof message === 'string') text = message;
+  } catch {
+    // Not JSON: a gateway page or plain text.
+  }
+  return (
+    text
+      .replace(/<[^>]+>/g, ' ')
+      .replace(/\s+/g, ' ')
+      // Any long token-like run could be a key echoed back by the provider or a proxy.
+      .replace(/[A-Za-z0-9_-]{24,}/g, '***')
+      .trim()
+      .slice(0, 300)
+  );
+}
+/** Retry-After in seconds or as an HTTP date. */
+function retryAfterMs(header: string | null) {
+  if (!header) return undefined;
+  const ms = /^\d+$/.test(header.trim()) ? Number(header) * 1000 : Date.parse(header) - Date.now();
+  return Number.isFinite(ms) ? Math.max(0, ms) : undefined;
 }
 export function gameProviders(
   config: Omit<GameProviderConfig, 'id' | 'name'> & { additionalProviders?: GameProviderConfig[] },
@@ -138,9 +165,30 @@ export function gameProviders(
                   : ['network_failed', '无法连接模型服务，请检查网络或稍后重试'];
         throw new GameModelError('network', failure[1], 'game.' + failure[0]);
       }
-      if (!response.ok) throw new GameModelError('http', p.name + ' 请求失败：HTTP ' + response.status);
+      if (!response.ok) {
+        const status = response.status,
+          detail = providerMessage(await response.text().catch(() => ''));
+        const summary = status === 429 ? ' 请求过于频繁' : status >= 500 ? ' 暂时不可用' : ' 请求失败';
+        throw new GameModelError(
+          'http',
+          `${p.name}${summary}（HTTP ${status}${detail ? '：' + detail : ''}）`,
+          'game.http_' + status,
+          undefined,
+          retryAfterMs(response.headers.get('retry-after')),
+        );
+      }
       const headersMs = Date.now() - start;
-      const result = (await response.json()) as any;
+      let result: any;
+      try {
+        result = await response.json();
+      } catch (error) {
+        if (signal.aborted || (error as Error)?.name === 'TimeoutError') throw error;
+        throw new GameModelError(
+          'network',
+          p.name + ' 返回的不是有效 JSON 响应，可能是网关或代理错误',
+          'game.bad_response',
+        );
+      }
       options?.onResponse({
         httpStatus: response.status,
         headersMs,
@@ -174,7 +222,7 @@ export function gameProviders(
           'game.output_truncated',
         );
       if (typeof text !== 'string' || !text.trim()) throw new GameModelError('empty', p.name + ' 没有返回行动');
-      return parseGameAction(text, request.kind, request);
+      return parseGameAction(text, request.kind, request, context.seats);
     },
   };
 }

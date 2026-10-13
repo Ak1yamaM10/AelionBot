@@ -26,7 +26,7 @@ import {
 } from '../../../shared/types/group-types';
 import { hasSilenceMarker, normalized } from './group-response';
 import { isEmptyGroupReply } from '../../../shared/chat/group-empty-reply';
-import { rememberPublished } from './group-history';
+import { rememberPublished, silentBotMessage } from './group-history';
 import { pinDescription, updatePins, validPin, type PinInput } from '../../../shared/chat/reactions';
 import { readableContent } from '../../../shared/chat/activity';
 import { botMentions } from '../../../shared/chat/mentions';
@@ -45,6 +45,15 @@ interface Runner {
   cancel: (id: string) => void;
   refresh?: (id: string) => void;
 }
+/** A short record of a message for notes sent back to the model. */
+const excerpt = (message: GroupMessage) => ({
+  messageId: message.id,
+  from: message.sender.name,
+  content: groupReplyContent(message.content, message.sender.kind === 'bot' ? message.sender.id : undefined).slice(
+    0,
+    300,
+  ),
+});
 interface Worker {
   botId: string;
   groupId: string;
@@ -349,15 +358,7 @@ export class GroupChats implements GroupGateway {
     const room = this.store.data.groups.find((item) => item.id === worker.groupId);
     if (!room) return;
     const silent = !content || hasSilenceMarker(content),
-      own = new Set(worker.deliveries.map((delivery) => delivery.messageId)),
-      excerpt = (message: GroupMessage) => ({
-        messageId: message.id,
-        from: message.sender.name,
-        content: groupReplyContent(
-          message.content,
-          message.sender.kind === 'bot' ? message.sender.id : undefined,
-        ).slice(0, 300),
-      });
+      own = new Set(worker.deliveries.map((delivery) => delivery.messageId));
     // Look once more before speaking: someone answered the same message, or the user said something new.
     const arrived = room.messages.filter(
       (message) =>
@@ -369,14 +370,18 @@ export class GroupChats implements GroupGateway {
     );
     worker.seenSeq = room.messages.at(-1)?.seq || worker.seenSeq;
     if (arrived.length && !silent) return groupReviewNote(content, arrived.slice(-5).map(excerpt));
+    if (silent) return this.mustAnswerOnce(room, worker, botId);
+  }
+  /** Once per run, the note listing messages this Bot still owes an answer before it may stay quiet. */
+  private mustAnswerOnce(room: GroupRoom, worker: Worker, botId: string) {
+    if (worker.noted.has('must')) return;
     const unanswered = worker.deliveries
       .filter((delivery) => delivery.must)
       .map((delivery) => room.messages.find((message) => message.id === delivery.messageId)!)
       .filter((message) => message && !answerFrom(room, message, botId));
-    if (silent && unanswered.length && !worker.noted.has('must')) {
-      worker.noted.add('must');
-      return groupMustAnswerNote(unanswered.slice(-5).map(excerpt));
-    }
+    if (!unanswered.length) return;
+    worker.noted.add('must');
+    return groupMustAnswerNote(unanswered.slice(-5).map(excerpt));
   }
   /** Persist a private outbox entry first; publish text, delivery records and the receipt together. */
   private publish(
@@ -1753,11 +1758,13 @@ export class GroupChats implements GroupGateway {
           messages[0] && room.messages.findIndex((m) => m.id === messages[0].id) > 0 ? messages[0].id : undefined;
       return {
         groupId: room.id,
-        messages: messages.map((m) => ({
-          ...m,
-          content: m.content.slice(0, 2400),
-          ...(m.content.length > 2400 ? { truncated: true, offset: 2400 } : {}),
-        })),
+        messages: messages
+          .filter((m) => !silentBotMessage(m))
+          .map((m) => ({
+            ...m,
+            content: m.content.slice(0, 2400),
+            ...(m.content.length > 2400 ? { truncated: true, offset: 2400 } : {}),
+          })),
         before,
       };
     }
@@ -1774,6 +1781,23 @@ export class GroupChats implements GroupGateway {
           messageId: m.messageId,
           content: m.content.slice(0, 500),
         }));
+    }
+    if (name === 'group_pass') {
+      const worker = this.workers.get(botId);
+      // groupId only guards against passing in another group; the current turn is the one that ends.
+      if (
+        !options.groupOrigin ||
+        !worker ||
+        worker.runId !== runId ||
+        (args.groupId && args.groupId !== worker.groupId)
+      )
+        throw new AppError('group.pass_scope', 'group_pass 只能结束当前这个群聊回合');
+      const room = this.room(worker.groupId);
+      this.member(room, botId);
+      // Same one-time reminder as an empty final reply: answer, react, or pass again to stay quiet.
+      const note = this.mustAnswerOnce(room, worker, botId);
+      if (note) throw new AppError('group.answer_required', note);
+      return { passed: true, message: '本轮静默结束，不发送消息。' };
     }
     if (name === 'group_react') {
       const room = this.room(required(args.groupId, '群聊 ID', 80));
