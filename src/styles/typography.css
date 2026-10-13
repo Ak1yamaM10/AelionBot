@@ -134,21 +134,8 @@
   font-size: var(--text-title);
   font-weight: var(--weight-heading);
   color: var(--text-ink);
-  letter-spacing: 0;
-  line-height: 1.4;
-}
-:root .settings-modal .settings-sidebar button {
-  font-size: var(--text-control);
-  font-weight: var(--weight-body);
-  color: var(--text-secondary);
-}
-:root .settings-modal .settings-sidebar button.active {
-  font-weight: var(--weight-label);
-}
-:root .settings-modal .settings-section > h3 {
-  font-size: var(--text-control);
-  font-weight: var(--weight-label);
-  color: var(--text-secondary);
+  letter-spacing: -0.01em;
+  line-height: 1.3;
 }
 :root .settings-modal .settings-row {
   font-size: var(--text-control);
@@ -164,16 +151,7 @@
   font-size: var(--text-control);
   font-weight: var(--weight-label);
 }
-:root
-  .settings-modal
-  :is(
-    .settings-note,
-    .settings-path-field,
-    .provider-info span,
-    .provider-model-count,
-    .command-rule-directory,
-    .settings-specs dd
-  ) {
+:root .settings-modal :is(.settings-note, .command-rule-directory) {
   font-size: var(--text-caption);
   font-weight: var(--weight-body);
   color: var(--text-secondary);
@@ -296,10 +274,4 @@
 }
 :root :is(.permission-mode, .scheduled-row-footer) {
   min-width: 0;
-}
-@media (max-width: 1150px) {
-  :root .settings-modal .runtime-columns,
-  :root .settings-modal .runtime-group-wide .runtime-group-fields {
-    gap: 24px;
-  }
 }

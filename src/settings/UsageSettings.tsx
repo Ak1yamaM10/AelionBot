@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Select } from '../ui/Select';
+import { Icon } from '../ui/Icon';
 import type { Snapshot } from '../../shared/types/core';
 import {
   cacheHitRatio,
@@ -81,6 +82,16 @@ function UsageTimeline({ buckets, metric }: { buckets: UsageBucket[]; metric: Me
       return point;
     })
     .join(' ');
+  // The same line closed down to the baseline, one closed shape per unbroken run of points.
+  const area = path
+    .split(/(?=M)/)
+    .filter(Boolean)
+    .map((run) => {
+      const points = [...run.matchAll(/[ML]([\d.]+),([\d.]+)/g)];
+      if (points.length < 2) return '';
+      return `${run} L${points.at(-1)![1]},${height - bottom} L${points[0][1]},${height - bottom} Z`;
+    })
+    .join(' ');
   const selectedRow = selected === undefined ? undefined : buckets[selected],
     selectedValue = selectedRow ? metricValue(selectedRow, metric) : undefined;
   const labelIndices = [...new Set([0, Math.floor((buckets.length - 1) / 2), buckets.length - 1])].filter(
@@ -110,11 +121,11 @@ function UsageTimeline({ buckets, metric }: { buckets: UsageBucket[]; metric: Me
         {[0, 0.5, 1].map((fraction) => (
           <g key={fraction}>
             <line
+              className="usage-grid"
               x1={left}
               x2={width - right}
               y1={y(ceiling * fraction)}
               y2={y(ceiling * fraction)}
-              stroke="#e8e8ec"
               strokeDasharray={fraction ? '3 5' : undefined}
             />
             <text x={left - 9} y={y(ceiling * fraction) + 4} textAnchor="end" className="usage-axis">
@@ -122,21 +133,22 @@ function UsageTimeline({ buckets, metric }: { buckets: UsageBucket[]; metric: Me
             </text>
           </g>
         ))}
-        <path d={path} fill="none" stroke="#8571c8" strokeWidth="2.5" strokeLinejoin="round" />
+        {area && <path className="usage-area" d={area} />}
+        <path className="usage-line" d={path} fill="none" strokeWidth="2.25" strokeLinejoin="round" />
         {buckets.length === 1 && metricValue(buckets[0], metric) !== undefined && (
-          <circle cx={x(0)} cy={y(metricValue(buckets[0], metric)!)} r={4} fill="#8571c8" />
+          <circle className="usage-point" cx={x(0)} cy={y(metricValue(buckets[0], metric)!)} r={4} />
         )}
         {selected !== undefined && selectedValue !== undefined && (
           <g>
             <line
+              className="usage-cursor"
               x1={x(selected)}
               x2={x(selected)}
               y1={top}
               y2={height - bottom}
-              stroke="#b8acd8"
               strokeDasharray="3 4"
             />
-            <circle cx={x(selected)} cy={y(selectedValue)} r={4} fill="#8571c8" stroke="#fcfcfc" strokeWidth={2} />
+            <circle className="usage-point" cx={x(selected)} cy={y(selectedValue)} r={4} strokeWidth={2} />
           </g>
         )}
         {labelIndices.map((index) => (
@@ -280,10 +292,10 @@ export function UsageSettings({ state }: { state: Snapshot }) {
   const totals = JSON.stringify(report?.query) === JSON.stringify(query) ? report?.totals : undefined;
   return (
     <div className="usage-settings">
-      <div className="usage-filters">
-        <label>
-          <span>{t('时间')}</span>
+      <div className="usage-toolbar">
+        <div className="usage-filters">
           <Select
+            className="settings-select"
             aria-label={t('用量时间范围')}
             value={preset}
             onChange={(event) => {
@@ -298,10 +310,8 @@ export function UsageSettings({ state }: { state: Snapshot }) {
             <option value="90">{t('最近 90 天')}</option>
             <option value="custom">{t('自定义')}</option>
           </Select>
-        </label>
-        <label>
-          <span>Provider</span>
           <Select
+            className="settings-select"
             aria-label={t('用量 Provider')}
             value={query.providerId || ''}
             onChange={(event) => update({ providerId: event.target.value || undefined, model: undefined })}
@@ -313,10 +323,8 @@ export function UsageSettings({ state }: { state: Snapshot }) {
               </option>
             ))}
           </Select>
-        </label>
-        <label>
-          <span>{t('模型')}</span>
           <Select
+            className="settings-select"
             aria-label={t('用量模型')}
             value={query.model || ''}
             onChange={(event) => update({ model: event.target.value || undefined })}
@@ -326,10 +334,8 @@ export function UsageSettings({ state }: { state: Snapshot }) {
               <option key={model}>{model}</option>
             ))}
           </Select>
-        </label>
-        <label>
-          <span>{t('用途')}</span>
           <Select
+            className="settings-select"
             aria-label={t('用量用途')}
             value={query.purpose || ''}
             onChange={(event) => update({ purpose: event.target.value || undefined })}
@@ -341,7 +347,16 @@ export function UsageSettings({ state }: { state: Snapshot }) {
               </option>
             ))}
           </Select>
-        </label>
+        </div>
+        <div className="usage-actions">
+          <button type="button" className="text-button" onClick={reset}>
+            {t('重置筛选')}
+          </button>
+          <button type="button" className="text-button" onClick={() => setRefresh((value) => value + 1)}>
+            <Icon name="restart" size={13} />
+            {t('刷新')}
+          </button>
+        </div>
       </div>
       {preset === 'custom' && (
         <div className="usage-dates">
@@ -349,6 +364,7 @@ export function UsageSettings({ state }: { state: Snapshot }) {
             {t('开始日期')}
             <input
               type="date"
+              className="settings-field"
               aria-label={t('用量开始日期')}
               value={query.from}
               onChange={(event) => update({ from: event.target.value })}
@@ -359,6 +375,7 @@ export function UsageSettings({ state }: { state: Snapshot }) {
             {t('结束日期')}
             <input
               type="date"
+              className="settings-field"
               aria-label={t('用量结束日期')}
               value={query.to}
               onChange={(event) => update({ to: event.target.value })}
@@ -366,22 +383,6 @@ export function UsageSettings({ state }: { state: Snapshot }) {
           </label>
         </div>
       )}
-      <div className="usage-toolbar">
-        <span>
-          {totals
-            ? t('{count} 次请求', { count: number(totals.requests) }) +
-              (totals.failedRequests ? t(' · {count} 次失败', { count: number(totals.failedRequests) }) : '')
-            : t('正在读取记录…')}
-        </span>
-        <div>
-          <button type="button" className="text-button" onClick={reset}>
-            {t('重置筛选')}
-          </button>
-          <button type="button" className="text-button" onClick={() => setRefresh((value) => value + 1)}>
-            {t('刷新')}
-          </button>
-        </div>
-      </div>
       {totals?.missingUsage ? (
         <p className="usage-empty-small">
           {language === 'en'
@@ -400,6 +401,13 @@ export function UsageSettings({ state }: { state: Snapshot }) {
       ) : (
         <>
           <div className="usage-metrics">
+            <div>
+              <span>{t('请求')}</span>
+              <strong title={number(totals.requests)}>{compact(totals.requests)}</strong>
+              {totals.failedRequests > 0 && (
+                <small className="is-bad">{t('{count} 次失败', { count: number(totals.failedRequests) })}</small>
+              )}
+            </div>
             <div>
               <span>{t('总 tokens')}</span>
               <strong title={number(totals.totalTokens)}>
@@ -425,9 +433,9 @@ export function UsageSettings({ state }: { state: Snapshot }) {
           </div>
           {!totals.requests ? (
             <div className="usage-empty">
-              <svg width="42" height="42" viewBox="0 0 40 40" fill="none" aria-hidden="true">
-                <path d="M7 31h26M11 26V17m9 9V8m9 18V12" stroke="#aaa3bc" strokeWidth="2.5" strokeLinecap="round" />
-              </svg>
+              <span className="settings-empty-symbol" aria-hidden="true">
+                <Icon name="chart" size={22} />
+              </span>
               <strong>{t('这段时间还没有用量记录')}</strong>
             </div>
           ) : (
@@ -478,9 +486,10 @@ export function UsageSettings({ state }: { state: Snapshot }) {
                   onChoose={(row) => update({ providerId: row.providerId, model: row.model })}
                 />
               </div>
+              <h3 className="usage-table-title">{t('模型明细')}</h3>
               <div className="usage-table-wrap">
                 <table className="usage-table">
-                  <caption>{t('模型明细')}</caption>
+                  <caption className="settings-sr-only">{t('模型明细')}</caption>
                   <thead>
                     <tr>
                       <th>{t('模型 / Provider')}</th>

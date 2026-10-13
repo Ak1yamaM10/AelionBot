@@ -15,6 +15,7 @@ test('old profiles get appearance defaults and corrupted values stay bounded', (
   assert.deepEqual(normalizeAppearance(undefined), DEFAULT_APPEARANCE);
   const v = normalizeAppearance({
     theme: 'invalid',
+    canvas: 'plaid',
     font: 'invalid',
     zoom: 500,
     messageSize: -1,
@@ -24,6 +25,8 @@ test('old profiles get appearance defaults and corrupted values stay bounded', (
     textScale: 0,
   });
   assert.equal(v.theme, 'system');
+  assert.equal(v.canvas, 'neutral');
+  assert.equal(normalizeAppearance({ canvas: 'warm' }).canvas, 'warm');
   assert.equal(v.font, 'bundled');
   assert.equal(v.zoom, 200);
   assert.equal(v.messageSize, 12);

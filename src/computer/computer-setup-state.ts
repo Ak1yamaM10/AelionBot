@@ -54,6 +54,33 @@ export function computerSetupActions(vm: VmState): Array<'start' | 'restart' | '
   if (view.kind === 'upgrade') return ['start', 'repair-tools'];
   return vm.status === 'ready' ? ['repair-tools'] : ['start'];
 }
+/** The computer's state in a few words, for a status line under its name. */
+export function computerStatusTitle(vm: VmState) {
+  const kind = computerSetupState(vm).kind;
+  return translate(
+    kind === 'stopped'
+      ? '电脑已关闭'
+      : kind === 'invite'
+        ? '初始化工作电脑'
+        : kind === 'download'
+          ? '正在准备系统'
+          : kind === 'starting'
+            ? '正在启动'
+            : kind === 'stopping'
+              ? '正在关闭'
+              : kind === 'installing'
+                ? '正在准备应用'
+                : kind === 'restart'
+                  ? '需要重启'
+                  : kind === 'error'
+                    ? '准备未完成'
+                    : kind === 'incomplete'
+                      ? '继续准备桌面'
+                      : kind === 'upgrade'
+                        ? '更新工作环境'
+                        : '桌面已就绪',
+  );
+}
 export function computerSetupActionLabel(vm: VmState) {
   const kind = computerSetupState(vm).kind;
   return kind === 'restart'

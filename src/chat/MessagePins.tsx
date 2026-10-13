@@ -10,6 +10,8 @@ import {
 import { useI18n } from '../i18n';
 import './message-pins.css';
 
+/** Reactions one click away on the hover toolbar; the rest are in the picker next to them. */
+const HOVER_PIN_EMOJIS = [QUICK_PIN_EMOJIS[0], QUICK_PIN_EMOJIS[2], QUICK_PIN_EMOJIS[3]];
 const errorText = (error: unknown) =>
   (error as Error).message.replace(/^Error invoking remote method '[^']+': Error: /, '');
 interface Anchor {
@@ -73,6 +75,7 @@ export function MessageActions({
   onPin,
   onReply,
   bubbleClassName,
+  after,
   children,
 }: {
   messageId: string;
@@ -81,6 +84,8 @@ export function MessageActions({
   onPin?: (input: PinInput) => Promise<unknown>;
   onReply?: () => void;
   bubbleClassName: string;
+  /** Shown between the bubble and its reactions: the files a message carries. */
+  after?: ReactNode;
   children: ReactNode;
 }) {
   const { t } = useI18n();
@@ -92,9 +97,12 @@ export function MessageActions({
     [category, setCategory] = useState('all'),
     [focusedEmoji, setFocusedEmoji] = useState('');
   const [hovered, setHovered] = useState(false),
+    [copied, setCopied] = useState(false),
     [toolbarPosition, setToolbarPosition] = useState({ left: 0, top: 0 });
   const toolbar = useRef<HTMLDivElement>(null),
-    hoverTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+    hoverTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined),
+    copiedTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  const hasToolbar = Boolean(onPin || onReply || content.trim());
   const showToolbar = () => {
     clearTimeout(hoverTimer.current);
     window.dispatchEvent(new CustomEvent('aelion:message-hover', { detail: messageId }));
@@ -107,7 +115,13 @@ export function MessageActions({
         setHovered(false);
     }, 140);
   };
-  useEffect(() => () => clearTimeout(hoverTimer.current), []);
+  useEffect(
+    () => () => {
+      clearTimeout(hoverTimer.current);
+      clearTimeout(copiedTimer.current);
+    },
+    [],
+  );
   const options = useMemo(() => searchPinEmojis(query, category), [query, category]);
   const bubble = useRef<HTMLDivElement>(null),
     menu = useRef<HTMLDivElement>(null),
@@ -117,31 +131,20 @@ export function MessageActions({
   anchorRef.current = anchor;
   useLayoutEffect(() => {
     if (!hovered || !bubble.current) return;
+    // The toolbar rides the bubble's top edge at its outer corner, overlapping it so the pointer can cross over.
     const place = () => {
       const box = bubble.current!.getBoundingClientRect(),
         surface = bubble.current!.closest('.messages,.peer-chat-body')?.getBoundingClientRect(),
-        width = (onPin ? 28 : 0) + (onReply ? 28 : 0) + (onPin && onReply ? 4 : 0),
-        right = Math.min(window.innerWidth - 8, surface?.right || window.innerWidth - 8);
-      let left = box.right + 6,
-        top = box.bottom - 28;
-      if (left + width > right) {
-        if (box.left - width - 6 >= (surface?.left || 0) + 4) left = box.left - width - 6;
-        else {
-          left = Math.max(surface?.left || 8, box.right - width);
-          top = box.top - 31;
-        }
-      }
-      const pins = bubble.current!.nextElementSibling;
-      if (pins?.classList.contains('message-pins'))
-        for (const chip of pins.querySelectorAll('.pin-chip')) {
-          const rect = chip.getBoundingClientRect();
-          if (left < rect.right && left + width > rect.left && top < rect.bottom && top + 28 > rect.top)
-            top = rect.top - 32;
-        }
-      const bottom = Math.min(window.innerHeight - 8, surface?.bottom || window.innerHeight - 8);
+        width = toolbar.current?.offsetWidth || 0,
+        height = toolbar.current?.offsetHeight || 36,
+        min = (surface?.left ?? 0) + 8,
+        max = Math.min(window.innerWidth, surface?.right ?? window.innerWidth) - 8 - width,
+        // A bubble narrower than the toolbar keeps it on its own side of the conversation.
+        onLeft = surface ? box.left - surface.left < surface.right - box.right : true,
+        left = box.width >= width + 16 ? box.right - 8 - width : onLeft ? box.left : box.right - width;
       setToolbarPosition({
-        left: Math.max(8, left),
-        top: Math.max(42, surface ? surface.top + 4 : 42, Math.min(top, bottom - 32)),
+        left: Math.max(min, Math.min(left, max)),
+        top: Math.max(42, surface ? surface.top + 4 : 42, box.top - height + 9),
       });
     };
     place();
@@ -247,6 +250,9 @@ export function MessageActions({
     dismiss(true);
     try {
       await navigator.clipboard.writeText(text);
+      setCopied(true);
+      clearTimeout(copiedTimer.current);
+      copiedTimer.current = setTimeout(() => setCopied(false), 1400);
     } catch (error) {
       setError(errorText(error));
     }
@@ -277,7 +283,6 @@ export function MessageActions({
       <div
         ref={bubble}
         className={`${bubbleClassName} message-context-target`}
-        data-hover-actions={onPin || onReply ? 'true' : undefined}
         onMouseEnter={showToolbar}
         onMouseLeave={hideToolbar}
         onFocusCapture={showToolbar}
@@ -301,11 +306,12 @@ export function MessageActions({
       >
         {children}
       </div>
+      {after}
       {onPin && (
         <MessagePins messageId={messageId} pins={pins} pending={pending} onChoose={(emoji) => void choose(emoji)} />
       )}
       {hovered &&
-        (onPin || onReply) &&
+        hasToolbar &&
         createPortal(
           <div
             ref={toolbar}
@@ -319,28 +325,48 @@ export function MessageActions({
             onBlurCapture={hideToolbar}
           >
             {onPin && (
-              <button
-                type="button"
-                aria-label={t('添加表情')}
-                title={t('添加表情')}
-                onClick={(event) => {
-                  const rect = event.currentTarget.getBoundingClientRect();
-                  open(rect.left, rect.bottom + 5);
-                }}
-              >
-                <svg
-                  width="18"
-                  height="18"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="1.6"
-                  aria-hidden="true"
+              <>
+                {HOVER_PIN_EMOJIS.map((emoji) => {
+                  const label = t(PIN_EMOJI_BY_VALUE.get(emoji)?.label || emoji);
+                  return (
+                    <button
+                      key={emoji}
+                      type="button"
+                      className="message-hover-emoji"
+                      aria-label={`${emoji} ${label}`}
+                      aria-pressed={pins.some((pin) => pin.emoji === emoji && pin.actor.id === 'user')}
+                      title={label}
+                      disabled={pending}
+                      onClick={() => void choose(emoji)}
+                    >
+                      {emoji}
+                    </button>
+                  );
+                })}
+                <span className="message-hover-divider" aria-hidden="true" />
+                <button
+                  type="button"
+                  aria-label={t('添加表情')}
+                  title={t('添加表情')}
+                  onClick={(event) => {
+                    const rect = event.currentTarget.getBoundingClientRect();
+                    open(rect.left, rect.bottom + 5);
+                  }}
                 >
-                  <circle cx="12" cy="12" r="9" />
-                  <path d="M8 14s1 3 4 3 4-3 4-3M8 9h.01M16 9h.01" strokeLinecap="round" />
-                </svg>
-              </button>
+                  <svg
+                    width="17"
+                    height="17"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="1.6"
+                    aria-hidden="true"
+                  >
+                    <circle cx="12" cy="12" r="9" />
+                    <path d="M8 14s1 3 4 3 4-3 4-3M8 9h.01M16 9h.01" strokeLinecap="round" />
+                  </svg>
+                </button>
+              </>
             )}
             {onReply && (
               <button
@@ -353,8 +379,8 @@ export function MessageActions({
                 }}
               >
                 <svg
-                  width="18"
-                  height="18"
+                  width="17"
+                  height="17"
                   viewBox="0 0 24 24"
                   fill="none"
                   stroke="currentColor"
@@ -362,6 +388,30 @@ export function MessageActions({
                   aria-hidden="true"
                 >
                   <path d="m9 5-6 6 6 6M3 11h11a7 7 0 0 1 7 7" strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
+              </button>
+            )}
+            {content.trim() && (
+              <button type="button" aria-label={t('复制')} title={t('复制')} onClick={() => void copy()}>
+                <svg
+                  width="17"
+                  height="17"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="1.6"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  aria-hidden="true"
+                >
+                  {copied ? (
+                    <path d="m5 12.5 4.5 4.5L19 7.5" />
+                  ) : (
+                    <>
+                      <rect x="8" y="3" width="12" height="15" rx="2" />
+                      <path d="M16 21H5a2 2 0 0 1-2-2V8" />
+                    </>
+                  )}
                 </svg>
               </button>
             )}

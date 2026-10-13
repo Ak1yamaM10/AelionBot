@@ -78,7 +78,7 @@ export function ComputerPanel({
           </span>
         </div>
       ) : (
-        <ComputerStatus vm={vm} bot={bot} minimal onOpen={onSetup} />
+        <ComputerStatus vm={vm} bot={bot} onOpen={onSetup} />
       )}
       <button
         type="button"

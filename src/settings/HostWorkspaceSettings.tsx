@@ -1,6 +1,7 @@
 import { useEffect, useId, useState } from 'react';
 import type { HostWorkspaceSettings as WorkspaceSettings } from '../../shared/types/core';
 import { SettingsSection } from './SettingsWindow';
+import { Icon } from '../ui/Icon';
 import { useI18n } from '../i18n';
 
 export function HostWorkspaceSettings({
@@ -33,7 +34,21 @@ export function HostWorkspaceSettings({
     }
   };
   return (
-    <SettingsSection title={t('用户电脑')}>
+    <SettingsSection
+      title={t('用户电脑')}
+      aside={
+        path !== settings.defaultWorkspaceDir ? (
+          <button
+            type="button"
+            className="text-button"
+            disabled={busy}
+            onClick={() => void act(() => persist(settings.defaultWorkspaceDir))}
+          >
+            {t('恢复默认')}
+          </button>
+        ) : undefined
+      }
+    >
       <div className="settings-card">
         <div className="settings-row">
           <label htmlFor={inputId}>{t('默认工作目录')}</label>
@@ -60,20 +75,11 @@ export function HostWorkspaceSettings({
                 })
               }
             >
+              <Icon name="folder" size={15} />
               {t('浏览')}
             </button>
           </div>
         </div>
-      </div>
-      <div className="settings-actions workspace-actions">
-        <button
-          type="button"
-          className="text-button"
-          disabled={busy || path === settings.defaultWorkspaceDir}
-          onClick={() => void act(() => persist(settings.defaultWorkspaceDir))}
-        >
-          {t('恢复默认')}
-        </button>
       </div>
     </SettingsSection>
   );

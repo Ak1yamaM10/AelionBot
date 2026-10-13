@@ -1,27 +1,213 @@
+/* Files stand below the bubble they came with, as part of the same group. */
 .message-attachments {
   display: flex;
   flex-wrap: wrap;
-  gap: 8px;
-  margin-top: 9px;
+  gap: 6px;
+  margin-top: 3px;
   max-width: 100%;
   color: inherit;
 }
-.attachment-card {
-  width: 320px;
+:is(.bubble, .group-message-bubble, .peer-bubble, .run-step-note) > .message-attachments {
+  margin-top: 9px;
 }
-.attachment-open img {
-  width: 38px;
-  height: 42px;
-  object-fit: cover;
-  border-radius: 6px;
-  flex-shrink: 0;
+.is-media > .message-attachments:first-child {
+  margin-top: 0;
+}
+.is-media > .chat-images + .message-attachments {
+  margin-top: 3px;
+}
+.message-row.user > .message-attachments,
+.group-message.from-user .message-attachments {
+  justify-content: flex-end;
+}
+
+/* A file in a message: what it holds on top (the first lines of a text file, otherwise its kind), its name below.
+   The kind's color (--file-ink, file-cards.css) tints the top. */
+:where(.attachment-thumb) {
+  --file-ink: light-dark(#85818e, #c2bfc5);
+}
+.attachment-thumb {
+  --file-title: var(--text-ink);
+  --file-muted: var(--text-secondary);
+  --thumb-surface: var(--bubble-surface);
+  --thumb-paper: light-dark(#fff, #3b3742);
+  --thumb-edge: light-dark(#2a1f3a0d, #ffffff0d);
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  width: 172px;
+  max-width: 100%;
+  border-radius: 14px;
+  background: var(--thumb-surface);
+  box-shadow:
+    var(--bubble-lift),
+    0 0 0 1px var(--thumb-edge);
+  overflow: hidden;
+  text-align: left;
+  transition: box-shadow 0.15s;
+}
+/* Inside a bubble the tile has no shadow to lift it, so it gets a line. */
+:is(.bubble, .group-message-bubble, .peer-bubble, .run-step-note):not(.is-media) .attachment-thumb {
+  --thumb-edge: light-dark(#e3deea, #453f4d);
+}
+.attachment-thumb:hover,
+.attachment-thumb:focus-within {
+  --thumb-edge: light-dark(#c6b5d6, #6d5f86);
+}
+.attachment-thumb-preview {
+  position: relative;
+  display: grid;
+  place-items: center;
+  height: 108px;
+  background: color-mix(in srgb, var(--file-ink) 16%, var(--thumb-surface));
+  overflow: hidden;
+}
+.file-glyph {
+  display: grid;
+  place-items: center;
+  width: 46px;
+  height: 46px;
+  border-radius: 13px;
+  background: var(--file-ink);
+  color: light-dark(#fff, #231f29);
+}
+.file-glyph > svg {
+  width: 26px;
+  height: 26px;
+}
+/* A sheet of paper rising from the bottom edge. Its text is laid out at twice the size and scaled down, so it stays
+   sharp and wraps like the real page. */
+.attachment-thumb-page {
+  position: absolute;
+  left: 18px;
+  right: 18px;
+  top: 14px;
+  bottom: -4px;
+  border-radius: 5px 5px 0 0;
+  background: var(--thumb-paper);
+  box-shadow:
+    0 1px 4px #1d142826,
+    0 0 0 0.5px #1d14281f;
+  overflow: hidden;
+}
+.file-mini {
+  width: 200%;
+  margin: 0;
+  padding: 14px 16px 0;
+  transform: scale(0.5);
+  transform-origin: 0 0;
+  font-size: 11px;
+  line-height: 1.55;
+  color: var(--text-secondary);
+  text-align: left;
+  overflow-wrap: anywhere;
+}
+.file-mini > :is(b, p) {
+  display: block;
+  margin: 0;
+}
+.file-mini > b {
+  margin: 6px 0 2px;
+  font-size: 12px;
+  font-weight: var(--weight-heading);
+  color: var(--text-ink);
+}
+.file-mini > b:first-child {
+  margin: 0 0 5px;
+  font-size: 15px;
+  line-height: 1.4;
+}
+.file-mini.is-code {
+  font-family: var(--font-code);
+  line-height: 1.6;
+  white-space: pre;
+  overflow-wrap: normal;
+}
+.file-mini.is-table {
+  padding: 0;
+  border-collapse: collapse;
+  table-layout: fixed;
+  font-variant-numeric: tabular-nums;
+}
+.file-mini.is-table :is(th, td) {
+  padding: 4px 10px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  text-align: left;
+  font-weight: var(--weight-body);
+}
+.file-mini.is-table th {
+  padding-block: 5px;
+  background: color-mix(in srgb, var(--file-ink) 20%, var(--thumb-paper));
+  font-weight: var(--weight-heading);
+  color: var(--text-ink);
+}
+.file-mini.is-table td {
+  border-bottom: 1px solid light-dark(#ebe7f0, #4a4552);
+}
+.attachment-thumb-open {
+  display: block;
+  width: 100%;
+  padding: 9px 12px 10px;
+  text-align: left;
+  color: var(--file-title);
+}
+.attachment-thumb-open::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: 14px;
+}
+.attachment-thumb-open:focus-visible {
+  outline: none;
+}
+.attachment-thumb-open:focus-visible::before {
+  outline: 2px solid light-dark(#9783d7, #8f7fb3);
+  outline-offset: -2px;
+}
+:root .attachment-thumb .file-tile-name {
+  font-size: calc(13px * var(--appearance-text-scale, 1));
+}
+:root .attachment-thumb .file-tile-meta {
+  margin-top: 1px;
+  font-size: calc(11.5px * var(--appearance-text-scale, 1));
+}
+.attachment-thumb-save {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border-radius: 50%;
+  background: var(--thumb-surface);
+  color: var(--text-secondary);
+  box-shadow: 0 1px 4px #1d142838;
+  opacity: 0;
+  transition: opacity 0.15s;
+}
+.attachment-thumb:hover .attachment-thumb-save,
+.attachment-thumb-save:focus-visible {
+  opacity: 1;
+}
+.attachment-thumb-save:hover {
+  color: var(--text-ink);
+}
+@media (prefers-reduced-motion: reduce) {
+  .attachment-thumb,
+  .attachment-thumb-save {
+    transition: none;
+  }
 }
 
 /* Chat images sit above the bubble at their own aspect ratio; several form a two-column mosaic. */
 .chat-images {
   display: grid;
   gap: 4px;
-  margin-bottom: 6px;
+  margin-bottom: 3px;
   max-width: min(86%, 400px);
 }
 .chat-images.is-mosaic {
@@ -143,13 +329,13 @@
   justify-content: end;
 }
 /* A message that is only images shows them in a see-through bubble so hover actions still have a target. */
-.bubble.is-media {
+:is(.bubble, .group-message-bubble).is-media {
   min-height: 0;
   padding: 0 !important;
   background: none !important;
   box-shadow: none !important;
 }
-.bubble.is-media .chat-images {
+.is-media > .chat-images {
   margin-bottom: 0;
   max-width: 400px;
 }
@@ -229,11 +415,6 @@
 }
 .attachment-tag .file-type-lines {
   display: none;
-}
-.attachment-tag .attachment-open img {
-  width: 25px;
-  height: 28px;
-  border-radius: 4px;
 }
 .attachment-tag .file-tile-name {
   font-size: calc(12px * var(--appearance-text-scale, 1));

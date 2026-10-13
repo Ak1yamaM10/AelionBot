@@ -58,9 +58,10 @@ textarea {
   grid-template-columns: var(--sidebar-width) minmax(380px, 1fr);
   overflow: hidden;
 }
+/* The sidebar and the header are the window's frame: white, with the conversation's ground set into it. */
 .sidebar {
-  background: light-dark(#f7f7f7, #211f25);
-  border-right: 1px solid light-dark(#e7e7e7, #3e3945);
+  background: light-dark(#fff, #211f25);
+  border-right: 1px solid light-dark(#e6e3ec, #3e3945);
   display: flex;
   flex-direction: column;
   min-height: 0;
@@ -96,8 +97,8 @@ textarea {
 .search {
   margin: 4px 15px 13px;
   padding: 9px 12px;
-  background: light-dark(#ededed, #232127);
-  border: 1px solid light-dark(#e4e4e4, #3e3945);
+  background: light-dark(#f1eff4, #232127);
+  border: 1px solid light-dark(#eceaf0, #3e3945);
   border-radius: 11px;
   display: flex;
   gap: 9px;
@@ -127,10 +128,10 @@ textarea {
   margin: 2px 0;
 }
 .bot-item:hover {
-  background: light-dark(#ededed, #232127);
+  background: light-dark(#f5f3f8, #232127);
 }
 .bot-item.selected {
-  background: light-dark(#e3e3e3, #252329);
+  background: light-dark(#efedf3, #252329);
 }
 .bot-copy {
   min-width: 0;
@@ -165,7 +166,7 @@ textarea {
   background: light-dark(#26b082, #97d5c0);
   width: 9px;
   height: 9px;
-  border: 2px solid light-dark(#e3e3e3, #3e3945);
+  border: 2px solid light-dark(#fff, #3e3945);
   border-radius: 50%;
 }
 .sidebar-bottom {
@@ -180,7 +181,7 @@ textarea {
   border-radius: 10px;
 }
 .sidebar-link:hover {
-  background: light-dark(#ececec, #232127);
+  background: light-dark(#f3f1f6, #232127);
 }
 .setup-dot {
   width: 6px;
@@ -202,7 +203,8 @@ textarea {
   align-items: center;
   justify-content: space-between;
   padding: 13px 23px;
-  border-bottom: 1px solid light-dark(#eeeeef, #3e3945);
+  border-bottom: 1px solid light-dark(#e6e3ec, #3e3945);
+  background: light-dark(#fff, #25232a);
   flex-shrink: 0;
 }
 .bot-heading {
@@ -233,7 +235,7 @@ textarea {
   overflow-y: auto;
   padding: 22px 27px 14px;
   scrollbar-width: thin;
-  scrollbar-color: light-dark(#e2e2e2, #a19ea4) transparent;
+  scrollbar-color: light-dark(#d6d2dd, #a19ea4) transparent;
 }
 .day-separator {
   text-align: center;
@@ -242,32 +244,35 @@ textarea {
   margin-bottom: 25px;
 }
 .message-row {
+  position: relative;
   display: flex;
   flex-direction: column;
   align-items: flex-start;
-  margin: 14px 0 22px;
+  margin: 16px 0;
 }
 .message-row.user {
   align-items: flex-end;
 }
+/* On the conversation's ground; your own messages take the accent tint. Grouping and corners: message-surfaces.css. */
 .bubble {
+  position: relative;
   min-width: 0;
   white-space: pre-wrap;
   overflow-wrap: anywhere;
-  background: light-dark(#efedf2, #232127);
+  background: var(--bubble-surface);
   color: light-dark(#34313c, #dfdce2);
-  border-radius: 17px 17px 17px 6px;
-  padding: 14px 18px;
+  border-radius: 18px;
+  padding: 8px 13px;
   line-height: 1.85;
-  max-width: min(86%, 700px);
+  max-width: min(82%, 680px);
   font-size: calc(14px * var(--appearance-text-scale, 1));
+  box-shadow: var(--bubble-lift);
 }
 .message-row.user .bubble {
-  background: light-dark(#e9e2f3, #232127);
-  color: light-dark(#46374f, #c3bcc8);
-  border-radius: 17px 17px 6px 17px;
-  padding: 13px 18px;
-  max-width: min(76%, 620px);
+  background: light-dark(#e3d7f4, #44374f);
+  color: light-dark(#2e2440, #f0e8f7);
+  max-width: min(72%, 560px);
+  box-shadow: none;
 }
 .bubble.failed {
   background: light-dark(#fff2ef, #211f25);
@@ -496,19 +501,6 @@ textarea {
   line-height: 1.6;
   min-height: 26px;
 }
-.progress-track {
-  height: 4px;
-  background: light-dark(#e8ebed, #232127);
-  border-radius: 5px;
-  margin: 10px 0;
-  overflow: hidden;
-}
-.progress-track > div {
-  height: 100%;
-  background: light-dark(#8caac5, #acb9c6);
-  border-radius: 5px;
-  transition: width 0.3s;
-}
 .computer-actions {
   display: flex;
   gap: 8px;
@@ -636,30 +628,6 @@ dd {
   display: block;
   color: light-dark(#a4a7ab, #b6b3b9);
   margin-top: 6px;
-}
-.memory-card {
-  background: light-dark(#f1f2f2, #222026);
-  padding: 12px;
-  border-radius: 9px;
-  margin-bottom: 8px;
-  font-size: calc(12px * var(--appearance-text-scale, 1));
-  line-height: 1.7;
-}
-.skill-card {
-  border: 1px solid light-dark(#e6e6e6, #3e3945);
-  border-radius: 9px;
-  padding: 11px;
-  margin-bottom: 8px;
-  font-size: calc(12px * var(--appearance-text-scale, 1));
-  background: light-dark(#fff, #201e24);
-}
-.skill-card summary {
-  cursor: pointer;
-}
-.skill-card pre {
-  white-space: pre-wrap;
-  font: var(--weight-body) calc(13px * var(--appearance-text-scale, 1))/1.8 inherit;
-  color: light-dark(#7e8388, #c3c0c6);
 }
 .text-button {
   color: light-dark(#7893aa, #b5c3ce);
@@ -943,13 +911,6 @@ dd {
 :root .details-top {
   padding-top: 32px;
 }
-:root .skill-card pre {
-  font: var(--weight-body) calc(13px * var(--appearance-text-scale, 1))/1.7 var(--font-code);
-  overflow-wrap: anywhere;
-  max-height: 340px;
-  overflow: auto;
-  color: light-dark(#60666c, #cecbd1);
-}
 
 /* The side panel is a computer surface; files stay with their conversation. */
 .computer-details {
@@ -1042,28 +1003,6 @@ dd {
   padding-top: 20px;
   min-height: 360px;
 }
-.about-app {
-  padding: 20px 0;
-}
-.about-app .brand {
-  font-size: calc(24px * var(--appearance-text-scale, 1));
-}
-.about-version {
-  margin: 10px 0 0;
-  font-size: calc(13px * var(--appearance-text-scale, 1));
-  color: light-dark(#8a9199, #bebbc1);
-}
-.scope-picker {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  color: light-dark(#89929c, #bebbc1);
-  font-size: calc(12px * var(--appearance-text-scale, 1));
-  margin: 0 0 22px;
-}
-.scope-picker .aelion-select {
-  max-width: 300px;
-}
 .settings-skill {
   border: 1px solid light-dark(#e3e7eb, #3e3945);
   border-radius: 12px;
@@ -1121,53 +1060,6 @@ dd {
   color: light-dark(#a0a7af, #b6b3b9);
   font-size: calc(13px * var(--appearance-text-scale, 1));
   line-height: 1.9;
-}
-.settings-computer-title {
-  display: flex;
-  gap: 15px;
-  align-items: center;
-  color: light-dark(#65788d, #b8c2cc);
-  padding: 12px 0 26px;
-}
-.settings-computer-title strong {
-  font-size: calc(16px * var(--appearance-text-scale, 1));
-  color: light-dark(#344250, #bbc2c9);
-  font-weight: var(--weight-label);
-}
-.settings-computer-title p {
-  font-size: calc(12px * var(--appearance-text-scale, 1));
-  color: light-dark(#95a0ab, #b9b6bc);
-  margin: 6px 0 0;
-}
-.settings-specs {
-  font-size: calc(12px * var(--appearance-text-scale, 1));
-  gap: 16px;
-  grid-template-columns: 1fr 2fr;
-  border-top: 1px solid light-dark(#edf0f3, #3e3945);
-  padding-top: 21px;
-}
-.settings-maintenance {
-  border-top: 1px solid light-dark(#edf0f3, #3e3945);
-  margin-top: 24px;
-  padding-top: 8px;
-}
-.settings-maintenance button {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  width: 100%;
-  padding: 14px 5px;
-  font-size: calc(12px * var(--appearance-text-scale, 1));
-  color: light-dark(#687786, #c8c5cb);
-  text-align: left;
-}
-.settings-maintenance button > svg:last-child {
-  margin-left: auto;
-  color: light-dark(#a8b2bb, #b3b0b6);
-}
-.settings-maintenance button:hover {
-  background: light-dark(#f5f7f9, #211f25);
-  border-radius: 8px;
 }
 
 .preview-modal {
@@ -1759,26 +1651,6 @@ select:focus-visible,
 [contenteditable='true']:focus {
   outline: 0;
   box-shadow: none;
-}
-.learning-setting {
-  display: flex;
-  gap: 20px;
-  align-items: center;
-  justify-content: space-between;
-  padding: 16px 0 19px;
-  border-bottom: 1px solid light-dark(#e9edf2, #3e3945);
-  margin-bottom: 18px;
-}
-.learning-setting strong {
-  font-size: calc(13px * var(--appearance-text-scale, 1));
-  font-weight: var(--weight-label);
-  color: light-dark(#64778c, #b8c2cc);
-}
-.learning-setting > div > span {
-  display: block;
-  margin-top: 6px;
-  font-size: calc(12px * var(--appearance-text-scale, 1));
-  color: light-dark(#91a6b9, #b8c2cc);
 }
 .learning-switch {
   width: 36px;

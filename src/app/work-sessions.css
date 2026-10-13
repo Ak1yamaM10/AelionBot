@@ -54,10 +54,10 @@
   color: light-dark(#9a9ba0, #8f8b95);
 }
 .session-item:hover {
-  background: light-dark(#ededed, #232127);
+  background: light-dark(#f5f3f8, #232127);
 }
 .session-item.selected {
-  background: light-dark(#e3e3e3, #252329);
+  background: light-dark(#efedf3, #252329);
   color: light-dark(#25282c, #f0edf3);
 }
 .session-item.selected .session-name {

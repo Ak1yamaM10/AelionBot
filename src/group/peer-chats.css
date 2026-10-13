@@ -291,10 +291,11 @@
 }
 .peer-message .peer-bubble {
   min-width: 0;
-  padding: 13px 17px;
-  background: light-dark(#efedf2, #232127);
+  padding: 10px 14px;
+  background: var(--bubble-surface);
   color: light-dark(#34313c, #dfdce2);
-  border-radius: 6px 17px 17px 17px;
+  border-radius: 6px 18px 18px 18px;
+  box-shadow: var(--bubble-lift);
   overflow-wrap: anywhere;
   font-size: calc(14px * var(--appearance-text-scale, 1));
   line-height: 1.85;

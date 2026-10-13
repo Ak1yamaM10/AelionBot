@@ -1,0 +1,100 @@
+/* A scheduled task firing. It speaks for you, so it stands on your side of the conversation; a card with the task's
+   name, instead of a tinted bubble, says nobody typed it just now. */
+.scheduled-trigger {
+  display: flex;
+  justify-content: flex-end;
+  margin: 16px 0;
+}
+.scheduled-card {
+  min-width: 0;
+  max-width: min(72%, 560px);
+  padding: 12px 14px 11px;
+  border-radius: 18px;
+  background: var(--bubble-surface);
+  box-shadow: var(--bubble-lift);
+  color: var(--text-ink);
+  text-align: left;
+}
+.scheduled-card > header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+.scheduled-card-icon {
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  width: 30px;
+  height: 30px;
+  border-radius: 10px;
+  background: light-dark(#ece5f5, #3b3148);
+  color: light-dark(#7a5c9e, #bda8d8);
+}
+.scheduled-card-heading {
+  display: block;
+  min-width: 0;
+}
+.scheduled-card-heading > strong {
+  display: block;
+  font-size: var(--text-control);
+  font-weight: var(--weight-label);
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+}
+.scheduled-card-heading > small {
+  display: block;
+  margin-top: 1px;
+  font-size: var(--text-caption);
+  line-height: 1.5;
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+}
+/* The instruction is yours and usually long: two lines are enough to recognize it. */
+.scheduled-card-prompt {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  margin: 9px 0 0;
+  overflow: hidden;
+  font-size: calc(13.5px * var(--appearance-text-scale, 1));
+  line-height: 1.7;
+  color: var(--text-secondary);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.scheduled-card.is-open .scheduled-card-prompt {
+  display: block;
+  -webkit-line-clamp: none;
+}
+.scheduled-card .scheduled-card-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin: 5px 0 0 -6px;
+  padding: 2px 6px;
+  border-radius: 7px;
+  font-size: var(--text-caption);
+  font-weight: var(--weight-body);
+  color: var(--text-muted);
+}
+.scheduled-card .scheduled-card-toggle:hover {
+  background: light-dark(#29282c0d, #ffffff0f);
+  color: var(--text-secondary);
+}
+.scheduled-card-toggle > svg {
+  transition: transform 0.18s;
+}
+.scheduled-card.is-open .scheduled-card-toggle > svg {
+  transform: rotate(180deg);
+}
+@container conversation (max-width:560px) {
+  .scheduled-card {
+    max-width: 86%;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .scheduled-card-toggle > svg {
+    transition: none;
+  }
+}

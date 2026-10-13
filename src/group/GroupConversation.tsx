@@ -42,6 +42,7 @@ import './group-chats.css';
 import { AttachmentList } from '../files/Attachments';
 import { attachmentSummary } from '../../shared/types/attachment-types';
 import { MessageActions } from '../chat/MessagePins';
+import { ScheduledTriggerCard } from '../chat/ScheduledTrigger';
 import type { BotActivities } from '../bots/bot-activity';
 import { useI18n } from '../i18n';
 
@@ -474,13 +475,7 @@ const GroupMessageRow = memo(function GroupMessageRow({
       <>
         <MessageTime id={message.id} time={message.time} />
         <div className="scheduled-trigger" data-group-message-id={message.id}>
-          <div>
-            <Icon name="clock" size={15} />
-            <span>
-              {t('定时任务')} · {message.scheduled.title}
-            </span>
-          </div>
-          <p>{message.content}</p>
+          <ScheduledTriggerCard title={message.scheduled.title} content={message.content} time={message.time} />
         </div>
       </>
     );
@@ -503,6 +498,8 @@ const GroupMessageRow = memo(function GroupMessageRow({
       body === presentation.content
         ? { content: body, mentions: presentation.mentions }
         : botMentions(body, members, bot?.id, false);
+  // Files stand below the bubble; a message that is only attachments shows them without one.
+  const bare = Boolean(message.attachments?.length) && !formatted.content && !message.reply;
   return (
     <>
       <MessageTime id={message.id} time={message.time} />
@@ -517,13 +514,14 @@ const GroupMessageRow = memo(function GroupMessageRow({
             messageId={message.id}
             content={formatted.content || attachmentSummary(message.attachments)}
             pins={message.pins}
-            bubbleClassName="group-message-bubble markdown"
+            bubbleClassName={`group-message-bubble markdown ${bare ? 'is-media' : ''}`}
             onReply={() => actions.reply(message, formatted.content, author)}
             onPin={actions.pin}
+            after={bare ? undefined : <AttachmentList files={message.attachments} only="files" />}
           >
             {message.reply && <MessageQuote reply={message.reply} />}
             <MentionContent content={formatted.content} mentions={formatted.mentions} markdown />
-            <AttachmentList files={message.attachments} />
+            <AttachmentList files={message.attachments} only={bare ? undefined : 'images'} />
           </MessageActions>
           {unanswered && <div className="group-unanswered">{t('没有 Bot 回应，可以 @ 一个')}</div>}
           {message.sender.kind === 'user' && <GroupDecisionTrail deliveries={deliveries} laya={laya} bots={members} />}

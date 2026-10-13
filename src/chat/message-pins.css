@@ -1,4 +1,4 @@
-/* Compact reactions overlap the bubble edge, with a flat canvas-colored cutout. */
+/* Reactions sit just below the bubble as small white chips; your own take the accent tint. */
 .message-pins {
   position: relative;
   z-index: 1;
@@ -6,8 +6,8 @@
   flex-wrap: wrap;
   align-items: center;
   gap: 5px;
-  margin: -5px 10px 0;
-  max-width: calc(100% - 20px);
+  margin: 4px 2px 0;
+  max-width: calc(100% - 4px);
 }
 .pin-chip {
   position: relative;
@@ -15,45 +15,47 @@
   align-items: center;
   justify-content: center;
   gap: 5px;
-  padding: 2px 9px;
-  border: 0;
+  padding: 0 9px;
+  border: 1px solid light-dark(#e3deea, #453f4d);
   border-radius: 999px;
-  background: light-dark(#dcecff, #232127);
-  box-shadow: 0 0 0 2px #fbfafc;
-  min-width: 36px;
-  min-height: 24px;
+  background: light-dark(#fff, #302c37);
+  box-shadow: 0 1px 1.5px light-dark(#2a1f3a14, #0000);
+  min-height: 25px;
   line-height: 1;
-  transition: background 0.15s;
+  transition:
+    background 0.15s,
+    border-color 0.15s;
   animation: pin-appear 0.16s ease-out;
 }
 .pin-chip > span {
   display: block;
   font-family: 'Segoe UI Emoji', 'Apple Color Emoji', sans-serif;
-  font-size: 16px;
+  font-size: 14px;
   line-height: 20px;
   font-weight: var(--weight-body);
 }
 .pin-chip small {
   font-size: 12px;
-  font-weight: var(--weight-body);
+  font-weight: var(--weight-label);
   font-variant-numeric: tabular-nums;
-  color: light-dark(#587694, #b3c2d1);
+  color: light-dark(#5f5b67, #c2bdc8);
 }
 .pin-chip.own {
-  background: light-dark(#cfe5ff, #242228);
+  background: light-dark(#ece5f5, #3b3148);
+  border-color: light-dark(#cdbfe0, #5d4d70);
 }
 .pin-chip.own small {
-  color: light-dark(#466887, #b2c3d2);
+  color: light-dark(#7a5c9e, #bda8d8);
 }
-.pin-chip:hover {
-  background: light-dark(#cce3ff, #242228);
+.pin-chip:not(:disabled):hover {
+  border-color: light-dark(#cdc5d8, #5a5363);
 }
-.pin-chip.own:hover {
-  background: light-dark(#c2ddfc, #252329);
+.pin-chip.own:not(:disabled):hover {
+  background: light-dark(#e4daf1, #43384f);
 }
 .pin-chip:focus-visible {
-  outline: 2px solid light-dark(#8db9e8, #3e3945);
-  outline-offset: 3px;
+  outline: 2px solid light-dark(#b7a7cd, #6d5f86);
+  outline-offset: 2px;
 }
 .group-message.from-user .message-pins {
   justify-content: flex-end;

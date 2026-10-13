@@ -1,7 +1,11 @@
+/* The diagnostics card on the About page: what the package holds, then the two ways to send it. */
 .feedback-card {
-  padding: 22px 26px;
-  border-radius: 18px;
-  background: light-dark(#f0f0f0, #222026);
+  padding: 16px 18px 14px;
+  border-radius: var(--settings-radius, 14px);
+  background: var(--settings-card, light-dark(#fff, #2b2831));
+  box-shadow:
+    0 0 0 1px var(--settings-ring, light-dark(#1d14280f, #ffffff0f)),
+    var(--settings-lift, 0 1px 2px #1d14280d);
 }
 .feedback-heading {
   display: flex;
@@ -12,16 +16,15 @@
   font-weight: var(--weight-label);
 }
 .feedback-heading .text-button {
-  font-weight: var(--weight-label);
-  font-size: calc(12px * var(--appearance-text-scale, 1));
-  padding-right: 0;
+  margin: -6px -10px -6px 0;
+  font-weight: var(--weight-body);
 }
 .feedback-description,
 .feedback-status {
+  margin: 6px 0 0;
   font-size: calc(12px * var(--appearance-text-scale, 1));
   line-height: 1.7;
-  color: light-dark(#818181, #c4c1c7);
-  margin: 12px 0;
+  color: var(--text-secondary);
   overflow-wrap: anywhere;
 }
 .feedback-meta {
@@ -29,41 +32,51 @@
   flex-wrap: wrap;
   justify-content: space-between;
   gap: 8px;
-  color: light-dark(#8c8c8c, #c0bdc3);
+  margin: 14px 0 0;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: var(--settings-fill, light-dark(#f7f7f8, #26232b));
+  color: var(--text-secondary);
   font-size: calc(12px * var(--appearance-text-scale, 1));
-  margin: 18px 0 12px;
+  font-variant-numeric: tabular-nums;
 }
 .feedback-preview {
+  margin: 10px 0 0;
   font-size: calc(12px * var(--appearance-text-scale, 1));
-  color: light-dark(#626262, #cfccd2);
-  margin: 12px 0;
+  color: var(--text-secondary);
 }
 .feedback-preview summary {
-  cursor: pointer;
+  width: fit-content;
   padding: 4px 0;
+  cursor: pointer;
+}
+.feedback-preview summary:hover {
+  color: var(--text-ink);
 }
 .feedback-preview pre {
   max-height: 240px;
+  margin: 8px 0 0;
+  padding: 12px 14px;
   overflow: auto;
+  border-radius: 10px;
+  background: var(--settings-field, light-dark(#f4f4f6, #221f26));
   white-space: pre-wrap;
   overflow-wrap: anywhere;
-  background: light-dark(#fafafa, #211f25);
-  padding: 14px;
-  border-radius: 8px;
-  font: var(--weight-body) calc(13px * var(--appearance-text-scale, 1))/1.7 var(--font-code);
+  font: var(--weight-body) calc(12.5px * var(--appearance-text-scale, 1)) / 1.7 var(--font-code);
 }
 .feedback-preview ul {
-  list-style: none;
+  margin: 8px 0 0;
   padding: 0;
-  margin: 10px 0;
+  list-style: none;
 }
 .feedback-preview li {
   display: flex;
   justify-content: space-between;
   gap: 15px;
-  padding: 4px 0;
+  padding: 4px 2px;
   font-size: calc(12px * var(--appearance-text-scale, 1));
   overflow-wrap: anywhere;
+  font-variant-numeric: tabular-nums;
 }
 .feedback-preview li span:last-child {
   white-space: nowrap;
@@ -71,8 +84,8 @@
 .feedback-actions {
   display: flex;
   flex-wrap: wrap;
-  gap: 10px;
-  margin-top: 20px;
+  gap: 8px;
+  margin-top: 14px;
 }
 .feedback-actions button {
   display: inline-flex;
@@ -80,11 +93,13 @@
   gap: 7px;
 }
 .feedback-error {
+  margin: 10px 0 0;
   font-size: calc(12px * var(--appearance-text-scale, 1));
-  color: light-dark(#ad5d4e, #dfb7b0);
   line-height: 1.7;
+  color: light-dark(#a3554a, #e3b4ab);
   overflow-wrap: anywhere;
 }
-.feedback-status:last-child {
-  margin-bottom: 0;
+.feedback-actions + .feedback-status {
+  margin-top: 10px;
+  color: var(--text-muted);
 }

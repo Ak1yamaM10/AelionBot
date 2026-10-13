@@ -529,37 +529,6 @@
   border-color: light-dark(#96575c, #3e3945);
   color: light-dark(#fff, #231f29);
 }
-.scheduled-trigger {
-  padding: 1px 0 1px 13px;
-  margin: 20px 0;
-  border: 0;
-  border-left: 2px solid light-dark(#dedee5, #3e3945);
-  border-radius: 0;
-  background: transparent;
-  font-size: calc(13px * var(--appearance-text-scale, 1));
-  line-height: 1.8;
-}
-.scheduled-trigger > div {
-  display: flex;
-  align-items: center;
-  gap: 7px;
-  font-size: calc(12px * var(--appearance-text-scale, 1));
-  color: light-dark(#83838d, #c1bec4);
-}
-.scheduled-trigger > div > svg {
-  color: light-dark(#9999a3, #bab7bd);
-}
-.scheduled-trigger p {
-  margin: 6px 0 0;
-  white-space: pre-wrap;
-  overflow-wrap: anywhere;
-  color: light-dark(#53535d, #d3d0d6);
-}
-.scheduled-trigger time {
-  margin-left: auto;
-  font-size: calc(12px * var(--appearance-text-scale, 1));
-  color: light-dark(#9999a3, #bab7bd);
-}
 @media (max-width: 600px) {
   .scheduled-layer {
     padding: 12px;

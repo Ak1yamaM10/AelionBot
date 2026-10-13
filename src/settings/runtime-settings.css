@@ -1,62 +1,53 @@
+/* Runtime limits: two cards of number fields side by side, then file recovery, and a save bar that floats at the
+   bottom of the page while anything is unsaved. Built from the settings tokens (settings.css). */
 .runtime-settings {
   container: runtime / inline-size;
-  max-width: 880px;
   min-width: 0;
-  color: light-dark(#37343d, #dedbe1);
-}
-.runtime-intro {
-  margin: 0 0 20px;
-  color: light-dark(#7e7588, #c5c2c8);
-  font-size: calc(12px * var(--appearance-text-scale, 1));
-  line-height: 1.7;
+  color: var(--text-ink);
 }
 .runtime-fields {
-  border: 0;
-  padding: 0;
-  margin: 0;
   min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
 }
 .runtime-columns {
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-  gap: 38px;
+  gap: 18px;
   align-items: start;
-}
-.runtime-group-wide {
-  margin-top: 24px;
-}
-.runtime-group-wide .runtime-group-fields {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-  gap: 38px;
-}
-.runtime-group-wide .runtime-field {
-  border-bottom: 0;
 }
 .runtime-group {
   min-width: 0;
 }
+.runtime-group-wide {
+  margin-top: 26px;
+}
 .settings-modal .runtime-group h3 {
-  margin: 0 0 11px;
+  margin: 0 4px 8px;
   font-size: calc(13px * var(--appearance-text-scale, 1));
+  font-weight: var(--weight-label);
   line-height: 1.5;
-  font-weight: var(--weight-heading);
-  color: light-dark(#514b5b, #d4d1d7);
+  color: var(--text-secondary);
 }
 .runtime-group-fields {
-  border-top: 1px solid light-dark(#e2dfe7, #3e3945);
+  padding: 0 16px;
+  border-radius: var(--settings-radius);
+  background: var(--settings-card);
+  box-shadow:
+    0 0 0 1px var(--settings-ring),
+    var(--settings-lift);
 }
 .runtime-field {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 12px;
+  gap: 14px;
   min-height: 60px;
   padding: 10px 0;
-  border-bottom: 1px solid light-dark(#eceaf0, #3e3945);
 }
-.runtime-field:last-child {
-  border-bottom: 0;
+.runtime-field + .runtime-field {
+  border-top: 1px solid var(--settings-line);
 }
 .settings-modal .runtime-field-copy {
   display: block;
@@ -64,51 +55,57 @@
   min-width: 0;
   margin: 0;
   padding: 0;
-  font-size: calc(13px * var(--appearance-text-scale, 1));
+  font-size: calc(13.5px * var(--appearance-text-scale, 1));
   line-height: 1.5;
-  color: light-dark(#47424f, #d8d5db);
+  color: var(--text-ink);
 }
 .runtime-field-copy > span {
   display: block;
 }
 .runtime-field-copy small {
   display: block;
-  margin-top: 4px;
-  color: light-dark(#766f80, #c7c4ca);
-  font-size: calc(12px * var(--appearance-text-scale, 1));
+  margin-top: 2px;
+  color: var(--text-muted);
+  font-size: var(--text-caption);
   line-height: 1.5;
   font-weight: var(--weight-body);
 }
 .runtime-field-copy small.is-invalid {
-  color: light-dark(#9b5d4e, #d9bab3);
+  color: light-dark(#a3554a, #e3b4ab);
 }
+/* A number with its unit inside the field, read right-aligned like a figure. */
 .runtime-number {
   display: flex;
   align-items: center;
-  gap: 7px;
-  flex: 0 0 136px;
-  width: 136px;
+  gap: 6px;
+  flex: 0 0 124px;
+  width: 124px;
   min-width: 0;
-  height: 36px;
+  height: var(--settings-control-height);
   padding: 0 10px;
-  border: 1px solid light-dark(#e1dee6, #3e3945);
-  border-radius: 8px;
-  background: light-dark(#fff, #201e24);
-  transition: border-color 0.15s;
+  border: 1px solid transparent;
+  border-radius: var(--settings-control-radius);
+  background: var(--settings-field);
+  transition:
+    border-color 0.15s,
+    background 0.15s,
+    box-shadow 0.15s;
+}
+.runtime-number:hover {
+  border-color: var(--settings-field-line);
 }
 .runtime-number:focus-within {
-  border-color: light-dark(#a897bd, #3e3945);
-  outline: 2px solid light-dark(#bba7d21a, #3e39451a);
-  outline-offset: 1px;
+  border-color: light-dark(#a68bcf, #8f7fb3);
+  background: var(--settings-card);
+  box-shadow: 0 0 0 3px var(--settings-accent-soft);
 }
 .runtime-number.is-invalid {
-  border-color: light-dark(#c99585, #3e3945);
+  border-color: light-dark(#d39a8e, #a86a62);
 }
 .settings-modal .runtime-number input {
   display: block;
   width: 100%;
   min-width: 0;
-  min-height: 0;
   height: 32px;
   margin: 0;
   padding: 0;
@@ -117,9 +114,9 @@
   background: transparent;
   box-shadow: none;
   outline: none;
-  color: light-dark(#4c4358, #c2bdc8);
-  font-size: calc(13px * var(--appearance-text-scale, 1));
-  font-weight: var(--weight-body);
+  color: var(--text-ink);
+  font-size: calc(13.5px * var(--appearance-text-scale, 1));
+  font-weight: var(--weight-label);
   font-variant-numeric: tabular-nums;
   text-align: right;
   appearance: textfield;
@@ -137,15 +134,15 @@
 .runtime-unit {
   flex-shrink: 0;
   min-width: 14px;
-  color: light-dark(#766f80, #c7c4ca);
-  font-size: calc(12px * var(--appearance-text-scale, 1));
+  color: var(--text-muted);
+  font-size: var(--text-caption);
   font-weight: var(--weight-body);
 }
 .runtime-number.is-stepper {
-  padding: 0 3px;
-  gap: 2px;
   flex-basis: 104px;
   width: 104px;
+  gap: 2px;
+  padding: 0 3px;
 }
 .runtime-number.is-stepper input {
   text-align: center;
@@ -157,101 +154,82 @@
   width: 28px;
   height: 28px;
   padding: 0;
-  border-radius: 5px;
-  color: light-dark(#8f859b, #bfbcc2);
+  border-radius: 7px;
+  background: transparent;
+  color: var(--text-secondary);
   font-size: calc(17px * var(--appearance-text-scale, 1));
   line-height: 1;
-  background: transparent;
 }
 .runtime-number button:hover:not(:disabled) {
-  background: light-dark(#f2eef7, #222026);
-  color: light-dark(#6b557f, #c2b7cc);
+  background: var(--settings-card);
+  color: var(--text-ink);
+  box-shadow: 0 1px 2px #1d14281f;
 }
 .runtime-number button:disabled {
   opacity: 0.25;
 }
-.runtime-checkpoint {
-  min-height: 64px;
-}
-.runtime-switch {
-  position: relative;
-  display: block;
-  flex-shrink: 0;
-  width: 36px;
-  height: 22px;
-  padding: 3px;
-  border: 0;
-  border-radius: 20px;
-  background: light-dark(#dbd8e1, #26242a);
-  transition: background 0.15s;
-}
-.runtime-switch > span {
-  display: block;
-  width: 16px;
-  height: 16px;
-  border-radius: 50%;
-  background: light-dark(#fff, #201e24);
-  transition: transform 0.15s;
-  box-shadow: 0 1px 3px #29213215;
-}
-.runtime-switch[aria-checked='true'] {
-  background: light-dark(#9a83bd, #b7adc7);
-}
-.runtime-switch[aria-checked='true'] > span {
-  transform: translateX(14px);
-}
 .runtime-fields:disabled {
   opacity: 0.7;
 }
+/* The save bar lies flat at the end of the page; once something is unsaved it lifts into a floating card that
+   stays in reach, like the composer over the conversation. */
 .runtime-actions {
   position: sticky;
   bottom: 0;
+  z-index: 2;
   display: flex;
   align-items: center;
   gap: 12px;
-  min-height: 66px;
-  margin-top: 22px;
-  padding: 15px 0 5px;
-  border-top: 1px solid light-dark(#e7e3ec, #3e3945);
-  background: light-dark(#fcfcfc, #201e24);
+  margin: 22px 0 0;
+  padding: 10px 10px 10px 8px;
+  border-radius: var(--settings-radius);
+  transition:
+    background 0.2s,
+    box-shadow 0.2s;
+}
+.runtime-actions[data-dirty] {
+  background: var(--settings-card);
+  box-shadow:
+    0 0 0 1px var(--settings-ring),
+    0 10px 30px -14px #1d142859;
 }
 .runtime-reset {
-  padding: 7px 0;
-  color: light-dark(#796c85, #c7c4ca);
-  font-size: calc(12px * var(--appearance-text-scale, 1));
+  padding: 6px 10px;
+  border-radius: 8px;
+  color: var(--settings-accent);
+  font-size: calc(12.5px * var(--appearance-text-scale, 1));
   white-space: nowrap;
 }
 .runtime-reset:hover:not(:disabled) {
-  color: light-dark(#6a537d, #c3b7cc);
+  background: var(--settings-accent-soft);
 }
 .runtime-save-state {
-  min-width: 0;
   flex: 1;
-  color: light-dark(#796783, #c8c5cb);
-  font-size: calc(12px * var(--appearance-text-scale, 1));
+  min-width: 0;
+  color: var(--text-secondary);
+  font-size: var(--text-caption);
   text-align: right;
   overflow-wrap: anywhere;
 }
 .runtime-save-state.is-error {
-  color: light-dark(#9b5d4e, #d9bab3);
+  color: light-dark(#a3554a, #e3b4ab);
 }
 .runtime-save {
   flex-shrink: 0;
-  padding: 9px 17px;
+  min-height: 34px;
+  padding: 6px 14px;
   border: 0;
-  border-radius: 8px;
-  background: light-dark(#39343f, #e0dbe6);
-  color: light-dark(#fff, #231f29);
-  font-size: calc(12px * var(--appearance-text-scale, 1));
-  min-height: 36px;
+  border-radius: var(--settings-control-radius);
+  background: var(--settings-accent-fill);
+  color: var(--settings-accent-ink);
+  font-size: calc(13px * var(--appearance-text-scale, 1));
+  transition: opacity 0.15s;
 }
 .runtime-save:hover:not(:disabled) {
-  background: light-dark(#514459, #e0dbe6);
+  background: light-dark(#6b4f8d, #b39bcb);
 }
 .runtime-save:disabled {
-  background: light-dark(#efedf2, #232127);
-  color: light-dark(#aea6b7, #b4b1b7);
-  opacity: 1;
+  opacity: 0.4;
 }
 .runtime-sr-only {
   position: absolute;
@@ -263,29 +241,16 @@
   clip-path: inset(50%);
   white-space: nowrap;
 }
-.settings-modal .settings-pane:has(.runtime-settings) .settings-heading {
-  padding-bottom: 18px;
-}
-@container runtime (max-width:610px) {
+@container runtime (max-width: 610px) {
   .runtime-columns {
     grid-template-columns: minmax(0, 1fr);
-    gap: 27px;
-  }
-  .runtime-group-wide .runtime-group-fields {
-    grid-template-columns: minmax(0, 1fr);
-    gap: 0;
-  }
-  .runtime-field {
-    min-height: 62px;
-  }
-  .runtime-intro {
-    margin-bottom: 23px;
+    gap: 26px;
   }
 }
-@container runtime (max-width:350px) {
+@container runtime (max-width: 350px) {
   .runtime-number {
-    flex-basis: 120px;
-    width: 120px;
+    flex-basis: 112px;
+    width: 112px;
   }
   .runtime-field {
     gap: 8px;
@@ -293,17 +258,9 @@
   .runtime-actions {
     gap: 8px;
   }
-  .runtime-save {
-    padding: 8px 12px;
-  }
-  .runtime-save-state {
-    font-size: calc(12px * var(--appearance-text-scale, 1));
-  }
 }
 @media (prefers-reduced-motion: reduce) {
-  .runtime-number,
-  .runtime-switch,
-  .runtime-switch > span {
+  .runtime-number {
     transition: none;
   }
 }

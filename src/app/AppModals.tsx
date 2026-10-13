@@ -154,7 +154,12 @@ export function AppModals({
           </div>
         )}
         {modal === 'settings' && (
-          <SettingsWindow tab={settingsTab} onTabChange={setSettingsTab} onClose={() => void act(closeModal)}>
+          <SettingsWindow
+            tab={settingsTab}
+            profile={state.userProfile}
+            onTabChange={setSettingsTab}
+            onClose={() => void act(closeModal)}
+          >
             {settingsTab === 'appearance' && <AppearanceSettings {...appearance} />}
             {settingsTab === 'profile' && <UserProfileSettings profile={state.userProfile} onNotify={setToast} />}
             {settingsTab === 'runtime' && <RuntimeSettings settings={state.runtime} onNotify={setToast} />}

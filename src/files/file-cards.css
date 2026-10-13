@@ -162,19 +162,6 @@
   --file-ink: light-dark(#727fc1, #b3b9da);
   --file-tint: light-dark(#eff0fb, #222026);
 }
-.file-preview-hint {
-  flex-shrink: 0;
-  color: var(--file-muted);
-  opacity: 0.5;
-  transition:
-    opacity 0.18s,
-    transform 0.18s;
-}
-.file-tile-open:hover .file-preview-hint,
-.file-tile-open:focus-visible .file-preview-hint {
-  opacity: 1;
-  transform: translateX(2px);
-}
 .artifact-card {
   width: 320px;
 }
@@ -203,12 +190,7 @@
 }
 @media (prefers-reduced-motion: reduce) {
   .file-tile,
-  .file-preview-hint,
   .artifact-save {
     transition: none;
-  }
-  .file-tile-open:hover .file-preview-hint,
-  .file-tile-open:focus-visible .file-preview-hint {
-    transform: none;
   }
 }

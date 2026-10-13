@@ -1,11 +1,14 @@
+/* A floating bar on the bubble's top edge: quick reactions, the emoji picker, reply and copy. */
 .message-hover-actions {
   position: fixed;
   z-index: 110;
   display: flex;
   align-items: center;
-  gap: 4px;
-  border-radius: 7px;
-  background: light-dark(#fbfafcee, #211f25ee);
+  padding: 3px;
+  border: 1px solid light-dark(#e6e3ec, #453f4d);
+  border-radius: 11px;
+  background: light-dark(#fff, #2f2b36);
+  box-shadow: 0 5px 16px -5px light-dark(#1d14283d, #00000080);
   -webkit-app-region: no-drag;
   animation: message-actions-in 0.12s ease-out;
 }
@@ -16,35 +19,40 @@
   height: 28px;
   padding: 0;
   border: 0;
-  border-radius: 6px;
+  border-radius: 7px;
   background: transparent;
-  color: light-dark(#96919f, #bcb9bf);
+  color: light-dark(#6f6a79, #bcb9bf);
 }
-.message-hover-actions button:hover {
-  color: light-dark(#655b75, #cdcad0);
-  background: light-dark(#eeebf3, #232127);
+.message-hover-actions button:not(:disabled):hover,
+.message-hover-actions button[aria-pressed='true'] {
+  color: light-dark(#3f394a, #e3e0e6);
+  background: light-dark(#f2eff6, #3b3643);
 }
 .message-hover-actions button:focus-visible {
-  outline: 2px solid light-dark(#b7a7cd, #3e3945);
-  outline-offset: 1px;
+  outline: 2px solid light-dark(#b7a7cd, #6d5f86);
+  outline-offset: -1px;
 }
-/* Reserve a narrow action gutter without changing layout on hover. */
-:root .message-row.assistant .bubble[data-hover-actions] {
-  max-width: min(86%, 700px, calc(100% - 68px));
+.message-hover-actions .message-hover-emoji {
+  font-family: 'Segoe UI Emoji', 'Apple Color Emoji', sans-serif;
+  font-size: 15px;
+  line-height: 1;
 }
-:root .group-message:not(.from-user) .group-message-copy:has(> .message-context-target[data-hover-actions]) {
-  max-width: min(85%, 700px, calc(100% - 108px));
+.message-hover-divider {
+  width: 1px;
+  height: 16px;
+  margin: 0 3px;
+  background: light-dark(#e6e3ec, #453f4d);
 }
 .message-quote {
   display: flex;
   align-items: flex-start;
   gap: 8px;
   min-width: 0;
-  margin: 0 0 10px;
-  padding: 7px 10px;
-  border-left: 2px solid light-dark(#b9a9ce, #3e3945);
-  border-radius: 0 6px 6px 0;
-  background: light-dark(#ffffff60, #201e2460);
+  margin: 2px 0 6px;
+  padding: 5px 10px;
+  border-left: 3px solid light-dark(#8f72b3, #a995c4);
+  border-radius: 7px;
+  background: color-mix(in srgb, currentColor 7%, transparent);
   white-space: normal;
   text-align: left;
 }
@@ -104,12 +112,17 @@
   display: flex;
   justify-content: center;
   width: 100%;
-  margin: 23px 0 20px;
+  margin: 22px 0 18px;
   color: light-dark(#9a97a0, #bbb8be);
   font-size: calc(12px * var(--appearance-text-scale, 1));
   line-height: 1.6;
   font-weight: var(--weight-body);
   user-select: none;
+}
+.conversation-time > time {
+  padding: 1px 11px;
+  border-radius: 999px;
+  background: light-dark(#29282c0f, #ffffff0d);
 }
 .messages > .conversation-time:first-child {
   margin-top: 3px;

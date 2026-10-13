@@ -1,9 +1,9 @@
 import type { Bot, Snapshot } from '../../shared/types/core';
 import { SettingsSection, SettingsEmpty } from '../settings/SettingsWindow';
-import { Select } from '../ui/Select';
+import { Avatar } from '../ui/Avatar';
 import { useI18n } from '../i18n';
 
-/** The Memory settings tab: background learning and the memories of the bot chosen in the scope picker. */
+/** The Memory settings tab: background learning, then the memories of the Bot picked from the row of avatars. */
 export function MemorySettings({
   state,
   bot,
@@ -20,71 +20,72 @@ export function MemorySettings({
   act: (operation: () => Promise<unknown>) => Promise<void>;
 }) {
   const { t, language } = useI18n();
-  const scopeBot = state.bots.find((item) => item.id === scope) || bot;
-  const scopePicker = (
-    <label className="scope-picker">
-      <span>Bot</span>
-      <Select
-        aria-label={t('选择 Bot')}
-        disabled={!state.bots.length}
-        value={scopeBot?.id || ''}
-        onChange={(event) => onScope(event.target.value)}
-      >
-        {state.bots.map((item) => (
-          <option key={item.id} value={item.id}>
-            {item.name}
-          </option>
-        ))}
-      </Select>
-    </label>
-  );
+  const scopeBot = state.bots.find((item) => item.id === scope) || bot || state.bots[0];
+  const learning = state.cognition?.learning,
+    lastLearning = state.cognition?.bots.find((item) => item.botId === scopeBot?.id)?.lastLearning;
   return (
     <>
-      {scopePicker}
-      {state.cognition && (
+      {learning && (
         <SettingsSection title={t('后台学习')}>
-          <div className="learning-setting">
-            <div>
-              <strong>{t('后台整理经验')}</strong>
-              {(state.cognition.learning.runningBotId || state.cognition.learning.queued > 0) && (
-                <span>
-                  {state.cognition.learning.runningBotId
-                    ? t('正在整理经验')
-                    : t('{count} 项等待整理', { count: state.cognition.learning.queued })}
-                </span>
-              )}
+          <div className="settings-card">
+            <div className="settings-switch-row">
+              <div className="settings-row-copy">
+                <span>{t('后台整理经验')}</span>
+                {(learning.runningBotId || learning.queued > 0) && (
+                  <small>
+                    {learning.runningBotId ? t('正在整理经验') : t('{count} 项等待整理', { count: learning.queued })}
+                  </small>
+                )}
+              </div>
+              <button
+                role="switch"
+                aria-label={t('后台整理经验')}
+                aria-checked={learning.enabled}
+                className={learning.enabled ? 'learning-switch enabled' : 'learning-switch'}
+                disabled={busy}
+                onClick={() => act(() => window.aelion.setBackgroundLearning(!learning.enabled))}
+              >
+                <i />
+              </button>
             </div>
-            <button
-              role="switch"
-              aria-label={t('后台整理经验')}
-              aria-checked={state.cognition.learning.enabled}
-              className={state.cognition.learning.enabled ? 'learning-switch enabled' : 'learning-switch'}
-              disabled={busy}
-              onClick={() => act(() => window.aelion.setBackgroundLearning(!state.cognition!.learning.enabled))}
-            >
-              <i />
-            </button>
           </div>
         </SettingsSection>
       )}
-      <SettingsSection title={t('已有记忆')}>
-        {scopeBot?.memories.length ? (
-          <div className="settings-card">
-            {scopeBot.memories.map((value, i) => (
-              <div className="memory-card" key={i}>
-                {value}
-              </div>
+      <SettingsSection
+        title={t('已有记忆')}
+        aside={scopeBot?.memories.length ? <small>{scopeBot.memories.length}</small> : undefined}
+      >
+        {state.bots.length > 1 && (
+          <div className="memory-bots" role="radiogroup" aria-label={t('选择 Bot')}>
+            {state.bots.map((item) => (
+              <button
+                key={item.id}
+                type="button"
+                role="radio"
+                className="memory-bot"
+                aria-checked={item.id === scopeBot?.id}
+                onClick={() => onScope(item.id)}
+              >
+                <Avatar bot={item} size={28} />
+                <span>{item.name}</span>
+                {item.memories.length > 0 && <small>{item.memories.length}</small>}
+              </button>
             ))}
           </div>
+        )}
+        {scopeBot?.memories.length ? (
+          <ul className="settings-card memory-list">
+            {scopeBot.memories.map((value, i) => (
+              <li key={i}>{value}</li>
+            ))}
+          </ul>
         ) : (
           <SettingsEmpty icon="memory" title={t('还没有记忆')} />
         )}
-        {state.cognition?.bots.find((item) => item.botId === scopeBot?.id)?.lastLearning && (
+        {lastLearning && (
           <p className="settings-note">
             {t('最近一次知识更新')}
-            {new Date(
-              state.cognition.bots.find((item) => item.botId === scopeBot?.id)!.lastLearning!.time,
-            ).toLocaleString(language)}
+            {new Date(lastLearning.time).toLocaleString(language)}
           </p>
         )}
       </SettingsSection>

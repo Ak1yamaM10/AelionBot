@@ -2,11 +2,16 @@ import React, { useEffect, useRef, useState } from 'react';
 import type { Bot, VmState } from '../../shared/types/core';
 import { Avatar } from '../ui/Avatar';
 import { Icon } from '../ui/Icon';
-import { computerSetupActions, computerSetupActionLabel, computerSetupState } from './computer-setup-state';
+import {
+  computerSetupActions,
+  computerSetupActionLabel,
+  computerSetupState,
+  computerStatusTitle,
+} from './computer-setup-state';
 import { useI18n } from '../i18n';
 import './computer-setup.css';
 
-function SetupProgress({ vm }: { vm: VmState }) {
+export function SetupProgress({ vm }: { vm: VmState }) {
   const { t } = useI18n();
   const downloading = vm.status === 'preparing',
     percent =
@@ -35,123 +40,73 @@ function SetupProgress({ vm }: { vm: VmState }) {
 export function ComputerStatus({
   vm,
   onOpen,
-  minimal = false,
   bot,
 }: {
   vm: VmState;
   onOpen: () => void;
-  minimal?: boolean;
   bot?: Pick<Bot, 'id' | 'name' | 'color' | 'avatarStyle'>;
 }) {
   const { t } = useI18n();
   const view = computerSetupState(vm);
-  if (minimal) {
-    const title = t(
-      view.kind === 'stopped'
-        ? '电脑已关闭'
+  const title = computerStatusTitle(vm);
+  const label = t(
+    view.working
+      ? '查看进度'
+      : view.kind === 'stopped'
+        ? '启动电脑'
         : view.kind === 'invite'
-          ? '初始化工作电脑'
-          : view.kind === 'download'
-            ? '正在准备系统'
-            : view.kind === 'starting'
-              ? '正在启动'
-              : view.kind === 'stopping'
-                ? '正在关闭'
-                : view.kind === 'installing'
-                  ? '正在准备应用'
-                  : view.kind === 'restart'
-                    ? '需要重启'
-                    : view.kind === 'error'
-                      ? '准备未完成'
-                      : view.kind === 'incomplete'
-                        ? '继续准备桌面'
-                        : view.kind === 'upgrade'
-                          ? '更新工作环境'
-                          : '桌面已就绪',
-    );
-    const label = t(
-      view.working
-        ? '查看进度'
-        : view.kind === 'stopped'
-          ? '启动电脑'
-          : view.kind === 'invite'
-            ? '开始设置'
-            : view.kind === 'error'
-              ? '重试'
-              : view.kind === 'restart'
-                ? '重启电脑'
-                : view.kind === 'upgrade'
-                  ? '更新桌面'
-                  : '继续设置',
-    );
-    return (
-      <section className="computer-rest-card" data-state={view.kind} aria-label={t('工作电脑状态')}>
-        <div className={`computer-rest-visual ${view.working ? '' : 'is-sleeping'}`} aria-hidden="true">
-          <svg className="computer-rest-scene" viewBox="0 0 198 139" fill="none">
-            <ellipse cx="99" cy="128" rx="65" ry="3" fill="#eeebf2" />
-            <path d="M85 100h28l4 21H81l4-21Z" fill="#e4dfec" />
-            <rect x="69" y="120" width="60" height="4" rx="2" fill="#d9d2e4" />
-            <rect x="26" y="19" width="146" height="89" rx="10" fill="#f2eff7" stroke="#d7d0e2" strokeWidth="1.4" />
-            <rect x="32" y="25" width="134" height="71" rx="5" fill="#faf8fd" />
-            <circle cx="99" cy="102" r="1.6" fill="#c4b7d5" />
-            <path d="M17 38h-5m151-28 3-4m16 45h5" stroke="#e1dbea" strokeWidth="2" strokeLinecap="round" />
-          </svg>
-          <Avatar
-            bot={bot || { name: 'AelionBot', color: '#a38cc7' }}
-            size={46}
-            activity={view.working ? 'thinking' : 'idle'}
-          />
-        </div>
-        <span className="computer-rest-title" role="status" aria-live="polite">
-          {title}
-        </span>
-        {view.working && <SetupProgress vm={vm} />}
-        <button
-          type="button"
-          className="computer-rest-start"
-          onClick={onOpen}
-          aria-label={view.working ? t('查看工作电脑准备进度') : t(computerSetupActionLabel(vm))}
-        >
-          {!view.working && (
-            <svg
-              width="14"
-              height="14"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="1.8"
-              strokeLinecap="round"
-              aria-hidden="true"
-            >
-              <path d="M12 3v9m-5-7a9 9 0 1 0 10 0" />
-            </svg>
-          )}
-          {label}
-        </button>
-      </section>
-    );
-  }
+          ? '开始设置'
+          : view.kind === 'error'
+            ? '重试'
+            : view.kind === 'restart'
+              ? '重启电脑'
+              : view.kind === 'upgrade'
+                ? '更新桌面'
+                : '继续设置',
+  );
   return (
-    <section className="computer-setup-card" aria-label={t('工作电脑状态')}>
-      <Icon name="computer" size={29} />
-      <strong>{t(view.title)}</strong>
-      {view.kind === 'upgrade' ? (
-        <p>{t('更新将安装压缩包、表格和演示文稿工具，保留现有文件。')}</p>
-      ) : view.kind === 'restart' ? (
-        <p>{t('应用已安装，请重启工作电脑继续。')}</p>
-      ) : view.working && vm.detail ? (
-        <p>{vm.detail}</p>
-      ) : null}
+    <section className="computer-rest-card" data-state={view.kind} aria-label={t('工作电脑状态')}>
+      <div className={`computer-rest-visual ${view.working ? '' : 'is-sleeping'}`} aria-hidden="true">
+        <svg className="computer-rest-scene" viewBox="0 0 198 139" fill="none">
+          <ellipse cx="99" cy="128" rx="65" ry="3" fill="#eeebf2" />
+          <path d="M85 100h28l4 21H81l4-21Z" fill="#e4dfec" />
+          <rect x="69" y="120" width="60" height="4" rx="2" fill="#d9d2e4" />
+          <rect x="26" y="19" width="146" height="89" rx="10" fill="#f2eff7" stroke="#d7d0e2" strokeWidth="1.4" />
+          <rect x="32" y="25" width="134" height="71" rx="5" fill="#faf8fd" />
+          <circle cx="99" cy="102" r="1.6" fill="#c4b7d5" />
+          <path d="M17 38h-5m151-28 3-4m16 45h5" stroke="#e1dbea" strokeWidth="2" strokeLinecap="round" />
+        </svg>
+        <Avatar
+          bot={bot || { name: 'AelionBot', color: '#a38cc7' }}
+          size={46}
+          activity={view.working ? 'thinking' : 'idle'}
+        />
+      </div>
+      <span className="computer-rest-title" role="status" aria-live="polite">
+        {title}
+      </span>
       {view.working && <SetupProgress vm={vm} />}
-      {view.kind === 'upgrade' ? (
-        <span className="setup-estimate-small">{t('通常几分钟，需要联网')}</span>
-      ) : (
-        !(view.kind === 'stopped' && vm.appsReady) && (
-          <span className="setup-estimate-small">{t('首次准备约 5～15 分钟')}</span>
-        )
-      )}
-      <button className={view.working ? 'secondary-button' : 'primary-button'} onClick={onOpen}>
-        {view.working ? t('查看进度') : t(computerSetupActionLabel(vm))}
+      <button
+        type="button"
+        className="computer-rest-start"
+        onClick={onOpen}
+        aria-label={view.working ? t('查看工作电脑准备进度') : t(computerSetupActionLabel(vm))}
+      >
+        {!view.working && (
+          <svg
+            width="14"
+            height="14"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="1.8"
+            strokeLinecap="round"
+            aria-hidden="true"
+          >
+            <path d="M12 3v9m-5-7a9 9 0 1 0 10 0" />
+          </svg>
+        )}
+        {label}
       </button>
     </section>
   );

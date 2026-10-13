@@ -2,10 +2,67 @@
   /* Declare both schemes in CSS so production light-dark() lowering has a scope.
      Setting colorScheme only from JavaScript leaves generated color variables unset. */
   color-scheme: light;
-  --appearance-line: light-dark(#e9e3ef, #403947);
-  --appearance-fill: light-dark(#f8f6fb, #29262f);
+  --appearance-line: light-dark(#e8e8ec, #403947);
+  --appearance-fill: light-dark(#f6f6f7, #29262f);
   --text-code: 13px;
   --message-leading: 1.8;
+}
+/* The conversation: its ground, the flat color where that ground meets the composer, and what sits on it. Appearance
+   settings choose the ground for the light theme (data-canvas, see shared/preview/appearance.ts); the swatches that
+   offer the choices take the same tokens. */
+:root,
+.appearance-canvas-swatch {
+  --conversation-canvas: light-dark(#f4f4f5, #202024);
+  --conversation-edge: light-dark(#f4f4f5, #202024);
+  --bubble-surface: light-dark(#fff, #302c37);
+  --bubble-lift: 0 1px 1.5px light-dark(#2a1f3a1c, #0000);
+  --bubble-chip: light-dark(#f1f1f3, #201e24b3);
+  --bubble-block: light-dark(#f6f6f7, #211f25);
+}
+:root:not([data-theme='dark'])[data-canvas='lilac'],
+.appearance-canvas-swatch[data-canvas='lilac'] {
+  --conversation-canvas: #f3f2f6;
+  --conversation-edge: #f3f2f6;
+  --bubble-chip: #f2eff6;
+  --bubble-block: #f6f4f9;
+}
+:root:not([data-theme='dark'])[data-canvas='cool'],
+.appearance-canvas-swatch[data-canvas='cool'] {
+  --conversation-canvas: #eef1f5;
+  --conversation-edge: #eef1f5;
+  --bubble-chip: #f0f2f6;
+  --bubble-block: #f5f6f9;
+}
+:root:not([data-theme='dark'])[data-canvas='warm'],
+.appearance-canvas-swatch[data-canvas='warm'] {
+  --conversation-canvas: #f5f2ec;
+  --conversation-edge: #f5f2ec;
+  --bubble-chip: #f4f1ec;
+  --bubble-block: #f8f6f2;
+}
+:root:not([data-theme='dark'])[data-canvas='deep'],
+.appearance-canvas-swatch[data-canvas='deep'] {
+  --conversation-canvas: #e9e6ef;
+  --conversation-edge: #e9e6ef;
+  --bubble-chip: #f2eff6;
+  --bubble-block: #f6f4f9;
+}
+:root:not([data-theme='dark'])[data-canvas='wash'],
+.appearance-canvas-swatch[data-canvas='wash'] {
+  --conversation-canvas: linear-gradient(180deg, #f3eef9, #edf1f8);
+  --conversation-edge: #edf1f8;
+  --bubble-chip: #f2eff6;
+  --bubble-block: #f6f4f9;
+}
+/* No ground at all: the Bot's bubbles turn gray to stand on white. */
+:root:not([data-theme='dark'])[data-canvas='white'],
+.appearance-canvas-swatch[data-canvas='white'] {
+  --conversation-canvas: #fff;
+  --conversation-edge: #fff;
+  --bubble-surface: #f2f1f5;
+  --bubble-lift: 0 0 0 0 #0000;
+  --bubble-chip: #ffffffb3;
+  --bubble-block: #faf9fc;
 }
 /* Theme belongs to the application chrome, never to document canvases or images. */
 :root[data-theme='dark'] {
@@ -16,7 +73,7 @@
 :root[data-theme='dark'] body {
   background: #202024;
 }
-:root[data-theme='dark'] :is(.sidebar, .settings-sidebar) {
+:root[data-theme='dark'] .sidebar {
   background: #25232a;
 }
 :root[data-theme='dark'] :is(.conversation, .messages, .peer-chat-body, .composer-wrap, .computer-panel) {
@@ -33,10 +90,6 @@
 }
 :root[data-theme='dark'] :is(.bot-item.selected, .search) {
   background: #35303c;
-}
-:root[data-theme='dark'] .settings-modal {
-  --settings-fill: #2c2832;
-  --settings-line: #443c4d;
 }
 :root[data-theme='dark'] .modal-backdrop {
   background: #0008;
@@ -56,22 +109,13 @@
 :root[data-theme='dark'] .runtime-actions {
   background: #202024;
 }
-:root[data-theme='dark'] .settings-modal .runtime-save:disabled {
-  background: #343039;
-  color: #9c91a6;
-}
-:root[data-theme='dark'] .appearance-control :is(input, .aelion-select) {
-  color: var(--text-ink);
-  background: var(--appearance-fill);
-  border-color: var(--appearance-line);
-}
-:root[data-theme='dark'] .appearance-theme-swatch {
+:root[data-theme='dark'] :is(.appearance-theme-swatch, .appearance-canvas-swatch) {
   color-scheme: light;
 }
-:root[data-theme='dark'] .appearance-themes > button {
+:root[data-theme='dark'] :is(.appearance-themes, .appearance-canvases) > button {
   color: var(--text-secondary);
 }
-:root[data-theme='dark'] .appearance-themes > button[aria-pressed='true'] {
+:root[data-theme='dark'] :is(.appearance-themes, .appearance-canvases) > button[aria-pressed='true'] {
   color: var(--text-ink);
 }
 :root[data-theme='dark'] .computer-rest-scene :is([fill='#f2eff7'], [fill='#faf8fd']) {

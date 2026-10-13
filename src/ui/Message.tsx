@@ -1,15 +1,17 @@
-import { memo, useRef } from 'react';
+import { createContext, memo, useContext, useRef } from 'react';
 import { previewFeedbackDisplay } from '../../shared/preview/preview-feedback';
 import { MessageQuote } from '../chat/MessageQuote';
 import { MessageTime } from '../chat/ConversationTime';
+import { clockTime } from '../chat/conversation-time';
 import { AttachmentList } from '../files/Attachments';
 import { attachmentSummary } from '../../shared/types/attachment-types';
-import type { ChatMessage } from '../../shared/types/core';
+import type { Bot, ChatMessage } from '../../shared/types/core';
 import { readableContent } from '../../shared/chat/activity';
 import { legacyQuestionAnswerData, readableQuestionAnswer } from '../../shared/chat/question-answers';
 import { QuestionAnswerMessage } from '../chat/QuestionAnswerMessage';
 import { MessageActions } from '../chat/MessagePins';
-import { Icon } from './Icon';
+import { ScheduledTriggerCard } from '../chat/ScheduledTrigger';
+import { Avatar } from './Avatar';
 import { MentionContent } from './MentionContent';
 import { MessageReasoning } from '../chat/MessageReasoning';
 import { shallowEqual } from './equality';
@@ -34,6 +36,10 @@ const MemoMessage = memo(
     shallowEqual(a.message, b.message),
 );
 type ReplyRef = { current?: (message: ChatMessage) => void };
+/** The Bot whose avatar stands beside its messages; the styles show it on the last message of a run of them. */
+export const MessageAvatarContext = createContext<Pick<Bot, 'id' | 'name' | 'color' | 'avatarStyle'> | undefined>(
+  undefined,
+);
 export function Message(props: MessageProps) {
   const reply = useRef<(message: ChatMessage) => void>(undefined);
   reply.current = props.onReply;
@@ -48,19 +54,14 @@ function MessageView({
 }: MessageProps & { reply: ReplyRef }) {
   const onReply = hasReply ? (value: ChatMessage) => reply.current?.(value) : undefined;
   const { t } = useI18n();
+  const avatar = useContext(MessageAvatarContext);
   if (!showReasoning && message.reasoning) message = { ...message, reasoning: undefined };
   if (message.scheduled)
     return (
       <>
         <MessageTime id={message.id} time={message.time} />
         <div className="scheduled-trigger" data-message-id={message.id}>
-          <div>
-            <Icon name="clock" size={15} />
-            <span>
-              {t('定时任务')} · {message.scheduled.title}
-            </span>
-          </div>
-          <p>{message.content}</p>
+          <ScheduledTriggerCard title={message.scheduled.title} content={message.content} time={message.time} />
         </div>
       </>
     );
@@ -92,16 +93,21 @@ function MessageView({
       </div>
     );
   const images = (message.attachments || []).filter((file) => file.image || file.mime.startsWith('image/')),
-    // Images sit above the bubble. A message that is only images puts them in a see-through bubble so hover
-    // actions (reply, pin) still have a target.
-    mediaOnly =
-      images.length > 0 && !content && !answer && !message.reply && images.length === message.attachments?.length;
+    // Images sit above the bubble and other files below it. A message that is only attachments puts them in a
+    // see-through bubble so hover actions (reply, pin) still have a target.
+    bare = Boolean(message.attachments?.length) && !content && !answer && !message.reply,
+    clock = bare || message.status === 'running' || !(content || answer) ? '' : clockTime(message.time);
   return (
     <>
       <MessageTime id={message.id} time={message.time} />
       <div className={`message-row ${message.role}`} data-message-id={message.id}>
+        {message.role === 'assistant' && avatar && (
+          <span className="message-avatar" aria-hidden="true">
+            <Avatar bot={avatar} size={30} />
+          </span>
+        )}
         {message.role === 'assistant' && <MessageReasoning reasoning={message.reasoning} />}
-        {!mediaOnly && <AttachmentList files={images} only="images" />}
+        {!bare && <AttachmentList files={images} only="images" />}
         <MessageActions
           messageId={message.id}
           content={content || attachmentSummary(message.attachments)}
@@ -113,7 +119,8 @@ function MessageView({
               ? () => onReply({ ...message, content })
               : undefined
           }
-          bubbleClassName={`bubble ${answer ? 'question-answer-bubble' : ''} ${message.status === 'failed' ? 'failed' : ''} ${mediaOnly ? 'is-media' : ''}`}
+          bubbleClassName={`bubble ${answer ? 'question-answer-bubble' : ''} ${message.status === 'failed' ? 'failed' : ''} ${bare ? 'is-media' : ''} ${clock ? 'has-time' : ''}`}
+          after={bare ? undefined : <AttachmentList files={message.attachments} only="files" />}
           onPin={
             allowPins && (content || message.attachments?.length) && (!message.status || message.status === 'done')
               ? (input) => window.aelion.pinChat({ ...input, botId: message.botId })
@@ -129,7 +136,11 @@ function MessageView({
                 <MentionContent content={content} mentions={presentation.mentions} markdown />
               </div>
             ) : (
-              <MentionContent content={content} mentions={presentation.mentions} />
+              <>
+                <MentionContent content={content} mentions={presentation.mentions} />
+                {/* Keeps the last line of text clear of the time in the bubble's corner. */}
+                {clock && <span className="bubble-time-gap" aria-hidden="true" />}
+              </>
             )
           ) : message.attachments?.length ? null : (
             <span className="typing">
@@ -138,7 +149,12 @@ function MessageView({
               <i />
             </span>
           )}
-          <AttachmentList files={message.attachments} only={mediaOnly ? undefined : 'files'} />
+          {bare && <AttachmentList files={message.attachments} />}
+          {clock && (
+            <time className="bubble-time" dateTime={message.time}>
+              {clock}
+            </time>
+          )}
         </MessageActions>
       </div>
     </>

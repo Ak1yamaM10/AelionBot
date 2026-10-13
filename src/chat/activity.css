@@ -2,19 +2,20 @@
   width: fit-content;
 }
 .message-row.assistant:has(.message-code-block) .bubble {
-  width: min(86%, 700px);
+  width: min(82%, 680px);
 }
 .message-row.assistant .bubble.failed {
   background: light-dark(#f9ecea, #222026);
   color: light-dark(#89483d, #dab9b4);
 }
 
+/* A run reads as one group: its process line sits right above the answer. */
 .run-message {
   min-width: 0;
-  margin: 4px 0 20px;
+  margin: 16px 0;
 }
 .run-message .message-row.assistant {
-  margin-bottom: 0;
+  margin: 0;
 }
 .run-notice {
   display: flex;

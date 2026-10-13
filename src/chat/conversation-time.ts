@@ -31,10 +31,16 @@ export function conversationTimeLabels(messages: readonly TimedMessage[], now = 
   }
   return labels;
 }
+/** The time of day a message was sent, as shown in its bubble: 02:31. */
+export function clockTime(value: string) {
+  const date = new Date(value);
+  if (!Number.isFinite(date.getTime())) return '';
+  return `${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`;
+}
 export function formatConversationTime(value: string, now = new Date()) {
   const date = new Date(value);
   if (!Number.isFinite(date.getTime())) return '';
-  const clock = `${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`;
+  const clock = clockTime(value);
   if (dateKey(date) === dateKey(now)) return clock;
   const yesterday = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1);
   if (dateKey(date) === dateKey(yesterday)) return translate('昨天 {time}', { time: clock });

@@ -1,7 +1,7 @@
 /* A quiet line above the reply bubble; the bubble stays the reply's only surface. */
 .message-reasoning {
-  max-width: min(86%, 700px);
-  margin: 0 0 8px 2px;
+  max-width: min(82%, 680px);
+  margin: 0 0 4px 4px;
   min-width: 0;
   font-size: calc(13px * var(--appearance-text-scale, 1));
 }
@@ -20,7 +20,7 @@
 }
 .reasoning-toggle:not(:disabled):hover,
 .reasoning-toggle:focus-visible {
-  background: light-dark(#f5f4f7, #232127);
+  background: light-dark(#29282c12, #29262f);
   color: light-dark(#5f5a69, #d0ccd4);
   outline: none;
 }

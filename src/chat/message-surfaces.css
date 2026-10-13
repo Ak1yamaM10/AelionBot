@@ -1,21 +1,27 @@
-/* Keep conversation surfaces separate from document and attachment previews. */
+/* Keep conversation surfaces separate from document and attachment previews. The conversation is a canvas set into
+   the window's frame (sidebar and header); bubbles, cards and the composer are the things on it. Its colors are the
+   --conversation-* and --bubble-* tokens in theme.css, which the appearance settings choose. */
 .messages,
 .peer-chat-body {
-  background: light-dark(#fff, #201e24);
+  background: var(--conversation-canvas);
   container: conversation / inline-size;
 }
 .composer-wrap {
-  background: light-dark(#fff, #201e24);
+  background: var(--conversation-edge);
 }
 
 :root :is(.bubble, .group-message-bubble, .peer-bubble).markdown,
 :root :is(.bubble, .group-message-bubble, .peer-bubble) .markdown {
   --message-line: light-dark(#e2dee8, #3e3945);
-  --message-surface: light-dark(#faf9fc, #211f25);
+  --message-surface: var(--bubble-block);
   --message-link: light-dark(#755491, #c3b2d1);
   --message-link-line: light-dark(#c6b5d6, #3e3945);
-  --message-inline: light-dark(#ffffffb3, #201e24b3);
+  --message-inline: var(--bubble-chip);
   --code-comment: light-dark(#79717f, #c7c4ca);
+}
+/* Your own bubbles are tinted, so code in them sits on a wash of white instead. */
+:root .from-user .group-message-bubble.markdown {
+  --message-inline: light-dark(#ffffff8c, #201e24b3);
 }
 :root :is(.bubble, .group-message-bubble, .peer-bubble) :is(h1, h2, h3) {
   font-weight: var(--weight-heading);
@@ -30,7 +36,7 @@
   border-color: light-dark(#c5bacf, #3e3945);
 }
 :root :is(.bubble, .group-message-bubble, .peer-bubble) .message-code-block {
-  border-color: light-dark(#e0dbe6, #3e3945);
+  border-color: light-dark(#ece8f2, #3e3945);
   box-shadow: none;
 }
 :root :is(.bubble, .group-message-bubble, .peer-bubble) .message-code-header {
@@ -43,7 +49,7 @@
 }
 
 :root :is(.message-row, .group-message, .peer-message) .file-tile {
-  --file-surface: light-dark(#faf9fc, #211f25);
+  --file-surface: light-dark(#fff, #211f25);
   --file-border: light-dark(#e0dce7, #3e3945);
   --file-title: light-dark(#4a4053, #d8d5db);
   --file-muted: light-dark(#85768f, #c3c0c6);
@@ -58,31 +64,119 @@
   box-shadow: none;
 }
 :root :is(.message-row, .group-message, .peer-message) .bot-mention {
-  background: light-dark(#ffffff77, #201e2477);
+  background: var(--bubble-chip);
   color: light-dark(#786183, #c4b9ca);
+}
+:root :is(.message-row.user, .group-message.from-user) .bot-mention {
+  background: light-dark(#ffffff77, #201e2477);
+}
+
+/* A reply of several blocks reads as a page: more room around it than a one-line message gets. */
+:root .message-row.assistant .bubble:has(> .markdown > :is(:nth-child(2), :not(p))) {
+  padding: 12px 16px 11px;
+}
+
+/* The time a message was sent sits in the bubble's lower right corner. The last line of text keeps clear of it with
+   an invisible spacer; text that ends in a list, a table or code gets a line of padding instead. */
+.bubble-time {
+  position: absolute;
+  right: 11px;
+  bottom: 5px;
+  font-size: calc(11px * var(--appearance-text-scale, 1));
+  line-height: 14px;
+  color: color-mix(in srgb, currentColor 52%, transparent);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  user-select: none;
+  pointer-events: none;
+}
+.bubble-time-gap,
+.bubble.has-time > .markdown > p:last-child::after {
+  content: '';
+  display: inline-block;
+  width: calc(38px * var(--appearance-text-scale, 1));
+  height: 1px;
+}
+:root .message-row .bubble.has-time:has(> .markdown > :last-child:not(p)) {
+  padding-bottom: 22px;
+}
+
+/* Messages from one side that follow each other form a group: 3px apart, the corners between them tightened. */
+.messages > .message-row.user:has(+ .message-row.user) {
+  margin-bottom: 3px;
+}
+.messages > .message-row.user + .message-row.user {
+  margin-top: 3px;
+}
+.messages > .message-row.user:has(+ .message-row.user) .bubble {
+  border-bottom-right-radius: 6px;
+}
+.messages > .message-row.user + .message-row.user .bubble {
+  border-top-right-radius: 6px;
+}
+.messages > :is(.message-row.assistant, .run-message):has(+ :is(.message-row.assistant, .run-message)) {
+  margin-bottom: 3px;
+}
+.messages > :is(.message-row.assistant, .run-message) + :is(.message-row.assistant, .run-message) {
+  margin-top: 3px;
+}
+/* Only bubbles that touch share corners; a run's process line between two bubbles keeps both round. */
+.messages
+  > :is(.message-row.assistant, .run-message):has(
+    + .message-row.assistant:not(.reasoning-only),
+    + .run-message > .message-row.assistant:first-child
+  )
+  .bubble {
+  border-bottom-left-radius: 6px;
+}
+.messages > :is(.message-row.assistant, .run-message) + .message-row.assistant .bubble,
+.messages > :is(.message-row.assistant, .run-message) + .run-message > .message-row.assistant:first-child .bubble {
+  border-top-left-radius: 6px;
+}
+
+/* In a Bot's own chat its avatar stands in a gutter left of its messages, beside the last one of each group. */
+.messages:not(.group-messages)
+  > :is(.message-row.assistant, .run-message, .message-artifacts, .artifact-list, .designer-task-card) {
+  padding-left: 40px;
+}
+.message-avatar {
+  position: absolute;
+  left: 0;
+  bottom: 0;
+  display: block;
+  width: 30px;
+  height: 30px;
+  pointer-events: none;
+}
+.run-message .message-row > .message-avatar {
+  left: -40px;
+}
+/* Reactions hang below the bubble; the avatar stays level with the bubble. */
+.message-row:has(> .message-pins) > .message-avatar {
+  bottom: 29px;
+}
+.messages
+  > :is(.message-row.assistant, .run-message):has(+ :is(.message-row.assistant:not(.reasoning-only), .run-message))
+  .message-avatar {
+  display: none;
 }
 
 /* The conversation can be narrow even in a wide window with side panels. */
 @container conversation (max-width:560px) {
   :root .message-row.assistant .bubble {
-    max-width: 95%;
-    padding: 13px 15px;
+    max-width: 100%;
   }
   :root .message-row.assistant:has(.message-code-block) .bubble {
-    width: 95%;
+    width: 100%;
   }
   :root .message-row.user .bubble {
     max-width: 86%;
-    padding: 12px 15px;
   }
   :root .group-message-copy {
     max-width: calc(100% - 44px);
   }
   :root .peer-message > div {
     max-width: calc(100% - 40px);
-  }
-  :root :is(.group-message-bubble, .peer-bubble) {
-    padding: 12px 15px;
   }
 }
 @media (forced-colors: active) {

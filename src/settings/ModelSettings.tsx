@@ -9,6 +9,7 @@ import {
   type ImageProtocolInfo,
 } from '../../shared/types/image-types';
 import { Icon } from '../ui/Icon';
+import { Emblem } from '../ui/Emblem';
 import { ModelSelectionFields, validModelSelection } from './ModelSelectionFields';
 import { ContextCapacityInput } from './ContextCapacityInput';
 import { EditableSelect } from '../ui/EditableSelect';
@@ -126,7 +127,9 @@ export function ModelSettings({ state, onNotify }: { state: Snapshot; onNotify: 
         <div className="model-assignment-grid">
           <section className="model-assignment-panel">
             <header>
-              <Icon name="message" size={18} />
+              <span className="model-assignment-mark" aria-hidden="true">
+                <Icon name="message" size={16} />
+              </span>
               <h3>{t('默认模型')}</h3>
             </header>
             <DefaultModelAssignment
@@ -143,7 +146,9 @@ export function ModelSettings({ state, onNotify }: { state: Snapshot; onNotify: 
           </section>
           <section className="model-assignment-panel">
             <header>
-              <Icon name="shield" size={18} />
+              <span className="model-assignment-mark" aria-hidden="true">
+                <Icon name="shield" size={16} />
+              </span>
               <h3>{t('自动审核模型')}</h3>
             </header>
             <DefaultModelAssignment
@@ -194,23 +199,28 @@ export function ModelSettings({ state, onNotify }: { state: Snapshot; onNotify: 
                 aria-label={t('编辑 Provider {name}', { name: provider.name })}
                 onClick={() => setEditing(provider.id)}
               >
-                <span className="provider-browser-name">
-                  <strong>{provider.name}</strong>
-                  {provider.modelsError && (
-                    <span className="provider-warning" title={provider.modelsError}>
-                      <Icon name="alert" size={14} />
-                    </span>
-                  )}
-                </span>
-                <span className="provider-browser-meta">
-                  {protocolName(provider.protocol, t)}
-                  <span>{refreshing.includes(provider.id) ? t('拉取中…') : provider.models.length}</span>
+                <Emblem seed={provider.id} size={30} />
+                <span className="provider-browser-copy">
+                  <span className="provider-browser-name">
+                    <strong>{provider.name}</strong>
+                    {provider.modelsError && (
+                      <span className="provider-warning" title={provider.modelsError}>
+                        <Icon name="alert" size={14} />
+                      </span>
+                    )}
+                  </span>
+                  <span className="provider-browser-meta">
+                    {protocolName(provider.protocol, t)}
+                    <span>{refreshing.includes(provider.id) ? t('拉取中…') : provider.models.length}</span>
+                  </span>
                 </span>
               </button>
             ))}
             {editing === 'new' && (
               <div className="provider-browser-item is-selected provider-new-item">
-                <Icon name="plus" size={16} />
+                <span className="provider-new-mark" aria-hidden="true">
+                  <Icon name="plus" size={15} />
+                </span>
                 {t('添加 Provider')}
               </div>
             )}
@@ -386,6 +396,13 @@ function ProviderEditor({
     >
       <header className="provider-editor-heading">
         <div>
+          {provider ? (
+            <Emblem seed={provider.id} size={38} />
+          ) : (
+            <span className="provider-new-mark is-large" aria-hidden="true">
+              <Icon name="plus" size={18} />
+            </span>
+          )}
           <h3>{provider?.name || t('添加 Provider')}</h3>
           {provider && <span className="provider-protocol">{protocolName(provider.protocol, t)}</span>}
         </div>

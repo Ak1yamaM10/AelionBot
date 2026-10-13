@@ -14,7 +14,7 @@ export function CommandPermissionsSettings({
 }) {
   const { t } = useI18n();
   return (
-    <SettingsSection title={t('自动审批中的命令规则')}>
+    <SettingsSection title={t('自动审批中的命令规则')} aside={rules.length ? <small>{rules.length}</small> : undefined}>
       {rules.length ? (
         <div className="settings-card command-permissions-list">
           {rules.map((rule) => (
@@ -25,13 +25,14 @@ export function CommandPermissionsSettings({
             >
               <div className="command-rule-main">
                 <code className="command-rule-pattern">{rule.pattern}</code>
-                <div className="command-rule-kind">
-                  <span>{rule.kind === 'prefix' ? t('命令前缀') : t('完整命令')}</span>
-                  {!rule.enabled && <span>{t('已停用')}</span>}
-                </div>
-                <div className="command-rule-directory">
-                  <span>{t('工作目录')}</span>
-                  <code>{rule.cwd}</code>
+                <div className="command-rule-meta">
+                  <span className="command-rule-kind">{rule.kind === 'prefix' ? t('命令前缀') : t('完整命令')}</span>
+                  {!rule.enabled && <span className="command-rule-kind is-off">{t('已停用')}</span>}
+                  <span className="command-rule-directory" title={rule.cwd}>
+                    <Icon name="folder" size={13} />
+                    <span className="settings-sr-only">{t('工作目录')}</span>
+                    <code>{rule.cwd}</code>
+                  </span>
                 </div>
               </div>
               <div className="command-rule-actions">
@@ -55,7 +56,7 @@ export function CommandPermissionsSettings({
                   disabled={busy}
                   onClick={() => act(() => window.aelion.removeCommandPermission(rule.id))}
                 >
-                  <Icon name="trash" size={18} />
+                  <Icon name="trash" size={16} />
                 </button>
               </div>
             </article>

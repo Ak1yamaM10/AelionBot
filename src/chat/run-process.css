@@ -1,9 +1,12 @@
 /* One quiet line above the answer; expanding it shows the run's steps as a vertical timeline. */
 .run-process {
-  max-width: min(86%, 700px);
-  margin: 2px 0 10px;
+  max-width: min(82%, 680px);
+  margin: 0 0 3px 4px;
   min-width: 0;
   font-size: calc(12.5px * var(--appearance-text-scale, 1));
+}
+.run-process.is-expanded {
+  margin-bottom: 12px;
 }
 .run-process-toggle {
   display: inline-flex;
@@ -19,7 +22,7 @@
 }
 .run-process-toggle:hover,
 .run-process-toggle:focus-visible {
-  background: var(--appearance-fill);
+  background: light-dark(#29282c12, #29262f);
   color: var(--text-secondary);
   outline: none;
 }
@@ -65,7 +68,7 @@
   width: 6px;
   height: 6px;
   border-radius: 50%;
-  background: light-dark(#fff, #201e24);
+  background: var(--conversation-edge);
   border: 1.5px solid light-dark(#cfc8da, #5a5363);
 }
 .run-step-tool.is-running::before {
@@ -93,7 +96,7 @@
 }
 .run-step-row:not(:disabled):hover,
 .run-step-row:focus-visible {
-  background: var(--appearance-fill);
+  background: light-dark(#29282c12, #29262f);
   outline: none;
 }
 .run-step-row:disabled {

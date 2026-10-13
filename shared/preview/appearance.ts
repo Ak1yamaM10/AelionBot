@@ -1,7 +1,11 @@
 export type ThemePreference = 'system' | 'light' | 'dark';
 export type ReasoningDisplay = 'collapsed' | 'expanded' | 'hidden';
+/** The ground the conversation sits on in the light theme; the dark theme has one of its own. Colors: theme.css. */
+export const CANVAS_TONES = ['neutral', 'lilac', 'cool', 'warm', 'deep', 'wash', 'white'] as const;
+export type CanvasTone = (typeof CANVAS_TONES)[number];
 export interface AppearanceSettings {
   theme: ThemePreference;
+  canvas: CanvasTone;
   font: 'bundled' | 'system' | 'custom';
   customFont: string;
   codeFont: 'bundled' | 'system' | 'custom';
@@ -16,6 +20,7 @@ export interface AppearanceSettings {
 }
 export const DEFAULT_APPEARANCE: AppearanceSettings = {
   theme: 'system',
+  canvas: 'neutral',
   font: 'bundled',
   customFont: '',
   codeFont: 'bundled',
@@ -40,6 +45,7 @@ export function normalizeAppearance(value: unknown): AppearanceSettings {
       : (DEFAULT_APPEARANCE[key] as number);
   return {
     theme: choice('theme', ['system', 'light', 'dark'], 'system'),
+    canvas: choice('canvas', [...CANVAS_TONES], 'neutral'),
     font: choice('font', ['bundled', 'system', 'custom'], 'bundled'),
     customFont: family(v.customFont),
     codeFont: choice('codeFont', ['bundled', 'system', 'custom'], 'bundled'),

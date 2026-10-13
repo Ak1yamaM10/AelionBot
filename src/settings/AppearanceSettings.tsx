@@ -2,12 +2,27 @@ import { useEffect, useState, type ReactNode } from 'react';
 import { Select } from '../ui/Select';
 import { Icon } from '../ui/Icon';
 import {
+  CANVAS_TONES,
   DEFAULT_APPEARANCE,
   normalizeAppearance,
+  resolvedTheme,
   type AppearanceSettings as Values,
+  type CanvasTone,
 } from '../../shared/preview/appearance';
+import { Avatar } from '../ui/Avatar';
+import { SettingsSection } from './SettingsWindow';
 import { languageOptions, useI18n } from '../i18n';
 import './appearance-settings.css';
+
+const canvasNames: Record<CanvasTone, string> = {
+  neutral: '中性灰',
+  lilac: '淡紫灰',
+  cool: '冷灰蓝',
+  warm: '暖米色',
+  deep: '深紫灰',
+  wash: '淡渐变',
+  white: '纯白',
+};
 
 function Row({ title, hint, children }: { title: string; hint?: string; children: ReactNode }) {
   return (
@@ -81,26 +96,25 @@ export function AppearanceSettings({
       </output>
     </div>
   );
+  const dark = resolvedTheme(settings.theme, window.matchMedia('(prefers-color-scheme: dark)').matches) === 'dark';
   return (
     <div className="appearance-settings">
-      <section className="appearance-section">
-        <h3>{t('语言')}</h3>
-        <Row title={t('界面语言')}>
-          <Select
-            aria-label={t('选择界面语言')}
-            value={language}
-            onChange={(event) => setLanguage(event.target.value as typeof language)}
-          >
-            {languageOptions.map((option) => (
-              <option value={option.value} key={option.value}>
-                {option.label}
-              </option>
-            ))}
-          </Select>
-        </Row>
-      </section>
-      <section className="appearance-section">
-        <h3>{t('主题')}</h3>
+      {/* Stays in view while you scroll, so every change below shows on a real exchange. */}
+      <div className="appearance-preview-dock">
+        <figure className="appearance-preview" aria-label={t('外观实时预览')}>
+          <div className="appearance-preview-chat" aria-hidden="true">
+            <p className="appearance-preview-bubble is-you">{t('帮我整理一下今天的工作记录。')}</p>
+            <div className="appearance-preview-reply">
+              <Avatar bot={{ name: 'AelionBot', color: '#4fc3b5' }} size={26} />
+              <p className="appearance-preview-bubble">
+                {t('整理好了，三件事都已完成：')}
+                <code>notes.md</code>
+              </p>
+            </div>
+          </div>
+        </figure>
+      </div>
+      <SettingsSection title={t('主题')}>
         <div className="appearance-themes">
           {(['light', 'dark', 'system'] as const).map((theme) => (
             <button type="button" key={theme} aria-pressed={settings.theme === theme} onClick={() => change({ theme })}>
@@ -116,104 +130,139 @@ export function AppearanceSettings({
             </button>
           ))}
         </div>
-      </section>
-      <div className="appearance-sample" aria-label={t('外观实时预览')}>
-        <span>{t('实时预览')}</span>
-        <h3>{t('字体预览')}</h3>
-        <p>{t('正文示例：今天的工作记录。')} The quick brown fox jumps over the lazy dog.</p>
-        <code>const progress = 100;</code>
-      </div>
-      <section className="appearance-section">
-        <h3>{t('字体')}</h3>
-        <Row title={t('界面字体')}>
-          <Select
-            aria-label={t('界面字体')}
-            value={settings.font}
-            onChange={(e) => change({ font: e.target.value as Values['font'] })}
-          >
-            <option value="bundled">Inter ＋ {language === 'en' ? 'Noto Sans' : '思源黑体'}</option>
-            <option value="system">{t('系统默认')}</option>
-            <option value="custom">{t('自定义字体')}</option>
-          </Select>
-        </Row>
-        {settings.font === 'custom' && (
-          <Row title={t('字体名称')} hint={t('填写已安装的字体；未找到时使用内置字体')}>
-            <FontName
-              label={t('自定义界面字体名称')}
-              value={settings.customFont}
-              onChange={(customFont) => change({ customFont })}
-            />
+      </SettingsSection>
+      <SettingsSection title={t('对话背景')} aside={dark ? <small>{t('这项设置只影响浅色主题')}</small> : undefined}>
+        <div className="appearance-canvases">
+          {CANVAS_TONES.map((canvas) => (
+            <button
+              type="button"
+              key={canvas}
+              aria-pressed={settings.canvas === canvas}
+              onClick={() => change({ canvas })}
+            >
+              <span className="appearance-canvas-swatch" data-canvas={canvas} aria-hidden="true">
+                <i />
+                <b />
+              </span>
+              <span>
+                {t(canvasNames[canvas])}
+                {settings.canvas === canvas && <Icon name="check" size={14} />}
+              </span>
+            </button>
+          ))}
+        </div>
+      </SettingsSection>
+      <SettingsSection title={t('字体')}>
+        <div className="settings-card">
+          <Row title={t('界面字体')}>
+            <Select
+              aria-label={t('界面字体')}
+              value={settings.font}
+              onChange={(e) => change({ font: e.target.value as Values['font'] })}
+            >
+              <option value="bundled">Inter ＋ {language === 'en' ? 'Noto Sans' : '思源黑体'}</option>
+              <option value="system">{t('系统默认')}</option>
+              <option value="custom">{t('自定义字体')}</option>
+            </Select>
           </Row>
-        )}
-        <Row title={t('代码字体')}>
-          <Select
-            aria-label={t('代码字体')}
-            value={settings.codeFont}
-            onChange={(e) => change({ codeFont: e.target.value as Values['codeFont'] })}
-          >
-            <option value="bundled">JetBrains Mono</option>
-            <option value="system">{t('系统等宽字体')}</option>
-            <option value="custom">{t('自定义字体')}</option>
-          </Select>
-        </Row>
-        {settings.codeFont === 'custom' && (
-          <Row title={t('代码字体名称')} hint={t('建议使用等宽字体')}>
-            <FontName
-              label={t('自定义代码字体名称')}
-              value={settings.customCodeFont}
-              onChange={(customCodeFont) => change({ customCodeFont })}
-            />
+          {settings.font === 'custom' && (
+            <Row title={t('字体名称')} hint={t('填写已安装的字体；未找到时使用内置字体')}>
+              <FontName
+                label={t('自定义界面字体名称')}
+                value={settings.customFont}
+                onChange={(customFont) => change({ customFont })}
+              />
+            </Row>
+          )}
+          <Row title={t('代码字体')}>
+            <Select
+              aria-label={t('代码字体')}
+              value={settings.codeFont}
+              onChange={(e) => change({ codeFont: e.target.value as Values['codeFont'] })}
+            >
+              <option value="bundled">JetBrains Mono</option>
+              <option value="system">{t('系统等宽字体')}</option>
+              <option value="custom">{t('自定义字体')}</option>
+            </Select>
           </Row>
-        )}
-        <Row title={t('正文字重')}>
-          <Select
-            aria-label={t('正文字重')}
-            value={String(settings.weight)}
-            onChange={(e) => change({ weight: Number(e.target.value) })}
-          >
-            <option value="300">{t('纤细 · 300')}</option>
-            <option value="400">{t('常规 · 400')}</option>
-            <option value="500">{t('中等 · 500')}</option>
-            <option value="600">{t('较粗 · 600')}</option>
-          </Select>
-        </Row>
-      </section>
-      <section className="appearance-section">
-        <h3>{t('大小与间距')}</h3>
-        <Row title={t('界面文字')}>{number('textScale', '界面文字大小', 85, 130, 5, '%')}</Row>
-        <Row title={t('消息文字')}>{number('messageSize', '消息文字大小', 12, 22, 1, ' px')}</Row>
-        <Row title={t('代码文字')}>{number('codeSize', '代码文字大小', 11, 20, 1, ' px')}</Row>
-        <Row title={t('消息行距')}>{number('lineHeight', '消息行距', 1.4, 2.2, 0.1)}</Row>
-        <Row title={t('显示比例')}>
-          <Select
-            aria-label={t('显示比例')}
-            value={String(settings.zoom)}
-            onChange={(e) => change({ zoom: Number(e.target.value) })}
-          >
-            {[...new Set([50, 75, 90, 100, 110, 125, 150, 175, 200, settings.zoom])]
-              .sort((a, b) => a - b)
-              .map((value) => (
-                <option key={value} value={String(value)}>
-                  {value}%{value === 100 ? ` · ${t('默认')}` : ''}
+          {settings.codeFont === 'custom' && (
+            <Row title={t('代码字体名称')} hint={t('建议使用等宽字体')}>
+              <FontName
+                label={t('自定义代码字体名称')}
+                value={settings.customCodeFont}
+                onChange={(customCodeFont) => change({ customCodeFont })}
+              />
+            </Row>
+          )}
+          <Row title={t('正文字重')}>
+            <Select
+              aria-label={t('正文字重')}
+              value={String(settings.weight)}
+              onChange={(e) => change({ weight: Number(e.target.value) })}
+            >
+              <option value="300">{t('纤细 · 300')}</option>
+              <option value="400">{t('常规 · 400')}</option>
+              <option value="500">{t('中等 · 500')}</option>
+              <option value="600">{t('较粗 · 600')}</option>
+            </Select>
+          </Row>
+        </div>
+      </SettingsSection>
+      <SettingsSection title={t('大小与间距')}>
+        <div className="settings-card">
+          <Row title={t('消息文字')}>{number('messageSize', '消息文字大小', 12, 22, 1, ' px')}</Row>
+          <Row title={t('代码文字')}>{number('codeSize', '代码文字大小', 11, 20, 1, ' px')}</Row>
+          <Row title={t('消息行距')}>{number('lineHeight', '消息行距', 1.4, 2.2, 0.1)}</Row>
+          <Row title={t('界面文字')}>{number('textScale', '界面文字大小', 85, 130, 5, '%')}</Row>
+          <Row title={t('显示比例')}>
+            <Select
+              aria-label={t('显示比例')}
+              value={String(settings.zoom)}
+              onChange={(e) => change({ zoom: Number(e.target.value) })}
+            >
+              {[...new Set([50, 75, 90, 100, 110, 125, 150, 175, 200, settings.zoom])]
+                .sort((a, b) => a - b)
+                .map((value) => (
+                  <option key={value} value={String(value)}>
+                    {value}%{value === 100 ? ` · ${t('默认')}` : ''}
+                  </option>
+                ))}
+            </Select>
+          </Row>
+        </div>
+      </SettingsSection>
+      <SettingsSection title={t('对话')}>
+        <div className="settings-card">
+          <Row title={t('思考过程')} hint={t('模型返回的推理内容在对话中的展示方式')}>
+            <Select
+              aria-label={t('思考过程')}
+              value={settings.reasoning}
+              onChange={(e) => change({ reasoning: e.target.value as Values['reasoning'] })}
+            >
+              <option value="collapsed">{t('自动收起')}</option>
+              <option value="expanded">{t('始终展开')}</option>
+              <option value="hidden">{t('不显示')}</option>
+            </Select>
+          </Row>
+        </div>
+      </SettingsSection>
+      <SettingsSection title={t('语言')}>
+        <div className="settings-card">
+          <Row title={t('界面语言')}>
+            <Select
+              aria-label={t('选择界面语言')}
+              value={language}
+              onChange={(event) => setLanguage(event.target.value as typeof language)}
+            >
+              {languageOptions.map((option) => (
+                <option value={option.value} key={option.value}>
+                  {option.label}
                 </option>
               ))}
-          </Select>
-        </Row>
-      </section>
-      <section className="appearance-section">
-        <h3>{t('对话')}</h3>
-        <Row title={t('思考过程')} hint={t('模型返回的推理内容在对话中的展示方式')}>
-          <Select
-            aria-label={t('思考过程')}
-            value={settings.reasoning}
-            onChange={(e) => change({ reasoning: e.target.value as Values['reasoning'] })}
-          >
-            <option value="collapsed">{t('自动收起')}</option>
-            <option value="expanded">{t('始终展开')}</option>
-            <option value="hidden">{t('不显示')}</option>
-          </Select>
-        </Row>
-      </section>
+            </Select>
+          </Row>
+        </div>
+      </SettingsSection>
       <footer className="appearance-footer">
         <button type="button" className="text-button" onClick={() => change({ ...DEFAULT_APPEARANCE })}>
           {t('恢复默认')}

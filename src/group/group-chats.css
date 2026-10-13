@@ -254,10 +254,11 @@
 }
 .group-message-bubble {
   min-width: 0;
-  padding: 13px 17px;
-  background: light-dark(#efedf2, #232127);
+  padding: 10px 14px;
+  background: var(--bubble-surface);
   color: light-dark(#34313c, #dfdce2);
-  border-radius: 6px 17px 17px 17px;
+  border-radius: 6px 18px 18px 18px;
+  box-shadow: var(--bubble-lift);
   overflow-wrap: anywhere;
   font-size: calc(14px * var(--appearance-text-scale, 1));
   line-height: 1.85;
@@ -280,9 +281,10 @@
   justify-content: flex-end;
 }
 .from-user .group-message-bubble {
-  background: light-dark(#e9e2f3, #232127);
-  color: light-dark(#46374f, #c3bcc8);
-  border-radius: 17px 6px 17px 17px;
+  background: light-dark(#e3d7f4, #232127);
+  color: light-dark(#2e2440, #c3bcc8);
+  border-radius: 18px 6px 18px 18px;
+  box-shadow: none;
 }
 .from-user .group-message-author {
   justify-content: flex-end;

@@ -172,7 +172,7 @@ export function RuntimeSettings({ settings, onNotify }: { settings?: Values; onN
           </div>
         </RuntimeGroup>
       </fieldset>
-      <footer className="runtime-actions">
+      <footer className="runtime-actions" data-dirty={dirty || error ? '' : undefined}>
         <button
           type="button"
           className="runtime-reset"

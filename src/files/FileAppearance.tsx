@@ -94,6 +94,35 @@ export const fileSize = (value: number) =>
       ? `${Math.round(value / 102.4) / 10} KB`
       : `${Math.round(value / 104857.6) / 10} MB`;
 
+export const fileKind = (name: string, mime?: string) => appearance(name, mime).kind;
+
+const glyphs: Record<FileKind, string> = {
+  document: 'M5.5 6h9M5.5 10h9M5.5 14h5.5',
+  sheet:
+    'M5.5 5h9A1.5 1.5 0 0 1 16 6.5v7a1.5 1.5 0 0 1-1.5 1.5h-9A1.5 1.5 0 0 1 4 13.5v-7A1.5 1.5 0 0 1 5.5 5ZM4 9h12M9 5v10',
+  slides:
+    'M5 4.5h10A1.5 1.5 0 0 1 16.5 6v5.5A1.5 1.5 0 0 1 15 13H5a1.5 1.5 0 0 1-1.5-1.5V6A1.5 1.5 0 0 1 5 4.5ZM10 13v3M7 16h6',
+  pdf: 'M6 3.5h5.5L15 7v9.5H6zM11.5 3.5V7H15',
+  code: 'M7.5 6.5 4 10l3.5 3.5M12.5 6.5 16 10l-3.5 3.5',
+  image:
+    'M5.5 4.5h9A1.5 1.5 0 0 1 16 6v8a1.5 1.5 0 0 1-1.5 1.5h-9A1.5 1.5 0 0 1 4 14V6a1.5 1.5 0 0 1 1.5-1.5ZM4.5 13l3.2-3.2 2.6 2.6 1.9-1.9 3.3 3.3M12.6 7.6h.01',
+  archive: 'M6.5 3.5h7a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2h-7a2 2 0 0 1-2-2v-9a2 2 0 0 1 2-2ZM10 3.5v2M10 7.5v2M10 11.5v2',
+  audio: 'M8 14.5V5.5l7-1.5v9M8 14.5a2 2 0 1 1-4 0 2 2 0 0 1 4 0ZM15 13a2 2 0 1 1-4 0 2 2 0 0 1 4 0Z',
+  video:
+    'M5 5h10a1.5 1.5 0 0 1 1.5 1.5v7A1.5 1.5 0 0 1 15 15H5a1.5 1.5 0 0 1-1.5-1.5v-7A1.5 1.5 0 0 1 5 5ZM8.5 7.8v4.4l3.8-2.2z',
+  file: 'M6 3.5h5.5L15 7v9.5H6zM11.5 3.5V7H15',
+};
+/** A file kind as a white line icon on its color; the tile of a file that has no content to show. */
+export function FileGlyph({ kind }: { kind: FileKind }) {
+  return (
+    <span className="file-glyph" aria-hidden="true">
+      <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round">
+        <path d={glyphs[kind]} strokeLinejoin="round" />
+      </svg>
+    </span>
+  );
+}
+
 export function FileTypeBadge({ name, mime }: { name: string; mime?: string }) {
   const { kind, badge } = appearance(name, mime);
   return (
@@ -135,24 +164,5 @@ export function FileInfo({
         </small>
       )}
     </span>
-  );
-}
-
-export function FilePreviewHint() {
-  return (
-    <svg
-      className="file-preview-hint"
-      width="16"
-      height="16"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.6"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      aria-hidden="true"
-    >
-      <path d="m9 6 6 6-6 6" />
-    </svg>
   );
 }

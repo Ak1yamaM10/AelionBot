@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { EMPTY_USER_PROFILE, normalizeUserProfile, type UserProfile } from '../../shared/chat/user-profile';
-import { SettingsSection } from './SettingsWindow';
+import { ProfileEmblem } from './SettingsWindow';
 import { useI18n } from '../i18n';
 export function UserProfileSettings({
   profile,
@@ -36,64 +36,64 @@ export function UserProfileSettings({
         void save();
       }}
     >
-      <SettingsSection title={t('关于你')}>
-        <div className="settings-card">
-          <label className="settings-row">
-            <span>{t('称呼')}</span>
+      <div className="profile-card">
+        <div className="profile-identity">
+          <ProfileEmblem name={value.displayName} size={64} />
+          <div className="profile-identity-fields">
             <input
+              className="profile-name"
               aria-label={t('希望 Bot 如何称呼你')}
               maxLength={80}
               value={value.displayName}
               disabled={saving}
-              placeholder={t('例如 Wendy')}
+              placeholder={t('希望 Bot 如何称呼你')}
               onChange={(event) => setValue({ ...value, displayName: event.target.value })}
             />
-          </label>
-          <label className="settings-row">
-            <span>{t('身份 / 职业')}</span>
             <input
+              className="profile-role"
               aria-label={t('身份或职业')}
               maxLength={200}
               value={value.role}
               disabled={saving}
-              placeholder={t('例如产品经理、独立开发者')}
+              placeholder={t('身份或职业')}
               onChange={(event) => setValue({ ...value, role: event.target.value })}
             />
-          </label>
-          <label className="profile-background">
-            <span>{t('工作背景')}</span>
-            <textarea
-              aria-label={t('工作背景')}
-              rows={5}
-              maxLength={3000}
-              value={value.background}
-              disabled={saving}
-              placeholder={t('你的工作内容、经验和希望 Bot 了解的背景')}
-              onChange={(event) => setValue({ ...value, background: event.target.value })}
-            />
-          </label>
+          </div>
         </div>
-      </SettingsSection>
-      {error && (
-        <p role="alert" className="provider-error">
-          {error}
-        </p>
-      )}
-      <div className="settings-actions">
-        <button
-          type="button"
-          className="text-button"
-          disabled={saving}
-          onClick={() => setValue({ ...EMPTY_USER_PROFILE })}
-        >
-          {t('清空资料')}
-        </button>
-        <button
-          className="primary-button"
-          disabled={saving || JSON.stringify(value) === JSON.stringify(profile || EMPTY_USER_PROFILE)}
-        >
-          {saving ? t('保存中…') : t('保存个人资料')}
-        </button>
+        <label className="profile-background">
+          <span>{t('工作背景')}</span>
+          <textarea
+            className="settings-field"
+            aria-label={t('工作背景')}
+            rows={6}
+            maxLength={3000}
+            value={value.background}
+            disabled={saving}
+            placeholder={t('你的工作内容、经验和希望 Bot 了解的背景')}
+            onChange={(event) => setValue({ ...value, background: event.target.value })}
+          />
+        </label>
+        <footer className="profile-actions">
+          <button
+            type="button"
+            className="text-button"
+            disabled={saving}
+            onClick={() => setValue({ ...EMPTY_USER_PROFILE })}
+          >
+            {t('清空资料')}
+          </button>
+          {error && (
+            <p role="alert" className="provider-error">
+              {error}
+            </p>
+          )}
+          <button
+            className="primary-button"
+            disabled={saving || JSON.stringify(value) === JSON.stringify(profile || EMPTY_USER_PROFILE)}
+          >
+            {saving ? t('保存中…') : t('保存个人资料')}
+          </button>
+        </footer>
       </div>
     </form>
   );

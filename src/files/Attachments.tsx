@@ -4,7 +4,7 @@ import { useFilePreview, usePreviewScope, type PreviewItem } from '../preview/Fi
 import { FilePreview } from '../preview/FilePreview';
 import type { Attachment } from '../../shared/types/attachment-types';
 import type { ArtifactPreview } from '../../shared/types/core';
-import { FileInfo, FilePreviewHint, FileTypeBadge } from './FileAppearance';
+import { FileGlyph, FileInfo, fileKind, FileTypeBadge } from './FileAppearance';
 import { useI18n } from '../i18n';
 import { Icon } from '../ui/Icon';
 import { bytes } from '../ui/format';
@@ -38,36 +38,11 @@ export function AttachmentIcon() {
     </svg>
   );
 }
-function AttachmentCard({
-  file,
-  compact,
-  onRemove,
-  onOpen,
-}: {
-  file: Attachment;
-  compact: boolean;
-  onRemove?: () => void;
-  onOpen: () => void;
-}) {
+/** A pending file in the composer: a small tag with its type and name. */
+function AttachmentCard({ file, onRemove, onOpen }: { file: Attachment; onRemove?: () => void; onOpen: () => void }) {
   const { t } = useI18n();
-  const [image, setImage] = useState('');
-  useEffect(() => {
-    let active = true;
-    if (file.image)
-      void preview(file.id)
-        .then((value) => {
-          if (active) setImage(value.dataUrl || '');
-        })
-        .catch(() => {});
-    return () => {
-      active = false;
-    };
-  }, [file.id, file.image?.id]);
   return (
-    <article
-      className={`attachment-card file-tile ${compact ? 'attachment-tag' : ''} ${image ? 'has-image' : ''}`}
-      data-attachment-id={file.id}
-    >
+    <article className="attachment-card file-tile attachment-tag" data-attachment-id={file.id}>
       <button
         type="button"
         className="attachment-open file-tile-open"
@@ -75,9 +50,8 @@ function AttachmentCard({
         title={t('预览 {name}', { name: file.name })}
         aria-label={t('预览附件 {name}', { name: file.name })}
       >
-        {image ? <img src={image} alt="" /> : <FileTypeBadge name={file.name} mime={file.mime} />}
-        <FileInfo name={file.name} size={file.size} mime={file.mime} compact={compact} />
-        {!compact && <FilePreviewHint />}
+        <FileTypeBadge name={file.name} mime={file.mime} />
+        <FileInfo name={file.name} size={file.size} mime={file.mime} compact />
       </button>
       {onRemove && (
         <button
@@ -101,6 +75,111 @@ function AttachmentCard({
           </svg>
         </button>
       )}
+    </article>
+  );
+}
+const excerpts = new Map<string, Promise<string>>();
+/** The opening of a text file, drawn small on its tile. Other formats would need rendering first, so they show a glyph. */
+const excerpt = (file: Attachment) => {
+  let value = excerpts.get(file.id);
+  if (!value) {
+    value = window.aelion.previewAttachment(file.id).then(
+      (result) => (result.content || '').slice(0, 1600),
+      () => '',
+    );
+    if (excerpts.size >= 80) excerpts.delete(excerpts.keys().next().value!);
+    excerpts.set(file.id, value);
+  }
+  return value;
+};
+const hasExcerpt = (file: Attachment) =>
+  file.size <= 1048576 && (sourceTextFile(file.name) || file.mime.startsWith('text/'));
+/** A text file's first lines as a miniature page: a table for CSV, headings and paragraphs for prose, code as it is. */
+function FileMiniature({ name, text }: { name: string; text: string }) {
+  const suffix = name.slice(name.lastIndexOf('.') + 1).toLowerCase(),
+    lines = text.split(/\r?\n/);
+  if (suffix === 'csv' || suffix === 'tsv') {
+    const rows = lines
+      .filter((line) => line.trim())
+      .slice(0, 9)
+      .map((line) =>
+        line
+          .split(suffix === 'tsv' ? '\t' : ',')
+          .slice(0, 3)
+          .map((cell) => cell.trim().replace(/^"|"$/g, '')),
+      );
+    return (
+      <table className="file-mini is-table">
+        <tbody>
+          {rows.map((row, index) => (
+            <tr key={index}>
+              {row.map((cell, column) => (index ? <td key={column}>{cell}</td> : <th key={column}>{cell}</th>))}
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    );
+  }
+  if (!['md', 'markdown', 'txt', 'log'].includes(suffix)) return <pre className="file-mini is-code">{text}</pre>;
+  return (
+    <div className="file-mini">
+      {lines
+        .filter((line) => line.trim() && !/^\s*([-=*_]{3,}|```.*)\s*$/.test(line))
+        .slice(0, 16)
+        .map((line, index) => {
+          const heading = /^\s{0,3}#{1,6}\s+(.*)$/.exec(line);
+          const copy = (heading ? heading[1] : line.replace(/^\s*(?:[-*+]|\d+[.)])\s+/, '· ')).replace(/[*_`]/g, '');
+          return heading ? <b key={index}>{copy}</b> : <p key={index}>{copy}</p>;
+        })}
+    </div>
+  );
+}
+/** A file in a message: what it holds on top (its first lines, or its kind), its name and size below. */
+function AttachmentTile({ file, onOpen }: { file: Attachment; onOpen: () => void }) {
+  const { t } = useI18n();
+  const [text, setText] = useState('');
+  const readable = hasExcerpt(file);
+  useEffect(() => {
+    let active = true;
+    if (readable)
+      void excerpt(file).then((value) => {
+        if (active) setText(value);
+      });
+    return () => {
+      active = false;
+    };
+  }, [file.id, readable]);
+  const kind = fileKind(file.name, file.mime);
+  return (
+    <article className={`attachment-thumb file-type-${kind}`} data-attachment-id={file.id}>
+      <div className="attachment-thumb-preview" aria-hidden="true">
+        {text.trim() ? (
+          <div className="attachment-thumb-page">
+            <FileMiniature name={file.name} text={text} />
+          </div>
+        ) : (
+          <FileGlyph kind={kind} />
+        )}
+      </div>
+      {/* The button's ::before covers the tile, so the whole tile opens the preview. */}
+      <button
+        type="button"
+        className="attachment-thumb-open"
+        onClick={onOpen}
+        title={t('预览 {name}', { name: file.name })}
+        aria-label={t('预览附件 {name}', { name: file.name })}
+      >
+        <FileInfo name={file.name} size={file.size} mime={file.mime} />
+      </button>
+      <button
+        type="button"
+        className="attachment-thumb-save"
+        title={t('另存为')}
+        aria-label={t('保存 {name}', { name: file.name })}
+        onClick={() => void window.aelion.saveAttachment(file.id)}
+      >
+        <Icon name="download" size={14} />
+      </button>
     </article>
   );
 }
@@ -267,15 +346,18 @@ export function AttachmentList({
         ))}
       {others.length > 0 && (
         <div className={`message-attachments ${compact ? 'composer-attachments' : ''}`}>
-          {others.map((file, index) => (
-            <AttachmentCard
-              key={file.id}
-              file={file}
-              compact={compact}
-              onOpen={() => open(others, index)}
-              onRemove={onRemove ? () => onRemove(file.id) : undefined}
-            />
-          ))}
+          {others.map((file, index) =>
+            compact ? (
+              <AttachmentCard
+                key={file.id}
+                file={file}
+                onOpen={() => open(others, index)}
+                onRemove={onRemove ? () => onRemove(file.id) : undefined}
+              />
+            ) : (
+              <AttachmentTile key={file.id} file={file} onOpen={() => open(others, index)} />
+            ),
+          )}
         </div>
       )}
       {selected && (
