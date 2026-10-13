@@ -9,6 +9,15 @@ export const HOST_PERMISSION_MODES = [
   },
   { id: 'full' as const, label: '完全访问', description: '当前会话的本机操作和 MCP 调用直接执行' },
 ];
+/** Computer Use on the user's own desktop. */
+export interface HostComputerSettings {
+  /** Whether Bots are offered it at all; each task still asks before it starts. */
+  enabled: boolean;
+}
+export interface HostComputerView extends HostComputerSettings {
+  /** False on systems host Computer Use does not support. */
+  available: boolean;
+}
 export interface HostApprovalView {
   mode: HostPermissionMode;
   phase: 'reviewing' | 'waiting';

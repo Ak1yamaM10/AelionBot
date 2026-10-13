@@ -1,4 +1,10 @@
-import type { ChatMessage, RunRecord, StreamingReply as Reply, ModelConfig } from '../../shared/types/core';
+import type {
+  ChatMessage,
+  InteractionRequest,
+  RunRecord,
+  StreamingReply as Reply,
+  ModelConfig,
+} from '../../shared/types/core';
 import { contextNeedsChange } from '../../shared/chat/context-issue';
 import { StreamingReply } from './StreamingReply';
 import { friendlyError, runDurationMs, runPresentation, runSteps } from '../../shared/chat/activity';
@@ -28,7 +34,7 @@ export function RunMessage({
   stream?: Reply;
   latest: boolean;
   canContinue: boolean;
-  waiting?: 'host_permission' | 'vm_takeover' | 'user_input';
+  waiting?: InteractionRequest['kind'];
   reviewing?: boolean;
   onContinue: () => void;
   onSettings: (tab: 'model' | 'computer' | 'mcp') => void;

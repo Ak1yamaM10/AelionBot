@@ -1,7 +1,7 @@
 import type { AppEvent, StateBase } from '../state-sync';
 import type { MessageReply } from '../chat/message-replies';
 import type { ModelParameters, NativeAssistant } from './model-types';
-import type { HostPermissionMode, HostApprovalView } from './permission-types';
+import type { HostPermissionMode, HostApprovalView, HostComputerView } from './permission-types';
 import type { WorkItem, WorkAction } from './work-types';
 import type { RuntimeSettings, TaskPlan, UsageRecord } from './runtime-types';
 import type {
@@ -369,6 +369,8 @@ export interface UserQuestion {
 export type InteractionRequest = { id: string; botId: string; runId: string; createdAt: string } & (
   | { kind: 'host_permission'; details: HostPermissionDetails; approval?: HostApprovalView }
   | { kind: 'vm_takeover'; reason: string; phase: 'waiting' | 'controlling' }
+  /** A Bot's task wants to start operating the user's own computer. */
+  | { kind: 'computer_use'; phase: 'waiting' }
   | { kind: 'user_input'; questions: UserQuestion[]; phase: 'waiting' }
 );
 export type InteractionAction = 'allow' | 'allow-always' | 'deny' | 'takeover' | 'resume' | 'cancel' | 'answer';
@@ -397,6 +399,7 @@ export interface Snapshot {
   appearance?: import('../preview/appearance').AppearanceSettings;
   userProfile?: import('../chat/user-profile').UserProfile;
   hostPermissionModes?: Record<string, HostPermissionMode>;
+  hostComputer?: HostComputerView;
   platform?: string;
   workItems?: WorkItem[];
   conversationWorkspaces?: Record<string, string>;
@@ -676,6 +679,7 @@ export interface AelionAPI {
   respondInteraction(input: { id: string; action: InteractionAction; answers?: Record<string, string> }): Promise<void>;
   setCommandPermissionEnabled(input: { id: string; enabled: boolean }): Promise<void>;
   removeCommandPermission(id: string): Promise<void>;
+  setHostComputerEnabled(enabled: boolean): Promise<void>;
   saveHostWorkspace(path: string): Promise<void>;
   pickHostWorkspace(): Promise<string | null>;
   openComputerApp(input: {

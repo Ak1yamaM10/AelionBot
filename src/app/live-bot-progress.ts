@@ -1,5 +1,5 @@
 import { liveBotStep, toolOperation, type LiveBotStep } from '../../shared/chat/activity';
-import type { ChatMessage, RunRecord } from '../../shared/types/core';
+import type { ChatMessage, InteractionRequest, RunRecord } from '../../shared/types/core';
 import { translate } from '../../shared/i18n';
 
 export interface LiveBotProgress extends LiveBotStep {
@@ -16,7 +16,7 @@ const batch = (name: string) => name === 'code_exec' || name === 'tools_batch';
 export function liveBotProgress(
   messages: ChatMessage[],
   run?: RunRecord,
-  waiting?: 'host_permission' | 'vm_takeover' | 'user_input',
+  waiting?: InteractionRequest['kind'],
   reviewing = false,
 ): LiveBotProgress | undefined {
   const executions = (run?.executions || []).filter((e) => e.runId === run?.id && e.botId === run?.botId);

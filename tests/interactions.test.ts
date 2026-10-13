@@ -7,7 +7,10 @@ import { basename, dirname, join, resolve } from 'node:path';
 import { Store } from '../electron/core/storage/store';
 import { Harness } from '../electron/core/agent/harness';
 import { HostComputer } from '../electron/core/host/host';
-import { Interactions } from '../electron/core/agent/interactions';
+import { Interactions, respondToInteraction } from '../electron/core/agent/interactions';
+import { HostDesktop } from '../electron/core/host/desktop/host-desktop';
+import type { DesktopDriver } from '../electron/core/host/desktop/desktop-helper';
+import type { HostComputerSettings } from '../shared/types/permission-types';
 import { ComputerController } from '../electron/core/vm/computer';
 import type { ModelClient } from '../electron/core/model/model';
 import type { VmController } from '../electron/core/vm/vm';
@@ -365,4 +368,114 @@ test('cancelling a paused run withdraws its request and never resumes the model'
   assert.equal(interactions.snapshot().length, 0);
   assert.equal(existsSync(join(root, 'cancelled.txt')), false);
   assert.equal(store.data.runs[0].status, 'cancelled');
+});
+test('host Computer Use asks once per task, shows the model the window, and frees the computer when the run ends', async (t) => {
+  const { root, store, interactions } = fixture(t),
+    bot = store.data.bots[0],
+    host = new HostComputer({ dataDir: root, homeDir: root, projectDir: root }, interactions);
+  t.after(() => host.dispose());
+  let settings: HostComputerSettings = { enabled: true },
+    captures = 0,
+    looks = 0;
+  const window = {
+    id: 7,
+    title: '表格',
+    className: 'X',
+    pid: 7,
+    exe: 'C:\\Apps\\Sheets\\Sheets.exe',
+    name: 'Sheets',
+    minimized: false,
+    foreground: true,
+    elevated: false,
+    x: 0,
+    y: 0,
+    width: 800,
+    height: 600,
+  };
+  const driver = {
+    status: async () => ({ elevated: false }),
+    window: async () => window,
+    capture: async () => {
+      captures++;
+      return { ...window, originX: 0, originY: 0, scale: 1, imageWidth: 800, imageHeight: 600 };
+    },
+    dispose: () => {},
+  } as unknown as DesktopDriver;
+  const desktop = new HostDesktop({
+    driver,
+    imageDir: root,
+    settings: { read: () => settings, write: (next) => void (settings = next) },
+    requestAccess: (botId, runId, signal) => interactions.computerAccess(botId, runId, signal),
+    running: (runId) => store.data.runs.some((run) => run.id === runId && run.status === 'running'),
+    changed: () => {},
+    platform: 'win32',
+    ownExe: 'C:\\Aelion\\AelionBot.exe',
+  });
+  const offered: string[][] = [],
+    observed: string[] = [];
+  const model = {
+    complete: async (messages: WireMessage[], tools: Array<{ function: { name: string } }>) => {
+      offered.push(tools.map((tool) => tool.function.name));
+      const seen = messages.find((message) => message.images?.length);
+      if (seen) observed.push(seen.content || '');
+      if (looks-- > 0)
+        return {
+          content: '',
+          finishReason: 'tool_calls',
+          calls: [
+            {
+              id: 'look-' + looks,
+              type: 'function',
+              function: { name: 'host_computer', arguments: '{"action":"get_window_state","window":7}' },
+            },
+          ],
+        };
+      return { content: '看完了', finishReason: 'stop', calls: [] };
+    },
+  } as unknown as ModelClient;
+  const harness = new Harness(
+    store,
+    {} as VmController,
+    model,
+    () => {},
+    undefined,
+    undefined,
+    undefined,
+    host,
+    interactions,
+  );
+  harness.setHostDesktop(desktop);
+  // Two looks in one task: the user is asked before the first and not again.
+  looks = 2;
+  const first = harness.run(bot.id, '看看我的表格');
+  await until(() => interactions.snapshot().length === 1);
+  const request = interactions.snapshot()[0];
+  assert.equal(request.kind, 'computer_use');
+  assert.equal(captures, 0);
+  assert.deepEqual(desktop.current, { botId: bot.id, runId: store.data.runs[0].id });
+  assert.throws(() =>
+    respondToInteraction(interactions, {} as ComputerController, { id: request.id, action: 'allow-always' }),
+  );
+  respondToInteraction(interactions, {} as ComputerController, { id: request.id, action: 'allow' });
+  await first;
+  assert.equal(captures, 2);
+  assert.equal(interactions.snapshot().length, 0);
+  assert.ok(offered[0].includes('host_computer'));
+  assert.match(observed[0], /本机窗口观察数据：observationId=.+窗口 7，图像尺寸 800×600/);
+  assert.equal(store.data.runs[0].status, 'completed');
+  assert.equal(desktop.current, undefined);
+  // The next task asks again; refused, it is not asked a second time and nothing is captured.
+  looks = 2;
+  const second = harness.run(bot.id, '再看一次');
+  await until(() => interactions.snapshot().length === 1);
+  respondToInteraction(interactions, {} as ComputerController, { id: interactions.snapshot()[0].id, action: 'deny' });
+  await second;
+  assert.equal(captures, 2);
+  assert.equal(interactions.snapshot().length, 0);
+  assert.equal(desktop.current, undefined);
+  // Turned off, the tool is not offered at all.
+  settings = { enabled: false };
+  looks = 0;
+  await harness.run(bot.id, '第三次');
+  assert.ok(!offered.at(-1)!.includes('host_computer'));
 });

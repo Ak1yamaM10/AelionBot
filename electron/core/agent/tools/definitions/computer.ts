@@ -14,6 +14,31 @@ export const PYTHON_SESSION_TOOLS: ToolDefinition[] = [
     ['action'],
   ),
 ];
+const pointer = {
+  x: { type: 'number' },
+  y: { type: 'number' },
+  toX: { type: 'number' },
+  toY: { type: 'number' },
+  button: { type: 'string', enum: ['left', 'middle', 'right'] },
+  direction: { type: 'string', enum: ['up', 'down', 'left', 'right'] },
+  amount: { type: 'integer' },
+  key: string,
+  text: string,
+  milliseconds: { type: 'integer' },
+};
+const steps = (actions: string[], properties: Record<string, unknown>) => ({
+  type: 'array',
+  minItems: 1,
+  maxItems: 20,
+  items: {
+    type: 'object',
+    properties: { action: { type: 'string', enum: actions }, ...properties },
+    required: ['action'],
+    additionalProperties: false,
+  },
+});
+const vmStep = { ...pointer, pasteKey: { type: 'string', enum: ['CTRL+V', 'CTRL+SHIFT+V'] } };
+const hostStep = { ...pointer, element: { type: 'integer' }, count: { type: 'integer' }, value: string };
 export const COMPUTER_TOOLS: ToolDefinition[] = [
   tool(
     'request_user_control',
@@ -23,27 +48,30 @@ export const COMPUTER_TOOLS: ToolDefinition[] = [
   ),
   tool(
     'computer',
-    '操作当前 Bot 专属的真实 Linux 桌面，不会切换其他 Bot 的桌面。先 screenshot 观察；鼠标与键盘动作必须携带最新截图的 observationId，坐标为截图原始像素。每次动作都会返回新截图。type 使用工作电脑剪贴板粘贴 Unicode 文本；终端中可指定 pasteKey=CTRL+SHIFT+V。open_app 可启动浏览器、文件管理器、文本编辑器、Writer、Calc、Impress 或终端；打开已有文档时把工作区内相对路径放到 path，不要只打开空白窗口再找文件。action=wait 最长等待 2 秒。',
+    '操作当前 Bot 专属的真实 Linux 桌面，不会切换其他 Bot 的桌面。先 screenshot 观察；鼠标与键盘动作必须携带最新截图的 observationId，坐标为截图原始像素。每次动作都会返回新截图。type 使用工作电脑剪贴板粘贴 Unicode 文本；终端中可指定 pasteKey=CTRL+SHIFT+V。open_app 可启动浏览器、文件管理器、文本编辑器、Writer、Calc、Impress 或终端；打开已有文档时把工作区内相对路径放到 path，不要只打开空白窗口再找文件。action=wait 最长等待 2 秒。action=batch 用同一个 observationId 按顺序执行 actions 里的多个动作，只在最后返回一张新截图；用于中途不会改变布局的连续操作，例如点击输入框、输入文字、按回车。',
     {
       action: {
         type: 'string',
-        enum: ['screenshot', 'click', 'double_click', 'move', 'drag', 'scroll', 'key', 'type', 'wait', 'open_app'],
+        enum: [
+          'screenshot',
+          'click',
+          'double_click',
+          'move',
+          'drag',
+          'scroll',
+          'key',
+          'type',
+          'wait',
+          'open_app',
+          'batch',
+        ],
       },
       observationId: string,
-      x: { type: 'number' },
-      y: { type: 'number' },
-      toX: { type: 'number' },
-      toY: { type: 'number' },
-      button: { type: 'string', enum: ['left', 'middle', 'right'] },
-      direction: { type: 'string', enum: ['up', 'down', 'left', 'right'] },
-      amount: { type: 'integer' },
-      key: string,
-      text: string,
-      pasteKey: { type: 'string', enum: ['CTRL+V', 'CTRL+SHIFT+V'] },
-      milliseconds: { type: 'integer' },
+      ...vmStep,
       app: { type: 'string', enum: ['browser', 'files', 'editor', 'writer', 'calc', 'impress', 'terminal'] },
       url: string,
       path: string,
+      actions: steps(['click', 'double_click', 'move', 'drag', 'scroll', 'key', 'type', 'wait'], vmStep),
     },
     ['action'],
   ),
@@ -52,5 +80,37 @@ export const COMPUTER_TOOLS: ToolDefinition[] = [
     '直接在当前 Bot 工作目录执行 Python3 代码。code 是纯 Python 源码，不要拼接 shell 命令或多层引号。适合 CSV、Excel（openpyxl）、JSON、PDF 文本（pypdf/pdftotext）、计算和文件验证；exitCode 非零表示这次运行的结果，查看 stderr 后继续。',
     { code: string },
     ['code'],
+  ),
+];
+export const HOST_COMPUTER_TOOLS: ToolDefinition[] = [
+  tool(
+    'host_computer',
+    '操作用户本机 Windows 上的应用窗口，使用真实的鼠标和键盘并占用前台：操作期间用户不能同时使用这台电脑，按 Esc 可随时取消。只在命令、MCP 和工作电脑都无法完成、确实需要用户本机的应用或已登录账号时使用。流程：list_windows 找到窗口，或用 list_apps、launch_app 启动应用；get_window_state 观察窗口，返回截图和 observationId；click、drag、scroll、set_value 必须携带该窗口最新的 observationId，坐标为截图原始像素；type_text 和 press_key 发给该窗口当前的焦点。includeText=true 时同时返回控件列表，click、scroll、set_value 可以用 element 编号代替坐标。每次操作后返回新截图，之前的 observationId 随即失效。任务第一次调用时由用户批准一次，之后不再询问。终端应用、AelionBot 自身、以管理员身份运行的窗口和系统安全提示无法操作，遇到时请用户处理。action=batch 用同一个 observationId 按顺序执行 actions 里的多个步骤，只在最后返回一张截图；用于中途不会改变布局的连续操作，例如点击输入框、输入文字、按回车。',
+    {
+      action: {
+        type: 'string',
+        enum: [
+          'list_apps',
+          'list_windows',
+          'launch_app',
+          'get_window_state',
+          'click',
+          'drag',
+          'scroll',
+          'type_text',
+          'press_key',
+          'set_value',
+          'wait',
+          'batch',
+        ],
+      },
+      app: string,
+      window: { type: 'integer' },
+      observationId: string,
+      includeText: { type: 'boolean' },
+      ...hostStep,
+      actions: steps(['click', 'drag', 'scroll', 'type_text', 'press_key', 'set_value', 'wait'], hostStep),
+    },
+    ['action'],
   ),
 ];

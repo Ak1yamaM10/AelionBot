@@ -138,6 +138,21 @@ export class Interactions {
     }
     return this.enqueue(request, signal);
   }
+  /** Asks whether this run may operate the user's computer. Only a person answers: no mode or rule skips it. */
+  computerAccess(botId: string, runId: string, signal: AbortSignal) {
+    return this.enqueue(
+      { id: randomUUID(), botId, runId, createdAt: new Date().toISOString(), kind: 'computer_use', phase: 'waiting' },
+      signal,
+    );
+  }
+  decideComputerAccess(id: string, allow: boolean) {
+    if (this.get(id).kind !== 'computer_use') throw new Error('请求类型不匹配');
+    this.finish(
+      id,
+      allow ? undefined : new InteractionDenied('用户没有允许操控这台电脑'),
+      allow ? 'allowed' : 'denied',
+    );
+  }
   requestTakeover(botId: string, runId: string, reason: string, controlling: boolean, signal: AbortSignal) {
     if (this.takeover(botId)) return Promise.reject(new Error('这个 Bot 已在等待人工接管'));
     return this.enqueue(
@@ -497,6 +512,11 @@ export function respondToInteraction(
     }
     if (!['allow', 'deny'].includes(input.action)) throw new Error('无效权限决定');
     interactions.approve(input.id, input.action === 'allow');
+    return;
+  }
+  if (request.kind === 'computer_use') {
+    if (!['allow', 'deny'].includes(input.action)) throw new Error('无效权限决定');
+    interactions.decideComputerAccess(input.id, input.action === 'allow');
     return;
   }
   if (input.action === 'takeover') {

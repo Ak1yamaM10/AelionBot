@@ -5,7 +5,7 @@ import { GROUP_PROTOCOL_TOOLS } from '../../group/group-protocol-tools';
 import { SKILLS_LIST_TOOL } from '../../extensions/skill-catalog';
 import { ATTACHMENT_TOOLS } from './definitions/attachments';
 import { CHAT_TOOLS, GROUP_READ_TOOLS } from './definitions/chat';
-import { COMPUTER_TOOLS, PYTHON_SESSION_TOOLS } from './definitions/computer';
+import { COMPUTER_TOOLS, HOST_COMPUTER_TOOLS, PYTHON_SESSION_TOOLS } from './definitions/computer';
 import { DELEGATION_TOOLS, PEER_TOOLS } from './definitions/delegation';
 import { CHECKPOINT_TOOLS, FILE_TOOLS, SEARCH_TOOLS } from './definitions/files';
 import { MCP_TOOLS } from './definitions/mcp';
@@ -41,4 +41,5 @@ export const TOOLS: ToolDefinition[] = [
   ...READ_RESULT_TOOLS,
   PLAN_UPDATE_TOOL,
   ...DESIGN_TOOLS,
+  ...HOST_COMPUTER_TOOLS,
 ];

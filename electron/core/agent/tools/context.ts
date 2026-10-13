@@ -2,6 +2,7 @@ import type { Bot, ModelConfig, RunRecord, WireMessage } from '../../../../share
 import type { Store } from '../../storage/store';
 import type { VmController } from '../../vm/vm';
 import type { ComputerController } from '../../vm/computer';
+import type { HostDesktop } from '../../host/desktop/host-desktop';
 import type { ModelClient, ToolDefinition } from '../../model/model';
 import type { Integrations } from '../../extensions/integrations';
 import type { HostComputer } from '../../host/host';
@@ -37,6 +38,8 @@ export interface ToolDeps {
   code: CodeOrchestrator;
   web: WebTools;
   computer?: ComputerController;
+  /** Computer Use on the user's own desktop; absent where the system does not support it. */
+  hostDesktop?: HostDesktop;
   integrations?: Integrations;
   host?: HostComputer;
   interactions?: Interactions;

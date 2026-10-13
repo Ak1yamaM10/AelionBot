@@ -27,6 +27,10 @@ export function registerWorkspace(ctx: IpcContext) {
     ctx.commandPermissions.remove(id);
     ctx.changed();
   });
+  handle('setHostComputerEnabled', (enabled) => {
+    if (typeof enabled !== 'boolean' || !ctx.hostDesktop?.available) throw new Error('这台电脑不支持本机电脑控制');
+    ctx.hostDesktop.setEnabled(enabled);
+  });
   const mentionSearches = new Map<string, AbortController>();
   handle('searchMentionFiles', async (input) => {
     const scope = assertWorkspaceScope(ctx.store, input?.scope),

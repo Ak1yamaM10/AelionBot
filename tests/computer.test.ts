@@ -182,3 +182,77 @@ test('artifact preview/export reject host paths and traversal', () => {
   for (const value of ['/etc/passwd', '../secret', 'a/../../secret', 'C:\\data', 'file:///etc/passwd', 'a\0b'])
     assert.throws(() => artifactPath(value));
 });
+test('a batch runs its steps in order against one observation and returns a single screenshot', async (t) => {
+  const dir = tempDir(t, 'aelion-computer-test-');
+  const events: string[] = [];
+  let fail = '';
+  const vm = {
+    state: { status: 'ready', desktopReady: true, appsReady: true },
+    ensureBotDesktop: async () => ({ vncUrl: 'ws://local/a' }),
+    executeDesktop: async (command: string) => {
+      events.push(command);
+      return fail && command.includes(fail)
+        ? { exitCode: 1, stdout: '', stderr: 'boom' }
+        : { exitCode: 0, stdout: '', stderr: '' };
+    },
+    desktopScreenshot: async () => {
+      events.push('screenshot');
+      const png = Buffer.alloc(32);
+      Buffer.from('89504e470d0a1a0a', 'hex').copy(png);
+      png.writeUInt32BE(1280, 16);
+      png.writeUInt32BE(800, 20);
+      return png;
+    },
+  } as unknown as VmController;
+  const computer = new ComputerController(vm, dir, () => {}),
+    signal = new AbortController().signal;
+  const first = await computer.execute('a', { action: 'screenshot' }, signal);
+  events.length = 0;
+  const result = await computer.execute(
+    'a',
+    {
+      action: 'batch',
+      observationId: first.screenshot.id,
+      actions: [
+        { action: 'click', x: 100, y: 200 },
+        { action: 'type', text: 'hello' },
+        { action: 'key', key: 'ENTER' },
+      ],
+    },
+    signal,
+  );
+  assert.equal(result.action, 'batch');
+  assert.notEqual(result.screenshot.id, first.screenshot.id);
+  assert.equal(events.filter((event) => event === 'screenshot').length, 1);
+  assert.equal(events.at(-1), 'screenshot');
+  const order = ['xdotool mousemove 100 200', 'xclip', 'Control_L+v', 'Return'].map((needle) =>
+    events.findIndex((event) => event.includes(needle)),
+  );
+  assert.ok(order.every((index, i) => index >= 0 && (i === 0 || index > order[i - 1])));
+  // Nothing moves when any step is out of range, observes, or nests another batch.
+  events.length = 0;
+  const batch = (actions: Parameters<ComputerController['execute']>[1]['actions']) =>
+    computer.execute('a', { action: 'batch', observationId: result.screenshot.id, actions }, signal);
+  await assert.rejects(() =>
+    batch([
+      { action: 'click', x: 1, y: 1 },
+      { action: 'click', x: 5000, y: 1 },
+    ]),
+  );
+  await assert.rejects(() => batch([{ action: 'screenshot' }]));
+  await assert.rejects(() => batch([{ action: 'batch', actions: [{ action: 'wait' }] }]));
+  await assert.rejects(() => batch([]));
+  assert.equal(events.length, 0);
+  // A step that fails names itself and stops the rest.
+  fail = 'mousemove 30 40';
+  await assert.rejects(
+    () =>
+      batch([
+        { action: 'click', x: 10, y: 20 },
+        { action: 'click', x: 30, y: 40 },
+        { action: 'key', key: 'ENTER' },
+      ]),
+    (error: Error & { code?: string }) => error.code === 'computer.batch_failed' && error.message.includes('第 2 步'),
+  );
+  assert.ok(!events.some((event) => event.includes('Return')));
+});

@@ -1,4 +1,5 @@
 import type { ComputerInput } from '../../../vm/computer';
+import type { HostComputerInput } from '../../../host/desktop/host-desktop';
 import { vmPython } from '../../../vm/vm-python';
 import type { ToolHandler } from '../context';
 import { requiredText } from '../validation';
@@ -44,6 +45,10 @@ export const COMPUTER_HANDLERS: Record<string, ToolHandler> = {
     // The Bot has one desktop: while one of its chats drives it, the others wait.
     deps.claimDesktop(bot.id, runId);
     return deps.computer.execute(bot.id, args as unknown as ComputerInput, signal);
+  },
+  host_computer: ({ bot, args, signal, runId, deps }) => {
+    if (!deps.hostDesktop?.enabled) throw new Error('本机电脑控制未开启');
+    return deps.hostDesktop.execute(bot.id, runId, args as unknown as HostComputerInput, signal);
   },
   python_execute: ({ bot, args, signal, deps }) =>
     vmPython(

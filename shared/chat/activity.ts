@@ -1,4 +1,4 @@
-import type { ChatMessage, RunRecord } from '../types/core';
+import type { ChatMessage, InteractionRequest, RunRecord } from '../types/core';
 import { placeQuestionAnswers, readableQuestionAnswer } from './question-answers';
 import { isContextCapacityFailure } from './context-issue';
 import { currentLanguage, translate } from '../i18n';
@@ -66,6 +66,7 @@ const operations: Record<string, { label: string; active: string; icon: string }
   host_file_patch: { label: '修改本机文件', active: '正在修改本机文件', icon: 'file' },
   request_user_control: { label: '请求人工接管', active: '等待你处理工作电脑', icon: 'computer' },
   computer: { label: '操作电脑', active: '正在操作电脑', icon: 'computer' },
+  host_computer: { label: '操作本机应用', active: '正在操作本机应用', icon: 'computer' },
   computer_execute: { label: '执行命令', active: '正在执行命令', icon: 'terminal' },
   python_execute: { label: '运行代码', active: '正在运行代码', icon: 'terminal' },
   exec_command: { label: '执行命令', active: '正在执行命令', icon: 'terminal' },
@@ -152,6 +153,7 @@ export function describeTool(
       key: '按下快捷键',
       type: '输入文字',
       open_app: '打开应用',
+      batch: '连续操作界面',
     };
     const action = actions[text(input.action || result.action)];
     label = action ? translate(action) : label;
@@ -166,6 +168,24 @@ export function describeTool(
     };
     const app = apps[text(input.app)];
     detail = app ? translate(app) : '';
+  }
+  if (name === 'host_computer') {
+    const actions: Record<string, string> = {
+      list_apps: '查看本机应用',
+      list_windows: '查看本机窗口',
+      launch_app: '打开本机应用',
+      get_window_state: '查看应用窗口',
+      click: '点击界面',
+      drag: '拖动界面',
+      scroll: '滚动页面',
+      type_text: '输入文字',
+      press_key: '按下快捷键',
+      set_value: '填写内容',
+      batch: '连续操作界面',
+    };
+    const action = actions[text(input.action || result.action)];
+    label = action ? translate(action) : label;
+    detail = text((result.window as Record<string, unknown> | undefined)?.app || input.app);
   }
   return { label, ...(detail ? { detail } : {}) };
 }
@@ -207,7 +227,7 @@ export interface LiveBotStep {
 export function liveBotStep(
   messages: ChatMessage[],
   run?: RunRecord,
-  waiting?: 'host_permission' | 'vm_takeover' | 'user_input',
+  waiting?: InteractionRequest['kind'],
   reviewing = false,
 ): LiveBotStep | undefined {
   if (!run || run.status !== 'running') return;
@@ -216,7 +236,7 @@ export function liveBotStep(
     return {
       phase: 'waiting',
       label: translate(
-        waiting === 'host_permission'
+        waiting === 'host_permission' || waiting === 'computer_use'
           ? '等待你的操作许可'
           : waiting === 'user_input'
             ? '等待你的回答'

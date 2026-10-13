@@ -915,7 +915,7 @@ function ResultBody({ message, value }: { message: ChatMessage; value: unknown }
       />
     );
   }
-  if (tool === 'computer' || tool === 'request_user_control')
+  if (tool === 'computer' || tool === 'request_user_control' || (tool === 'host_computer' && message.screenshotId))
     return (
       <p className="detail-computer-caption">
         {message.screenshotId ? t('操作后的电脑画面，可点击放大查看。') : t('电脑操作已结束。')}

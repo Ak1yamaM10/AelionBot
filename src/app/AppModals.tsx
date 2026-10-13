@@ -7,6 +7,7 @@ import { RuntimeSettings } from '../settings/RuntimeSettings';
 import { UsageSettings } from '../settings/UsageSettings';
 import { SettingsWindow, type SettingsTab } from '../settings/SettingsWindow';
 import { CommandPermissionsSettings } from '../settings/CommandPermissionsSettings';
+import { HostComputerSettings } from '../settings/HostComputerSettings';
 import { UserProfileSettings } from '../settings/UserProfileSettings';
 import { ModelSettings } from '../settings/ModelSettings';
 import { AboutSettings } from '../settings/AboutSettings';
@@ -186,7 +187,12 @@ export function AppModals({
               />
             )}
             {settingsTab === 'permissions' && (
-              <CommandPermissionsSettings rules={state.commandPermissions || []} busy={busy} act={act} />
+              <>
+                {state.hostComputer?.available && (
+                  <HostComputerSettings value={state.hostComputer} busy={busy} act={act} />
+                )}
+                <CommandPermissionsSettings rules={state.commandPermissions || []} busy={busy} act={act} />
+              </>
             )}
             {settingsTab === 'about' && <AboutSettings update={state.updates} onNotify={setToast} />}
           </SettingsWindow>

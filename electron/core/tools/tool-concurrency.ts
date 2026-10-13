@@ -1,5 +1,6 @@
 const EXCLUSIVE_TOOLS = new Set([
   'computer',
+  'host_computer',
   'request_user_control',
   'request_user_input',
   'user_input_wait',

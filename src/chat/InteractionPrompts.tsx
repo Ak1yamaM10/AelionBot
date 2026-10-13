@@ -10,6 +10,7 @@ import '../settings/permission-modes.css';
 type Permission = Extract<InteractionRequest, { kind: 'host_permission' }>;
 type Takeover = Extract<InteractionRequest, { kind: 'vm_takeover' }>;
 type Questions = Extract<InteractionRequest, { kind: 'user_input' }>;
+type ComputerAccess = Extract<InteractionRequest, { kind: 'computer_use' }>;
 const errorText = (error: unknown) =>
   (error as Error).message.replace(/^Error invoking remote method '[^']+': Error: /, '');
 function PermissionCard({ request, count }: { request: Permission; count: number }) {
@@ -177,6 +178,73 @@ function PermissionCard({ request, count }: { request: Permission; count: number
     </section>
   );
 }
+function ComputerAccessCard({ request }: { request: ComputerAccess }) {
+  const { t } = useI18n();
+  const [ready, setReady] = useState(false),
+    [pending, setPending] = useState(false),
+    [error, setError] = useState('');
+  const decide = async (action: 'allow' | 'deny') => {
+    if (pending) return;
+    setPending(true);
+    setError('');
+    try {
+      await window.aelion.respondInteraction({ id: request.id, action });
+    } catch (error) {
+      setError(errorText(error));
+      setPending(false);
+    }
+  };
+  // A click that was already on its way when the card appeared must not approve anything.
+  useEffect(() => {
+    const timer = setTimeout(() => setReady(true), 250);
+    return () => clearTimeout(timer);
+  }, []);
+  return (
+    <section
+      id={`interaction-${request.id}`}
+      className="conversation-request permission-card computer-access-card companion-surface"
+      tabIndex={-1}
+      aria-label={t('电脑控制权限')}
+    >
+      <header>
+        <CompanionBadge kind="permission" activity="waiting" />
+        <div className="request-heading-copy">
+          <h2>{t('操控这台电脑')}</h2>
+        </div>
+        <span className="request-status companion-status">{t('等待确认')}</span>
+      </header>
+      {error && (
+        <div className="permission-body">
+          <p className="permission-error" role="alert">
+            {error}
+          </p>
+        </div>
+      )}
+      <footer>
+        <div className="permission-actions">
+          <button
+            type="button"
+            className="companion-button permission-deny-button"
+            disabled={pending}
+            onClick={() => void decide('deny')}
+          >
+            {t('拒绝')}
+          </button>
+          <button
+            type="button"
+            className="companion-button companion-primary"
+            disabled={!ready || pending}
+            onClick={(event) => {
+              if (event.isTrusted && event.detail < 2) void decide('allow');
+            }}
+          >
+            {pending ? t('正在处理…') : t('允许')}
+          </button>
+        </div>
+      </footer>
+    </section>
+  );
+}
 function TakeoverCard({
   request,
   onTakeover,
@@ -259,6 +327,8 @@ export function ConversationInteractions({
     <PermissionCard key={request.id} request={request} count={pending.length} />
   ) : request.kind === 'user_input' ? (
     <QuestionCard key={request.id} request={request} />
+  ) : request.kind === 'computer_use' ? (
+    <ComputerAccessCard key={request.id} request={request} />
   ) : (
     <TakeoverCard key={request.id} request={request} onTakeover={onTakeover} />
   );
@@ -396,7 +466,11 @@ export function InteractionNotifications({
         aria-label={t('查看 {name} 的{kind}', {
           name: bot?.name || 'Bot',
           kind: t(
-            request.kind === 'host_permission' ? '权限请求' : request.kind === 'user_input' ? '问题' : '接管请求',
+            request.kind === 'host_permission' || request.kind === 'computer_use'
+              ? '权限请求'
+              : request.kind === 'user_input'
+                ? '问题'
+                : '接管请求',
           ),
         })}
       >
@@ -408,7 +482,9 @@ export function InteractionNotifications({
               ? t('等待你的本机操作许可')
               : request.kind === 'user_input'
                 ? t('有问题需要你回答')
-                : t('需要你接管工作电脑')}
+                : request.kind === 'computer_use'
+                  ? t('想操控这台电脑')
+                  : t('需要你接管工作电脑')}
           </small>
         </span>
         <span className="notification-view">

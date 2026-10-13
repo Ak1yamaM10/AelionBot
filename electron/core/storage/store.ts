@@ -54,6 +54,7 @@ interface Persisted {
   userProfile?: import('../../../shared/chat/user-profile').UserProfile;
   historyVersions?: Record<string, number>;
   hostPermissionModes?: Record<string, import('../../../shared/types/permission-types').HostPermissionMode>;
+  hostComputer?: Partial<import('../../../shared/types/permission-types').HostComputerSettings>;
   pythonSessions?: PythonSession[];
   fileCheckpoints?: FileCheckpoint[];
   processes?: BackgroundProcess[];

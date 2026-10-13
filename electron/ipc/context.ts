@@ -22,6 +22,7 @@ import type { GroupChats } from '../core/group/group-chats';
 import type { CommandPermissions } from '../core/host/command-permissions';
 import type { HostComputer } from '../core/host/host';
 import type { HostApprovals } from '../core/host/host-approvals';
+import type { HostDesktop } from '../core/host/desktop/host-desktop';
 import type { Cognition } from '../core/memory/cognition';
 import type { ModelClient } from '../core/model/model';
 import type { ModelProviders } from '../core/model/model-providers';
@@ -55,6 +56,7 @@ export interface IpcContext {
   readonly host: HostComputer;
   readonly commandPermissions: CommandPermissions;
   readonly hostApprovals: HostApprovals;
+  readonly hostDesktop: HostDesktop | undefined;
   readonly cognition: Cognition;
   readonly designSystems: DesignSystems;
   readonly designStore: DesignStore;

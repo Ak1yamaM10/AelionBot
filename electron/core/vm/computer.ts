@@ -6,7 +6,9 @@ import { VmController, shQuote } from './vm';
 import { AppError } from '../../../shared/errors';
 
 type ComputerAction =
-  'screenshot' | 'click' | 'double_click' | 'move' | 'drag' | 'scroll' | 'key' | 'type' | 'wait' | 'open_app';
+  'screenshot' | 'click' | 'double_click' | 'move' | 'drag' | 'scroll' | 'key' | 'type' | 'wait' | 'open_app' | 'batch';
+/** What a batch may contain: actions that neither observe nor start an app. */
+const BATCH_ACTIONS = new Set<string>(['click', 'double_click', 'move', 'drag', 'scroll', 'key', 'type', 'wait']);
 export interface ComputerInput {
   action: ComputerAction;
   observationId?: string;
@@ -24,6 +26,8 @@ export interface ComputerInput {
   app?: 'browser' | 'files' | 'editor' | 'writer' | 'calc' | 'impress' | 'terminal';
   url?: string;
   path?: string;
+  /** For action=batch: steps that run in order against the same observation, with one screenshot at the end. */
+  actions?: ComputerInput[];
 }
 export interface ComputerResult {
   screenshot: ScreenReference;
@@ -301,78 +305,112 @@ export class ComputerController {
     const command = `nohup ${args.map(shQuote).join(' ')} >.desktop/${app}.log 2>&1 </dev/null &`;
     await this.command(botId, command);
   }
+  /** One action against the latest screenshot. Returns how long the screen needs before it is worth capturing. */
+  private async perform(botId: string, input: ComputerInput, signal: AbortSignal) {
+    const desktop = this.desktop(botId);
+    if (signal.aborted) throw new Error('任务已取消');
+    if (['click', 'double_click', 'move', 'drag', 'scroll'].includes(input.action))
+      await this.point(botId, Number(input.x), Number(input.y));
+    if (input.action === 'click' || input.action === 'double_click') {
+      const button = input.button || 'left';
+      if (!['left', 'middle', 'right'].includes(button)) throw new Error('无效鼠标按钮');
+      const count = input.action === 'double_click' ? 2 : 1;
+      for (let i = 0; i < count; i++) {
+        await this.button(botId, button, true);
+        try {
+          await sleep(45);
+        } finally {
+          await this.button(botId, button, false);
+        }
+        if (count === 2) await sleep(80);
+      }
+    } else if (input.action === 'drag') {
+      absolutePoint(Number(input.toX), Number(input.toY), desktop.last!.width, desktop.last!.height);
+      await this.button(botId, 'left', true);
+      try {
+        for (let i = 1; i <= 8; i++) {
+          if (signal.aborted) throw new Error('任务已取消');
+          await this.point(
+            botId,
+            Number(input.x) + ((Number(input.toX) - Number(input.x)) * i) / 8,
+            Number(input.y) + ((Number(input.toY) - Number(input.y)) * i) / 8,
+          );
+          await sleep(30);
+        }
+      } finally {
+        await this.button(botId, 'left', false);
+      }
+    } else if (input.action === 'scroll') {
+      if (!['up', 'down', 'left', 'right'].includes(input.direction || '')) throw new Error('无效滚动方向');
+      const count = Math.min(12, Math.max(1, Math.round(input.amount || 3)));
+      for (let i = 0; i < count; i++) {
+        await this.button(botId, `wheel-${input.direction}`, true);
+        await this.button(botId, `wheel-${input.direction}`, false);
+      }
+    } else if (input.action === 'key') {
+      await this.keys(botId, String(input.key || ''));
+    } else if (input.action === 'type') {
+      if (typeof input.text !== 'string' || !input.text.length || input.text.length > 12000)
+        throw new Error('输入文本应为 1–12000 字符');
+      const encoded = Buffer.from(input.text).toString('base64');
+      await this.command(
+        botId,
+        `printf %s ${shQuote(encoded)} | base64 -d | xclip -selection clipboard -in >.desktop/clipboard.log 2>&1`,
+        signal,
+      );
+      await this.keys(botId, input.pasteKey === 'CTRL+SHIFT+V' ? 'CTRL+SHIFT+V' : 'CTRL+V');
+    } else if (input.action === 'open_app') {
+      if (!this.vm.state.appsReady) throw new Error('桌面应用尚未准备完成，请在电脑设置中修复环境');
+      await this.openApp(botId, input.app!, input.url, input.path);
+    } else if (!['screenshot', 'wait', 'move'].includes(input.action)) throw new Error('未知电脑操作');
+    return input.action === 'wait'
+      ? Math.min(2000, Math.max(100, input.milliseconds || 700))
+      : input.action === 'open_app'
+        ? 1000
+        : 200;
+  }
   async execute(botId: string, input: ComputerInput, signal: AbortSignal): Promise<ComputerResult> {
     if (signal.aborted) throw new Error('任务已取消');
     if (this.vm.state.status !== 'ready' || !this.vm.state.desktopReady || this.vm.state.maintenance)
       throw new Error('工作电脑桌面尚未就绪或正在维护');
     const desktop = this.desktop(botId),
-      passive = ['screenshot', 'wait', 'open_app'].includes(input.action);
+      steps = input.action === 'batch' ? input.actions || [] : [input],
+      passive = steps.every((step) => ['screenshot', 'wait', 'open_app'].includes(step.action));
+    if (input.action === 'batch') {
+      if (!Array.isArray(input.actions) || !steps.length || steps.length > 20)
+        throw new Error('batch 需要 1–20 个 actions');
+      if (steps.some((step) => !BATCH_ACTIONS.has(step?.action)))
+        throw new Error('batch 只能包含 click、double_click、move、drag、scroll、key、type、wait');
+    }
     if (!passive && (!desktop.last || input.observationId !== desktop.last.id || desktop.view.ownerBotId !== botId))
       throw new AppError('computer.observation_stale', '请先截取最新屏幕，再用返回的 observationId 操作');
+    // A batch is checked whole before its first step moves the pointer.
+    if (input.action === 'batch')
+      for (const step of steps) {
+        if (['click', 'double_click', 'move', 'drag', 'scroll'].includes(step.action))
+          absolutePoint(Number(step.x), Number(step.y), desktop.last!.width, desktop.last!.height);
+        if (step.action === 'drag')
+          absolutePoint(Number(step.toX), Number(step.toY), desktop.last!.width, desktop.last!.height);
+        if (step.action === 'key') keyCodes(String(step.key || ''));
+      }
     this.acquire(botId);
     try {
       await this.ensure(botId);
-      if (signal.aborted) throw new Error('任务已取消');
-      if (['click', 'double_click', 'move', 'drag', 'scroll'].includes(input.action))
-        await this.point(botId, Number(input.x), Number(input.y));
-      if (input.action === 'click' || input.action === 'double_click') {
-        const button = input.button || 'left';
-        if (!['left', 'middle', 'right'].includes(button)) throw new Error('无效鼠标按钮');
-        const count = input.action === 'double_click' ? 2 : 1;
-        for (let i = 0; i < count; i++) {
-          await this.button(botId, button, true);
-          try {
-            await sleep(45);
-          } finally {
-            await this.button(botId, button, false);
-          }
-          if (count === 2) await sleep(80);
-        }
-      } else if (input.action === 'drag') {
-        absolutePoint(Number(input.toX), Number(input.toY), desktop.last!.width, desktop.last!.height);
-        await this.button(botId, 'left', true);
+      let settle = 200;
+      for (const [index, step] of steps.entries()) {
         try {
-          for (let i = 1; i <= 8; i++) {
-            if (signal.aborted) throw new Error('任务已取消');
-            await this.point(
-              botId,
-              Number(input.x) + ((Number(input.toX) - Number(input.x)) * i) / 8,
-              Number(input.y) + ((Number(input.toY) - Number(input.y)) * i) / 8,
-            );
-            await sleep(30);
-          }
-        } finally {
-          await this.button(botId, 'left', false);
+          const wait = await this.perform(botId, step, signal);
+          // Between steps the screen only needs to take the input; the full settle comes before the screenshot.
+          if (index < steps.length - 1) await sleep(step.action === 'wait' ? wait : 120);
+          else settle = wait;
+        } catch (error) {
+          if (steps.length === 1 || signal.aborted) throw error;
+          throw new AppError(
+            'computer.batch_failed',
+            `第 ${index + 1} 步（${step.action}）失败：${(error as Error).message}。前 ${index} 步已经执行，请重新截图确认当前状态。`,
+          );
         }
-      } else if (input.action === 'scroll') {
-        if (!['up', 'down', 'left', 'right'].includes(input.direction || '')) throw new Error('无效滚动方向');
-        const count = Math.min(12, Math.max(1, Math.round(input.amount || 3)));
-        for (let i = 0; i < count; i++) {
-          await this.button(botId, `wheel-${input.direction}`, true);
-          await this.button(botId, `wheel-${input.direction}`, false);
-        }
-      } else if (input.action === 'key') {
-        await this.keys(botId, String(input.key || ''));
-      } else if (input.action === 'type') {
-        if (typeof input.text !== 'string' || !input.text.length || input.text.length > 12000)
-          throw new Error('输入文本应为 1–12000 字符');
-        const encoded = Buffer.from(input.text).toString('base64');
-        await this.command(
-          botId,
-          `printf %s ${shQuote(encoded)} | base64 -d | xclip -selection clipboard -in >.desktop/clipboard.log 2>&1`,
-          signal,
-        );
-        await this.keys(botId, input.pasteKey === 'CTRL+SHIFT+V' ? 'CTRL+SHIFT+V' : 'CTRL+V');
-      } else if (input.action === 'open_app') {
-        if (!this.vm.state.appsReady) throw new Error('桌面应用尚未准备完成，请在电脑设置中修复环境');
-        await this.openApp(botId, input.app!, input.url, input.path);
-      } else if (!['screenshot', 'wait', 'move'].includes(input.action)) throw new Error('未知电脑操作');
-      const settle =
-        input.action === 'wait'
-          ? Math.min(2000, Math.max(100, input.milliseconds || 700))
-          : input.action === 'open_app'
-            ? 1000
-            : 200;
+      }
       await sleep(settle);
       if (signal.aborted) throw new Error('任务已取消');
       const screenshot = await this.capture(botId, signal);

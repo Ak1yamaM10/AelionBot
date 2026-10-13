@@ -34,6 +34,10 @@ import { ModelClient } from './core/model/model';
 import { ModelProviders } from './core/model/model-providers';
 import { Harness } from './core/agent/harness';
 import { ComputerController } from './core/vm/computer';
+import { translateFor } from '../shared/i18n';
+import { HostDesktop } from './core/host/desktop/host-desktop';
+import { WindowsDesktopHelper } from './core/host/desktop/desktop-helper';
+import { ComputerUseOverlay } from './windows/computer-use-overlay';
 import { installComputerView } from './core/vm/computer-view';
 import { Attachments } from './core/attachments/attachments';
 import { ArtifactService } from './core/attachments/artifacts';
@@ -92,6 +96,7 @@ let interactions: Interactions;
 let host: HostComputer;
 let commandPermissions: CommandPermissions;
 let hostApprovals: HostApprovals;
+let hostDesktop: HostDesktop | undefined;
 // Parses host commands for the permission policy only; never executes them.
 const powershellParser = new PowerShellParser();
 let cognition: Cognition;
@@ -176,6 +181,7 @@ function snapshot(): Snapshot {
     modelUsage: store?.data.modelUsage?.slice(-100),
     commandPermissions: commandPermissions?.list() || [],
     hostPermissionModes: hostApprovals?.modes(),
+    hostComputer: hostDesktop?.view(),
     hostWorkspace: host?.workspaceSettings(),
     liveWork: harness?.liveWork() || [],
   };
@@ -641,6 +647,41 @@ async function initialize() {
     attachments,
   );
   generalHarness.setImageModel(imageModelAccess);
+  hostDesktop = new HostDesktop({
+    driver: new WindowsDesktopHelper(),
+    imageDir: computer.imageDir,
+    settings: {
+      read: () => store.data.hostComputer,
+      write: (next) => {
+        store.data.hostComputer = next;
+        store.save();
+      },
+    },
+    requestAccess: (botId, runId, signal) => interactions.computerAccess(botId, runId, signal),
+    running: (runId) => store.data.runs.some((run) => run.id === runId && run.status === 'running'),
+    changed,
+    presence: new ComputerUseOverlay({
+      text: ({ botId }) => ({
+        label: translateFor(store.data.language || 'zh-CN', '{name} 正在使用这台电脑', {
+          name: store.data.bots.find((bot) => bot.id === botId)?.name || 'Bot',
+        }),
+        hint: translateFor(store.data.language || 'zh-CN', '取消'),
+      }),
+      // Esc stops the chat that is driving the computer, the same way its stop button does.
+      cancel: ({ botId, runId }) => {
+        const run = store.data.runs.find((item) => item.id === runId),
+          lane = run?.sessionId ?? null;
+        chatPins?.cancel(botId, lane);
+        if (run && !lane) {
+          peerChats?.cancelRun(run);
+          groupChats?.cancelRun(run);
+        }
+        harness.cancel(botId, lane);
+        hostDesktop?.release(runId);
+      },
+    }),
+  });
+  generalHarness.setHostDesktop(hostDesktop);
   designSystems = new DesignSystems(
     join(app.getAppPath(), 'assets', 'design-systems'),
     join(store.dir, 'design-system-cache'),
@@ -920,6 +961,8 @@ async function initialize() {
   window.on('close', (event) => {
     if (!canDiscardPreview()) event.preventDefault();
   });
+  // The cue windows of host Computer Use would otherwise keep the app open after its own window is gone.
+  window.on('closed', () => hostDesktop?.release());
   window.webContents.on('will-prevent-unload', (event) => {
     if (canDiscardPreview()) event.preventDefault();
   });
@@ -1048,6 +1091,9 @@ async function initialize() {
     get hostApprovals() {
       return hostApprovals;
     },
+    get hostDesktop() {
+      return hostDesktop;
+    },
     get cognition() {
       return cognition;
     },
@@ -1143,6 +1189,7 @@ async function initialize() {
         () => peerChats?.dispose(),
         () => groupChats?.dispose(),
         () => interactions.dispose(),
+        () => hostDesktop?.dispose(),
         () => host.dispose(),
       ])
         try {
