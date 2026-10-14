@@ -765,7 +765,7 @@ async function initialize() {
     attachments,
     host,
     new LayaGroupDecisions(laya, layaLog),
-    (botId, people) => persona?.groupFragment(botId, people) || '',
+    (botId, people) => (persona ? persona.groupStyle(botId) + persona.groupFragment(botId, people) : ''),
   );
   chatPins = new ChatPinQueue(
     store,
