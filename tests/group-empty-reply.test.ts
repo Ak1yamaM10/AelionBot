@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { isEmptyGroupReply } from '../shared/chat/group-empty-reply';
+import { unwrapSendArguments } from '../electron/core/group/group-response';
 
 test('only complete empty placeholders and model ending markers are suppressed', () => {
   for (const value of ['', '  ', '<|eos|>', ' <|eos|>\n<|im_end|> ', '（空消息，无需回应）', '(空消息,无需回复)'])
@@ -146,4 +147,15 @@ test('English status replies that start like a placeholder stay visible', () => 
     assert.equal(isEmptyGroupReply(value), false, value);
   for (const value of ['No reply needed - already answered by B.', 'No new information.'])
     assert.equal(isEmptyGroupReply(value), true, value);
+});
+
+test('only JSON shaped like group_send_message arguments is unwrapped', () => {
+  assert.equal(unwrapSendArguments('{"groupId":"g","message":"早上好"}'), '早上好');
+  for (const value of [
+    '{"message":"只有一个字段"}',
+    '{"status":"ok","message":"done"}',
+    '早上好',
+    '{"groupId":"g","message":3}',
+  ])
+    assert.equal(unwrapSendArguments(value), value);
 });

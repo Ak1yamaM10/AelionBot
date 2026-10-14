@@ -2114,3 +2114,25 @@ test('group_pass cannot drop an unfinished group plan', async (t) => {
     ),
   );
 });
+test('a final reply written as group_send_message arguments publishes only its message', async (t) => {
+  const fx = fixture(t, (run, messages) => {
+    if (publishedMessages(messages).at(-1)?.event || run.botId !== fx.a.id) return silent();
+    return answer(
+      JSON.stringify({
+        clientMessageId: 'goodmorning-1014',
+        groupId: run.groupOrigin!.groupId,
+        kind: 'message',
+        message: '早上好，今天有什么想聊的，随时说。',
+      }),
+    );
+  });
+  const room = fx.groups.create({ name: '参数当正文', botIds: [fx.a.id, fx.b.id] });
+  await until(fx.settled);
+  fx.ask(room.id, fx.a, '早');
+  await until(fx.settled);
+  const replies = fx.store.data.groups[0].messages.filter((m) => m.sender.id === fx.a.id && m.kind === 'message');
+  assert.deepEqual(
+    replies.map((m) => m.content),
+    ['早上好，今天有什么想聊的，随时说。'],
+  );
+});
