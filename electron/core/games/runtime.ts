@@ -1,6 +1,5 @@
 import type { ResponseMetrics, GameModelConfig } from '../../../shared/types/game-types';
 import { settleLimited } from './request-pool';
-import { gameSkills } from './skills';
 import { existsSync, mkdirSync, readFileSync, writeFileSync, renameSync } from 'node:fs';
 import { randomUUID } from 'node:crypto';
 import { join } from 'node:path';
@@ -12,9 +11,10 @@ import type {
   GamePlayer,
   GameTrace,
 } from '../../../shared/types/game-types';
-import { acceptAction, createWerewolf, view, validateAction, log, type WerewolfState } from './werewolf';
-import { gamePrompt, gameInstructions, GameModelError } from './model-player';
-import { assignPersonas, personaPick, type PersonaSeed } from './persona-play';
+import { log } from './game-mode';
+import { gameMode, type AnyMatch } from './modes';
+import { GameModelError } from './model-player';
+import type { PersonaSeed } from './persona-play';
 import { AppError } from '../../../shared/errors';
 export interface DecisionOptions {
   retryFeedback?: string;
@@ -32,7 +32,7 @@ export type Decide = (
 /** Post-match effects cannot affect the result, but failures remain pending for retry. */
 export interface GameHooks {
   /** At-least-once delivery of a saved finished match. Effects must be idempotent; throw to retry. */
-  finished?: (s: WerewolfState) => void | Promise<void>;
+  finished?: (s: AnyMatch) => void | Promise<void>;
   /** One best-effort diagnostic per failed attempt, including a failed completion receipt write. */
   settlementFailed?: (matchId: string, error: unknown) => void;
   /** Personality of member Bots for a new match (§9.2), keyed by botId; seats without one keep the MBTI preset. */
@@ -48,7 +48,7 @@ const MAX_RETRY_AFTER_MS = 60_000;
 export class GameRuntime {
   private timer: ReturnType<typeof setInterval>;
   private closed = false;
-  private states = new Map<string, WerewolfState>();
+  private states = new Map<string, AnyMatch>();
   private jobs = new Map<string, AbortController>();
   private settling = new Set<string>();
   private settlementRetryAt = new Map<string, number>();
@@ -62,7 +62,7 @@ export class GameRuntime {
     mkdirSync(dir, { recursive: true });
     const file = join(dir, 'matches.json');
     if (existsSync(file)) {
-      for (const s of JSON.parse(readFileSync(file, 'utf8')) as WerewolfState[]) {
+      for (const s of JSON.parse(readFileSync(file, 'utf8')) as AnyMatch[]) {
         s.trace ||= [];
         s.revision ||= 0;
         if (s.status === 'paused' && s.error?.startsWith('AI 行动失败')) {
@@ -95,10 +95,10 @@ export class GameRuntime {
     this.timer.unref();
     for (const s of this.states.values()) this.queueSettlement(s);
   }
-  private needsSettlement(s: WerewolfState) {
+  private needsSettlement(s: AnyMatch) {
     return !!this.hooks.finished && s.status === 'finished' && !s.settlementComplete;
   }
-  private queueSettlement(s: WerewolfState) {
+  private queueSettlement(s: AnyMatch) {
     if (
       this.closed ||
       !this.hooks.finished ||
@@ -131,7 +131,7 @@ export class GameRuntime {
       this.settling.delete(id);
     }
   }
-  private record(s: WerewolfState, type: GameTrace['type'], detail: Partial<GameTrace> = {}) {
+  private record(s: AnyMatch, type: GameTrace['type'], detail: Partial<GameTrace> = {}) {
     (s.trace ||= []).push({ seq: s.trace.length + 1, time: Date.now(), type, day: s.day, phase: s.phase, ...detail });
   }
   private annotate(id: string, type: GameTrace['type'], detail: Partial<GameTrace> = {}) {
@@ -142,7 +142,7 @@ export class GameRuntime {
     this.record(s, type, detail);
     this.commit(s, false);
   }
-  private freeze(s: WerewolfState) {
+  private freeze(s: AnyMatch) {
     for (const r of s.requests) {
       if (!s.seats.find((p) => p.id === r.seatId)?.human) {
         delete r.deadlineAt;
@@ -185,7 +185,8 @@ export class GameRuntime {
       for (const r of expired) {
         if (!s.requests.some((x) => x.id === r.id)) continue;
         this.record(s, 'timeout', { requestId: r.id, seatId: r.seatId, kind: r.kind });
-        acceptAction(s, r.id, r.kind === 'speak' ? { text: '（发言超时）' } : {}, true);
+        const mode = gameMode(s.mode);
+        mode.accept(s, r.id, mode.timeoutAction(r), true);
       }
       try {
         this.commitTransition(current, s);
@@ -207,7 +208,7 @@ export class GameRuntime {
     writeFileSync(temp, JSON.stringify([...this.states.values()]), { mode: 0o600 });
     renameSync(temp, file);
   }
-  private commit(s: WerewolfState, visible = true) {
+  private commit(s: AnyMatch, visible = true) {
     const previous = this.states.get(s.id);
     if (this.needsSettlement(s)) s.settlementComplete = false;
     for (const r of s.requests)
@@ -226,7 +227,7 @@ export class GameRuntime {
     }
     this.queueSettlement(s);
   }
-  private commitTransition(previous: WerewolfState, next: WerewolfState) {
+  private commitTransition(previous: AnyMatch, next: AnyMatch) {
     if (previous.phase !== next.phase || previous.day !== next.day || previous.status !== next.status)
       this.record(next, 'transition', {
         detail: `${previous.day}/${previous.phase}/${previous.status} → ${next.day}/${next.phase}/${next.status}`,
@@ -248,8 +249,8 @@ export class GameRuntime {
     if (!s) throw Error('对局不存在');
     return s;
   }
-  private public(s: WerewolfState, omniscient = false) {
-    return view(s, s.seats.find((p) => p.human)?.id, omniscient);
+  private public(s: AnyMatch, omniscient = false) {
+    return gameMode(s.mode).view(s, s.seats.find((p) => p.human)?.id, omniscient);
   }
   read(groupId: string, omniscient = false) {
     const s = [...this.states.values()].reverse().find((s) => s.groupId === groupId);
@@ -263,14 +264,10 @@ export class GameRuntime {
   }
   create(input: GameCreate) {
     if (this.closed) throw Error('游戏服务已关闭');
-    if (
-      !input ||
-      typeof input.groupId !== 'string' ||
-      !input.groupId.trim() ||
-      !Array.isArray(input.players) ||
-      ![7, 12].includes(input.players.length)
-    )
-      throw Error('需要七位或十二位玩家');
+    if (!input || typeof input.groupId !== 'string' || !input.groupId.trim() || !Array.isArray(input.players))
+      throw Error('对局参数无效');
+    const mode = gameMode(input.mode);
+    mode.checkSeats(input.players.length);
     if (
       input.players.some(
         (p) =>
@@ -289,19 +286,18 @@ export class GameRuntime {
     if ([...this.states.values()].some((s) => s.groupId === input.groupId && s.status !== 'finished'))
       throw Error('请先结束当前对局');
     this.check(input.players);
-    const s = createWerewolf(
-      input.groupId,
+    const s = mode.create({
+      groupId: input.groupId,
       // Seat ids are random per match; the Bot a seat belongs to is kept as botId for post-match settlement.
-      input.players.map(({ botId, ...p }) => ({ ...p, id: randomUUID(), ...(botId ? { botId } : {}) })),
-      undefined,
-      input.board,
-    );
+      players: input.players.map(({ botId, ...p }) => ({ ...p, id: randomUUID(), ...(botId ? { botId } : {}) })),
+      board: input.board,
+    });
     s.personaPolicy = 'model_semantic_v1';
     try {
       const bots = s.seats.filter((p) => p.botId && !p.human);
-      if (bots.length && this.hooks.personas) {
+      if (bots.length && this.hooks.personas && mode.persona) {
         const members = s.seats.map((p) => (p.human ? 'user' : p.botId)).filter((x): x is string => !!x);
-        assignPersonas(
+        mode.persona.assign(
           s,
           this.hooks.personas(
             bots.map((p) => ({ botId: p.botId!, mbti: p.mbti })),
@@ -314,7 +310,7 @@ export class GameRuntime {
       delete s.persona;
     }
     this.record(s, 'created', {
-      detail: `规则 ${s.twelve ? s.twelve.board + '-sheriff-v1' : 'seven-player-v1'}；真人发言120秒、行动45秒；AI响应${this.timing.aiTimeoutMs / 1000}秒，超时暂停且保留行动`,
+      detail: mode.describe(s, this.timing.aiTimeoutMs),
     });
     for (const [seatId, p] of Object.entries(s.persona || {}))
       if (p.plan)
@@ -353,7 +349,7 @@ export class GameRuntime {
     if (!request) throw Error('不是你的行动，或请求已失效');
     const next = structuredClone(s);
     try {
-      acceptAction(next, requestId, action);
+      gameMode(next.mode).accept(next, requestId, action);
     } catch (e) {
       this.annotate(id, 'action_rejected', { requestId, seatId: human.id, detail: (e as Error).message });
       throw e;
@@ -473,9 +469,10 @@ export class GameRuntime {
           kind: r.kind,
           detail: '进入请求队列，排队不占模型响应预算',
         });
+      const mode = gameMode(snapshot.mode);
       const results = await settleLimited(requests, 3, signal, async (r) => {
         const seat = snapshot.seats.find((p) => p.id === r.seatId)!,
-          context = view(snapshot, seat.id);
+          context = mode.view(snapshot, seat.id);
         const dispatched = structuredClone(this.state(id)),
           pending = dispatched.requests.find((p) => p.id === r.id);
         if (!pending) return;
@@ -502,11 +499,11 @@ export class GameRuntime {
             attempt,
             detail: attempt === 1 ? `排队 ${Date.now() - queuedAt} 毫秒后发出请求` : '重新请求',
             model: seat.model?.model,
-            input: gamePrompt(context, r),
+            input: mode.prompt(context, r),
             instruction:
-              gameInstructions(context, r) +
+              mode.instructions(context, r) +
               (retryFeedback ? '\n上次校验失败：' + retryFeedback + '。请纠正本次 JSON 字段。' : ''),
-            skills: gameSkills(context, r).map(({ id, title, version }) => ({ id, title, version })),
+            skills: mode.skills(context, r).map(({ id, title, version }) => ({ id, title, version })),
           });
           let result: GameAction;
           let capturedInput: string | undefined;
@@ -559,7 +556,7 @@ export class GameRuntime {
               action: result,
             });
             validating = true;
-            validateAction(snapshot, r, result);
+            mode.validate(snapshot, r, result);
           } catch (e) {
             if (this.closed) return;
             this.annotate(id, signal.aborted ? 'model_cancelled' : 'model_failed', {
@@ -634,20 +631,20 @@ export class GameRuntime {
           const next = structuredClone(current);
           const open = next.requests.find((p) => p.id === r.id)!;
           // Personality may swap the model's pick for another reasonable candidate in a weak situation (§8.3).
-          const picked = personaPick(
+          const picked = mode.persona?.pick(
             next,
             open,
             result,
             (a) => {
               try {
-                validateAction(next, open, a);
+                mode.validate(next, open, a);
                 return true;
               } catch {
                 return false;
               }
             },
             capturedInput,
-          );
+          ) ?? { action: result };
           if (picked.decision) (next.decisions ||= []).push(picked.decision);
           if (picked.decision?.overridden)
             this.record(next, 'persona_override', {
@@ -657,7 +654,7 @@ export class GameRuntime {
               action: picked.action,
               detail: `模型首选 ${JSON.stringify({ target: result.target, potion: result.potion, choice: result.choice, skip: result.skip })}，人格在 ${picked.decision.options} 个合理候选中选择了另一个（概率 ${picked.decision.prob.toFixed(2)}）`,
             });
-          acceptAction(next, r.id, picked.action);
+          mode.accept(next, r.id, picked.action);
           this.record(next, 'action_accepted', {
             requestId: r.id,
             seatId: r.seatId,

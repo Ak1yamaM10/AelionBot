@@ -1,0 +1,92 @@
+/**
+ * The rules side of a match (docs/ai-party-games-design.md §1). The runtime owns scheduling, model calls,
+ * retries, pauses, persistence and the run record; a game mode owns everything a specific game decides:
+ * how a match starts, which actions are legal, how they advance it, and what each seat may see.
+ */
+import type {
+  GameAction,
+  GameLog,
+  GameModeId,
+  GamePhase,
+  GamePlayer,
+  GameRequest,
+  GameRole,
+  GameStatus,
+  GameTrace,
+  GameView,
+} from '../../../shared/types/game-types';
+import type { PersonaDecision, PersonaSeed, SeatPersona } from './persona-play';
+
+/** Fields every match has, whatever the game. Game-specific state lives in the mode's own fields. */
+export interface MatchState {
+  /** Missing on matches saved before game modes existed; those are all Werewolf. */
+  mode?: GameModeId;
+  id: string;
+  groupId: string;
+  day: number;
+  phase: GamePhase;
+  status: GameStatus;
+  seats: (GamePlayer & { alive: boolean; role: GameRole })[];
+  logs: GameLog[];
+  requests: GameRequest[];
+  accepted: string[];
+  error?: string;
+  trace?: GameTrace[];
+  revision?: number;
+  /** Seed behind every random draw of the match; keeps replays reproducible. Never sent to clients. */
+  seed?: number;
+  /** Each seat's last few decision notes, kept across phases so the next decision can read its own plan. */
+  notes?: Record<string, string[]>;
+  /** Durable acknowledgement of all post-match effects; missing receipts are replayed after restart. */
+  settlementComplete?: boolean;
+  /** Latest pre-receipt checkpoint only: may already have an unkeyed legacy report. */
+  settlementLegacy?: boolean;
+  /** New decisions record model interpretations separately from long-term trait growth. */
+  personaPolicy?: 'model_semantic_v1';
+  /** Bot seats' persona for this match. Private to each seat until the reveal. */
+  persona?: Record<string, SeatPersona>;
+  personaDraws?: number;
+  /** Key decisions made under personality, used for growth at settlement. */
+  decisions?: PersonaDecision[];
+}
+
+interface GameSkill {
+  id: string;
+  title: string;
+  version: string;
+  content: string;
+}
+
+export interface GameMode<S extends MatchState = MatchState> {
+  id: GameModeId;
+  /** Throws when this game cannot be played with this many seats. Checked before anything else. */
+  checkSeats(count: number): void;
+  /** Start a match. Throws when the players or options do not fit this game. */
+  create(input: { groupId: string; players: GamePlayer[]; board?: GameView['board'] }): S;
+  /** Rule description recorded in the run record when the match is created. */
+  describe(s: S, aiTimeoutMs: number): string;
+  validate(s: S, request: GameRequest, action: GameAction): void;
+  accept(s: S, requestId: string, action: GameAction, timeout?: boolean): void;
+  /** What a human seat submits when its deadline passes. */
+  timeoutAction(request: GameRequest): GameAction;
+  view(s: S, viewerId?: string, omniscient?: boolean): GameView;
+  /** System prompt and input sent to the model; they may only use what `view` gave this seat. */
+  instructions(context: GameView, request: GameRequest): string;
+  prompt(context: GameView, request: GameRequest): string;
+  skills(context: GameView, request: GameRequest): GameSkill[];
+  /** Personality hooks: an opening plan per Bot seat, and a choice among reasonable candidates. */
+  persona?: {
+    assign(s: S, seeds: Record<string, PersonaSeed>): void;
+    pick(
+      s: S,
+      request: GameRequest,
+      action: GameAction,
+      valid: (a: GameAction) => boolean,
+      actorInput?: string,
+    ): { action: GameAction; decision?: PersonaDecision };
+  };
+}
+
+export function log(s: MatchState, text: string, seatId?: string, audience?: string[]) {
+  s.logs.push({ id: s.logs.length + 1, day: s.day, phase: s.phase, text, seatId, audience, time: Date.now() });
+}

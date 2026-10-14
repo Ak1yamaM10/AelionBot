@@ -1,4 +1,5 @@
-import { GameModelError, gameInstructions, gamePrompt, parseGameAction } from './model-player';
+import { GameModelError, parseGameAction } from './model-player';
+import { gameMode } from './modes';
 import { contextBudget, textTokens } from '../context/context-budget';
 import { DEFAULT_RUNTIME } from '../../../shared/types/runtime-types';
 import type { DecisionOptions } from './runtime';
@@ -100,9 +101,9 @@ export function gameProviders(
         weekday: 'long',
       }).format(new Date());
       const instructions =
-          gameInstructions(context, request) +
+          gameMode(context.mode).instructions(context, request) +
           (options?.retryFeedback ? '\n上次校验失败：' + options.retryFeedback + '。请纠正本次 JSON 字段。' : ''),
-        input = gamePrompt(context, request);
+        input = gameMode(context.mode).prompt(context, request);
       const identity = p.model.startsWith('mimo-')
         ? `你是MiMo（中文名称也是MiMo），是小米公司研发的AI智能助手。今天的日期：${date}，你的知识截止日期是2024年12月。以下游戏中请扮演指定玩家，发言不需要介绍模型身份。\n\n`
         : '';
