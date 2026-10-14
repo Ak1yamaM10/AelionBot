@@ -1005,6 +1005,23 @@ test('an explicit send answers the addressed message even when other messages ar
     'replied',
   );
 });
+test('a reply addresses the replied Bot like an @: other members see whom it is for', async (t) => {
+  const seen: string[] = [];
+  const fx = fixture(t, (run, messages) => {
+    const last = publishedMessages(messages).at(-1);
+    if (run.botId === fx.a.id && /问候/.test(last?.content || '')) return answer('A 的消息');
+    if (run.botId === fx.b.id) seen.push(...messages.map((m) => m.content || '').filter((c) => c.includes('回复A')));
+    return silent();
+  });
+  const room = fx.groups.create({ name: '回复即点名', botIds: [fx.a.id, fx.b.id] });
+  await until(fx.settled);
+  fx.ask(room.id, fx.a, '问候');
+  await until(fx.settled);
+  const aMessage = fx.store.data.groups[0].messages.find((m) => m.sender.id === fx.a.id && m.kind === 'message')!;
+  fx.groups.send({ id: room.id, message: '回复A：辛苦了', replyToMessageId: aMessage.id });
+  await until(fx.settled);
+  assert.ok(seen.some((content) => content.includes(`"addressedTo":[${JSON.stringify(fx.a.name)}]`)));
+});
 test('others wait for a busy addressed Bot and are released when it is removed or the round is stopped', async (t) => {
   const woke: string[] = [];
   const fx = fixture(t, (run, messages) => {

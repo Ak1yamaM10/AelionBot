@@ -1,7 +1,7 @@
 import { buildGroupDecisionInput, type GroupDecisions } from './laya-decision';
 import { previewFeedbackDisplay } from '../../../shared/preview/preview-feedback';
 import { groupEventPrompt, groupMustAnswerNote, groupReviewNote, GROUP_STATE_EVENT_PROMPT } from './group-prompt';
-import { answerFrom, botMessageCount, noticed, sinceUser, triage } from './group-triage';
+import { addressedTo, answerFrom, botMessageCount, noticed, sinceUser, triage } from './group-triage';
 import { isGroupAnswer, replyTarget } from '../../../shared/chat/group-answers';
 import { userDisplayName } from '../../../shared/chat/user-profile';
 import { resolveGroupReply } from '../agent/message-replies';
@@ -1576,6 +1576,7 @@ export class GroupChats implements GroupGateway {
             (item) => item.id === lastMessage.workItemId && item.botId === bot.id && item.scope.id === room.id,
           )
         : undefined;
+    const names = new Map(this.identities(room).map((member) => [member.id, member.name]));
     await this.runner.run(
       bot.id,
       JSON.stringify({
@@ -1595,6 +1596,8 @@ export class GroupChats implements GroupGateway {
             ).slice(0, 1600),
             mentions: message.mentions,
             mentioned: message.mentions?.some((mention) => mention.id === bot.id) || false,
+            // @ and a reply both address a member; the model must not read a reply as open to everyone.
+            addressedTo: [...addressedTo(room, message)].map((id) => names.get(id) || id),
           };
         }),
         recent,
