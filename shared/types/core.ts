@@ -2,6 +2,14 @@ import type { AppEvent, StateBase } from '../state-sync';
 import type { MessageReply } from '../chat/message-replies';
 import type { ModelParameters, NativeAssistant } from './model-types';
 import type { HostPermissionMode, HostApprovalView, HostComputerView } from './permission-types';
+import type {
+  ConnectorCreateInput,
+  ConnectorSetupInput,
+  ConnectorUpdateInput,
+  ConnectorsView,
+  MessageConnectorSource,
+  WorkSessionConnector,
+} from './connector-types';
 import type { WorkItem, WorkAction } from './work-types';
 import type { RuntimeSettings, TaskPlan, UsageRecord } from './runtime-types';
 import type {
@@ -66,6 +74,8 @@ export interface WorkSession {
   updatedAt: string;
   /** Hidden in the conversation list; its records are kept and it can be restored. */
   archivedAt?: string;
+  /** The connector chat it serves; its permission mode follows the connector. */
+  connector?: WorkSessionConnector;
 }
 export interface Bot {
   /** Retired; kept on disk from older versions and not read. Every Bot runs the same engine. */
@@ -157,6 +167,8 @@ export interface ChatMessage {
   designSessionId?: string;
   /** The work session it belongs to; absent in the Bot's main chat. */
   sessionId?: string;
+  /** Sent from a connector chat rather than from this app. */
+  connector?: MessageConnectorSource;
   previewPrompt?: string;
   operationDenial?: import('../chat/operation-denial').OperationDenial;
   questionAnswer?: import('../chat/question-answers').QuestionAnswerData;
@@ -422,6 +434,7 @@ export interface Snapshot {
   computer: ComputerState;
   dataDir: string;
   integrations?: IntegrationsView;
+  connectors?: ConnectorsView;
   interactions?: InteractionRequest[];
   cognition?: CognitionView;
   peers?: PeerView;
@@ -702,6 +715,17 @@ export interface AelionAPI {
   }): Promise<void>;
   setMcpEnabled(input: { id: string; enabled: boolean }): Promise<void>;
   testMcp(id: string): Promise<{ tools: string[] }>;
+  /** Resolves to the new connector's ID. */
+  addConnector(input: ConnectorCreateInput): Promise<string>;
+  /** Starts a QR flow; its progress appears in Snapshot.connectors.setups. Resolves to the setup ID. */
+  startConnectorSetup(input: ConnectorSetupInput): Promise<string>;
+  answerConnectorSetup(input: { id: string; verifyCode: string }): Promise<void>;
+  cancelConnectorSetup(id: string): Promise<void>;
+  updateConnector(input: ConnectorUpdateInput): Promise<void>;
+  removeConnector(id: string): Promise<void>;
+  reconnectConnector(id: string): Promise<void>;
+  decideConnectorPairing(input: { id: string; code: string; allow: boolean }): Promise<void>;
+  setConnectorsKeepRunning(enabled: boolean): Promise<void>;
   onEvent(callback: (event: AppEvent) => void): () => void;
 }
 declare global {

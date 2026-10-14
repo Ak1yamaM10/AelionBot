@@ -3,4 +3,5 @@ allowBuilds:
   electron-winstaller: true
   esbuild: true
   node-pty: true
+  protobufjs: false
   ssh2: true

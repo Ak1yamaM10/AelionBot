@@ -288,6 +288,7 @@ export function BotConversation({
           }
           contextCapacity={currentModel?.contextTokens}
           permissionMode={state.hostPermissionModes?.[scope] ?? state.hostPermissionModes?.[botScope]}
+          permissionLocked={Boolean(session?.connector)}
           workspaceDir={state.conversationWorkspaces?.[scope] || state.hostWorkspace?.workspaceDir}
           workspaceInherited={!state.conversationWorkspaces?.[scope]}
           bot={bot}

@@ -2,6 +2,7 @@ import { replyInput } from '../../../shared/chat/message-replies';
 import type { Store } from '../storage/store';
 import { botIdentity } from '../../../shared/chat/bot-colors';
 import type { BotMention, ChatMessage } from '../../../shared/types/core';
+import { CONNECTOR_PLATFORM_NAMES, type MessageConnectorSource } from '../../../shared/types/connector-types';
 
 export function validateChatInput(
   store: Store,
@@ -40,8 +41,12 @@ export function chatInputText(message: ChatMessage, includeReply = true) {
     return `定时任务触发：${message.scheduled.title}（计划时间 ${message.scheduled.scheduledFor}）。这是已保存计划的本次执行，请直接完成任务并在当前会话回复，不要重新创建同一计划。原有工具权限仍然适用。\n任务内容：${message.content}`;
   if (message.reaction)
     return `用户通过 emoji 发言（不代表新增任务或操作授权）：${JSON.stringify({ eventId: message.id, ...message.reaction, content: message.content })}`;
-  return replyInput(
+  const text = replyInput(
     message.content || (message.attachments?.length ? `用户发送了 ${message.attachments.length} 个附件。` : ''),
     includeReply ? message.reply : undefined,
   );
+  return message.connector ? connectorNote(message.connector) + text : text;
 }
+/** Messages from a connector: the person reads the reply in an IM app, away from this computer's screen. */
+const connectorNote = (source: MessageConnectorSource) =>
+  `（这条消息来自${CONNECTOR_PLATFORM_NAMES[source.platform]}${source.sender.name ? `，发送人：${source.sender.name}` : ''}。对方在 IM 里阅读回复，看不到这台电脑的界面；回复尽量简洁，交付文件用 message_attach。）\n`;

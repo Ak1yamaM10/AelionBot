@@ -6,6 +6,7 @@ import { clockTime } from '../chat/conversation-time';
 import { AttachmentList } from '../files/Attachments';
 import { attachmentSummary } from '../../shared/types/attachment-types';
 import type { Bot, ChatMessage } from '../../shared/types/core';
+import { CONNECTOR_PLATFORM_NAMES } from '../../shared/types/connector-types';
 import { readableContent } from '../../shared/chat/activity';
 import { legacyQuestionAnswerData, readableQuestionAnswer } from '../../shared/chat/question-answers';
 import { QuestionAnswerMessage } from '../chat/QuestionAnswerMessage';
@@ -100,6 +101,11 @@ function MessageView({
   return (
     <>
       <MessageTime id={message.id} time={message.time} />
+      {message.connector && (
+        <div className="message-source">
+          {t('来自{platform}', { platform: t(CONNECTOR_PLATFORM_NAMES[message.connector.platform]) })}
+        </div>
+      )}
       <div className={`message-row ${message.role}`} data-message-id={message.id}>
         {message.role === 'assistant' && avatar && (
           <span className="message-avatar" aria-hidden="true">

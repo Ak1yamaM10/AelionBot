@@ -36,6 +36,8 @@ await build({
     'node-pty',
     'quickjs-emscripten',
     'electron-updater',
+    // Feishu connectors load it on first use; see electron/core/connectors/adapters/feishu.ts.
+    '@larksuiteoapi/node-sdk',
     'ssh2',
     '@modelcontextprotocol/sdk',
     'yaml',

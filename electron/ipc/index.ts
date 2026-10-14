@@ -10,6 +10,7 @@ import { registerFiles } from './register-files';
 import { registerGames } from './register-games';
 import { registerGroups } from './register-groups';
 import { registerIntegrations } from './register-integrations';
+import { registerConnectors } from './register-connectors';
 import { registerModels } from './register-models';
 import { registerPeers } from './register-peers';
 import { registerPersona } from './register-persona';
@@ -30,6 +31,7 @@ export function registerIpc(ctx: IpcContext) {
   registerTasks(ctx);
   registerWorkspace(ctx);
   registerIntegrations(ctx);
+  registerConnectors(ctx);
   registerBots(ctx);
   registerAttachments(ctx);
   registerDesign(ctx);

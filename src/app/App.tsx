@@ -380,6 +380,7 @@ function AppContent() {
               busy={busy || anyRunning}
               act={act}
               onClose={() => setPage('chat')}
+              onOpenSession={openSession}
             />
           )}
           <ConversationPane

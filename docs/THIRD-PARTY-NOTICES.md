@@ -30,6 +30,10 @@ AelionBot 的构建和运行依赖以下上游项目；第三方组件的许可�
 | node-pty | 本机交互终端与 Windows ConPTY | 固定版本 `1.1.0`；[上游项目](https://github.com/microsoft/node-pty)，MIT 许可见 `docs/licenses/node-pty.txt`；原生组件及附带许可随运行依赖保留 |
 | quickjs-emscripten / QuickJS | 独立 JavaScript 工具编排运行时 | 固定版本 `0.32.0`；[上游项目](https://github.com/justjake/quickjs-emscripten)，许可见 `docs/licenses/quickjs-emscripten.txt` 与 `docs/licenses/quickjs-runtime.txt` |
 | linkedom | 无页面脚本执行的 HTML/XML 解析 | 固定版本 `0.18.13`；[上游项目](https://github.com/WebReflection/linkedom)，ISC 许可见 `docs/licenses/linkedom.txt` |
+| 飞书 Node SDK | 飞书连接器：长连接、流式卡片、扫码创建应用 | 固定版本 `@larksuiteoapi/node-sdk@1.74.0`；[上游项目](https://github.com/larksuite/node-sdk)，MIT 许可见 `docs/licenses/larksuite-node-sdk.txt`；首次使用飞书连接器时加载 |
+| uqr | 连接器扫码页的二维码 | 固定版本 `0.1.3`；[上游项目](https://github.com/unjs/uqr)，MIT 许可见 `docs/licenses/uqr.txt` |
+| 企业微信智能机器人 Node SDK | 企业微信连接器的长连接帧格式参考 | 参考 `@wecom/aibot-node-sdk@1.0.7`（MIT，[上游项目](https://github.com/WecomTeam/aibot-node-sdk)）与[官方文档](https://developer.work.weixin.qq.com/document/path/101463)自行实现，未打包上游代码 |
+| openclaw-weixin | 微信连接器（实验）的 iLink 协议参考 | 参考 `@tencent-weixin/openclaw-weixin@2.4.10` 自行实现，未打包上游代码；MIT 许可见 `docs/licenses/openclaw-weixin.txt` |
 
 首次启动安装的 Linux 内核、XFCE、Chromium、Python、Git 等由 Debian 软件源提供，对应信息保留在 guest 的 `/usr/share/doc` 和包管理数据库中。
 

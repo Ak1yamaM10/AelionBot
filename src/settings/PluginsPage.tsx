@@ -1,36 +1,45 @@
 import { useEffect, useRef, useState } from 'react';
-import type { Snapshot } from '../../shared/types/core';
+import type { Snapshot, WorkSession } from '../../shared/types/core';
+import { CONNECTOR_PLATFORM_NAMES } from '../../shared/types/connector-types';
 import { IntegrationSources, McpSnippetDialog } from './IntegrationSettings';
 import { PluginDetails, PluginOwner, PluginSwitch } from './PluginDetails';
+import { AddConnectorDialog, connectorStatusText } from './AddConnectorDialog';
+import { ConnectorDetails } from './ConnectorDetails';
 import { Icon } from '../ui/Icon';
+import { ipcErrorText } from '../ui/ipc-error';
 import { useI18n } from '../i18n';
 import './plugins.css';
-export type PluginFilter = 'all' | 'skills' | 'mcp';
+export type PluginFilter = 'all' | 'skills' | 'mcp' | 'connectors';
 export function PluginsPage({
   state,
   initialFilter = 'all',
   busy,
   act,
   onClose,
+  onOpenSession,
 }: {
   state: Snapshot;
   initialFilter?: PluginFilter;
   busy: boolean;
   act: (operation: () => Promise<unknown>) => Promise<void>;
   onClose: () => void;
+  onOpenSession: (session: WorkSession) => void;
 }) {
   const { t } = useI18n();
   const [query, setQuery] = useState(''),
     [filter, setFilter] = useState<PluginFilter>(initialFilter),
-    [selected, setSelected] = useState<{ kind: 'skill' | 'mcp'; id: string }>(),
+    [selected, setSelected] = useState<{ kind: 'skill' | 'mcp' | 'connector'; id: string }>(),
     [addingMcp, setAddingMcp] = useState(false),
+    [addingConnector, setAddingConnector] = useState(false),
+    [connectorError, setConnectorError] = useState(''),
     heading = useRef<HTMLHeadingElement>(null);
   useEffect(() => {
     if (!selected) heading.current?.focus({ preventScroll: true });
   }, [selected]);
   const search = query.trim().toLowerCase(),
     skills = state.skills,
-    servers = state.integrations?.servers || [];
+    servers = state.integrations?.servers || [],
+    connectors = state.connectors?.connectors || [];
   const shownSkills = skills.filter((skill) =>
     `${skill.name} ${skill.description} ${skill.source?.label || ''} ${state.bots.find((bot) => bot.id === skill.botId)?.name || ''}`
       .toLowerCase()
@@ -39,19 +48,36 @@ export function PluginsPage({
   const shownServers = servers.filter((server) =>
     `${server.name} ${server.source.label}`.toLowerCase().includes(search),
   );
+  const shownConnectors = connectors.filter((connector) =>
+    `${t(CONNECTOR_PLATFORM_NAMES[connector.platform])} ${connector.account} ${state.bots.find((bot) => bot.id === connector.botId)?.name || ''}`
+      .toLowerCase()
+      .includes(search),
+  );
   const count =
     filter === 'skills'
       ? shownSkills.length
       : filter === 'mcp'
         ? shownServers.length
-        : shownSkills.length + shownServers.length;
+        : filter === 'connectors'
+          ? shownConnectors.length
+          : shownSkills.length + shownServers.length + shownConnectors.length;
   const filters: Array<{ id: PluginFilter; name: string; count: number }> = [
-    { id: 'all', name: t('全部'), count: skills.length + servers.length },
+    { id: 'all', name: t('全部'), count: skills.length + servers.length + connectors.length },
     { id: 'skills', name: t('技能'), count: skills.length },
     { id: 'mcp', name: 'MCP', count: servers.length },
+    { id: 'connectors', name: t('连接器'), count: connectors.length },
   ];
   const selectedSkill = selected?.kind === 'skill' ? skills.find((skill) => skill.id === selected.id) : undefined,
     selectedServer = selected?.kind === 'mcp' ? servers.find((server) => server.id === selected.id) : undefined;
+  // Connector actions stay available while Bots work; they report errors here rather than block on `busy`.
+  const connectorAct = async (operation: () => Promise<unknown>) => {
+    setConnectorError('');
+    try {
+      await operation();
+    } catch (error) {
+      setConnectorError(ipcErrorText(error));
+    }
+  };
   return (
     <main className="plugins-page" aria-labelledby="plugins-heading">
       <header className="plugins-header drag">
@@ -67,7 +93,15 @@ export function PluginsPage({
         </div>
       </header>
       <div className="plugins-content">
-        {selected ? (
+        {selected?.kind === 'connector' ? (
+          <ConnectorDetails
+            key={selected.id}
+            state={state}
+            connector={connectors.find((connector) => connector.id === selected.id)}
+            onBack={() => setSelected(undefined)}
+            onOpenSession={onOpenSession}
+          />
+        ) : selected ? (
           <PluginDetails
             key={selected.kind + ':' + selected.id}
             skill={selectedSkill}
@@ -111,6 +145,10 @@ export function PluginsPage({
                 <Icon name="plus" size={15} />
                 {t('添加 MCP')}
               </button>
+              <button className="primary-button" onClick={() => setAddingConnector(true)}>
+                <Icon name="plus" size={15} />
+                {t('添加连接器')}
+              </button>
             </div>
             <div className="plugins-filters">
               <div className="plugins-filter-group" role="group" aria-label={t('插件分类')}>
@@ -123,7 +161,7 @@ export function PluginsPage({
               </div>
             </div>
             <div className="plugins-list">
-              {filter !== 'mcp' && shownSkills.length > 0 && (
+              {(filter === 'all' || filter === 'skills') && shownSkills.length > 0 && (
                 <section className="plugins-section" aria-labelledby="plugins-skills-title">
                   <h2 id="plugins-skills-title">
                     {t('技能')}
@@ -164,7 +202,7 @@ export function PluginsPage({
                   </div>
                 </section>
               )}
-              {filter !== 'skills' && shownServers.length > 0 && (
+              {(filter === 'all' || filter === 'mcp') && shownServers.length > 0 && (
                 <section className="plugins-section" aria-labelledby="plugins-mcp-title">
                   <h2 id="plugins-mcp-title">
                     MCP<span>{shownServers.length}</span>
@@ -213,7 +251,84 @@ export function PluginsPage({
                   </div>
                 </section>
               )}
-              {count === 0 && (
+              {(filter === 'all' || filter === 'connectors') &&
+                (shownConnectors.length > 0 || filter === 'connectors') && (
+                  <section className="plugins-section" aria-labelledby="plugins-connectors-title">
+                    <h2 id="plugins-connectors-title">
+                      {t('连接器')}
+                      <span>{shownConnectors.length}</span>
+                      {state.connectors && (
+                        <label className="connector-keep-running">
+                          {t('关闭窗口后保持连接')}
+                          <PluginSwitch
+                            name={t('关闭窗口后保持连接')}
+                            enabled={state.connectors.keepRunning}
+                            disabled={false}
+                            onChange={() =>
+                              void connectorAct(() =>
+                                window.aelion.setConnectorsKeepRunning(!state.connectors!.keepRunning),
+                              )
+                            }
+                          />
+                        </label>
+                      )}
+                    </h2>
+                    {connectorError && (
+                      <p className="computer-notice" role="alert">
+                        {connectorError}
+                      </p>
+                    )}
+                    {shownConnectors.length === 0 && !search && (
+                      <p className="connector-empty">
+                        {t('把飞书、企业微信或微信连接到 Bot，在手机上就能给它发消息、收结果。')}
+                      </p>
+                    )}
+                    <div className="plugin-card-grid">
+                      {shownConnectors.map((connector) => {
+                        const name = t(CONNECTOR_PLATFORM_NAMES[connector.platform]);
+                        return (
+                          <article
+                            className="plugin-card"
+                            key={'connector:' + connector.id}
+                            data-plugin-id={connector.id}
+                          >
+                            <span className="plugin-card-icon">
+                              <Icon name="message" size={18} />
+                            </span>
+                            <div className="plugin-card-copy">
+                              <button
+                                className="plugin-name"
+                                onClick={() => setSelected({ kind: 'connector', id: connector.id })}
+                              >
+                                {name}
+                              </button>
+                              <p className={`plugin-connection ${connector.status}`}>
+                                <i />
+                                {connector.pairings.length
+                                  ? t('{count} 个配对请求', { count: connector.pairings.length })
+                                  : t(connectorStatusText(connector.status))}
+                              </p>
+                            </div>
+                            <div className="plugin-card-right">
+                              <PluginOwner bot={state.bots.find((bot) => bot.id === connector.botId)} />
+                              <PluginSwitch
+                                name={name}
+                                enabled={connector.enabled}
+                                disabled={false}
+                                onChange={() =>
+                                  void connectorAct(() =>
+                                    window.aelion.updateConnector({ id: connector.id, enabled: !connector.enabled }),
+                                  )
+                                }
+                              />
+                            </div>
+                          </article>
+                        );
+                      })}
+                    </div>
+                  </section>
+                )}
+              {count === 0 && filter !== 'connectors' && (
                 <div className="plugins-empty">
                   <span>
                     <Icon name={search ? 'search' : 'plugin'} size={24} />
@@ -263,6 +378,16 @@ export function PluginsPage({
                 busy={busy}
                 onClose={() => setAddingMcp(false)}
                 onImport={(text) => window.aelion.importMcpSnippet(text)}
+              />
+            )}
+            {addingConnector && (
+              <AddConnectorDialog
+                state={state}
+                onClose={() => setAddingConnector(false)}
+                onCreated={(id) => {
+                  setAddingConnector(false);
+                  setSelected({ kind: 'connector', id });
+                }}
               />
             )}
           </>

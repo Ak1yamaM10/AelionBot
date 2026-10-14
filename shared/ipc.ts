@@ -143,6 +143,16 @@ export const INVOKE_CHANNELS = {
   readSkill: 'skills:read',
   setMcpEnabled: 'mcp:enabled',
   testMcp: 'mcp:test',
+  // Connectors
+  addConnector: 'connectors:add',
+  startConnectorSetup: 'connectors:setup-start',
+  answerConnectorSetup: 'connectors:setup-answer',
+  cancelConnectorSetup: 'connectors:setup-cancel',
+  updateConnector: 'connectors:update',
+  removeConnector: 'connectors:remove',
+  reconnectConnector: 'connectors:reconnect',
+  decideConnectorPairing: 'connectors:pairing',
+  setConnectorsKeepRunning: 'connectors:keep-running',
   // Experimental local decision model
   installLaya: 'laya:install',
   selectLaya: 'laya:select',

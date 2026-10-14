@@ -86,3 +86,22 @@ stdio 服务运行在 **Windows 本机**，需要原配置声明的 Node.js、Py
 支持常用环境变量引用 `${VAR}`、`${env:VAR}`、`${VAR:-default}`、`${workspaceFolder}`、`${userHome}`、`{env:VAR}`，以及 Codex 的环境变量头配置。缺少变量会在设置中提示，不会默默使用空凭据。不会自动读取其他 Agent 的 OAuth 登录缓存或 `.env` 文件；交互式 VS Code inputs、mTLS、WebSocket 传输尚未支持。
 
 格式参考：[Claude Code](https://code.claude.com/docs/en/mcp)、[Codex MCP](https://learn.chatgpt.com/docs/extend/mcp?surface=cli)、[Hermes MCP](https://hermes-agent.nousresearch.com/docs/user-guide/features/mcp/)、[OpenCode MCP](https://opencode.ai/docs/mcp-servers/)、[MCP TypeScript SDK](https://ts.sdk.modelcontextprotocol.io/client)。
+
+## 连接器（飞书、企业微信、微信）
+
+连接器把 IM 账号接到某个 Bot：在 IM 里私聊它，Bot 在这台电脑上工作，把答复和文件发回去。在“插件 → 连接器”里添加和管理。
+
+- 所有平台都由本机主动连出去（飞书、企业微信是 WebSocket 长连接，微信是长轮询），不需要公网地址或内网穿透。
+- 每个外部私聊对应 Bot 的一个工作会话，名称带平台名，侧栏里用消息图标标出。会话的本机权限跟随连接器，在连接器详情里修改。
+- 只有主人和主人确认过的人能使用。其他人发来消息会收到 6 位配对码，在连接器详情里允许或拒绝。群聊消息一律忽略。
+- 只有从 IM 发来的消息和这个会话里的定时任务，答复才会发回 IM；在电脑上发的消息只在电脑上答复。发回 IM 的只有最终回复和它的附件；任务进行中，飞书在你的消息上显示“敲键盘”表情，微信显示“正在输入”，企业微信不显示。被新消息打断或手动停止的任务不发消息，失败时发一条说明。
+- 需要本机权限时，审批卡片发给主人，可以在 IM 里“允许一次”或“拒绝”；没有按钮的平台回复“同意 编号”或“拒绝 编号”。接管工作电脑、操作本机屏幕仍需回到电脑前。
+- IM 里可以用 `/new`（开始新会话）、`/stop`（停止当前任务）、`/status`、`/help`。
+- 托盘里一直有 AelionBot 图标。“关闭窗口后保持连接”默认打开：有启用的连接器时，关闭窗口只隐藏到托盘，从托盘菜单退出。
+- 凭证用系统加密存储保存在数据目录的 `connectors.json`。
+
+| 平台 | 添加方式 | 说明 |
+| --- | --- | --- |
+| 飞书 | 扫码创建（推荐），或填写自建应用的 App ID / App Secret | 扫码会自动创建应用并申请所需权限，扫码人成为主人。手动方式见添加对话框里的步骤：开通 `im:message`、`im:message.p2p_msg:readonly`、`im:message:send_as_bot`、`im:resource`，先在 AelionBot 里连上，再在开放平台把事件与回调都设为长连接，订阅 `im.message.receive_v1` 和 `card.action.trigger`，发布应用。暂不支持 Lark 国际版 |
+| 企业微信 | 智能机器人 API 模式的 BotID / Secret | 连接方式选“使用长连接”。同一个机器人只能保持一个连接，在别处连接后这里会显示“已在其他设备连接”。主动推送只能发给最近说过话的人 |
+| 微信（实验） | 扫码登录 | 依赖微信 ClawBot 插件，只能回复对方发来的消息，不能主动发起对话，可能被微信限制 |

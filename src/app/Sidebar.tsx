@@ -288,7 +288,7 @@ export function Sidebar({
                             onSessionSettings(entry);
                           }}
                         >
-                          <Icon name="folder" size={14} />
+                          <Icon name={entry.connector ? 'message' : 'folder'} size={14} />
                           <span className="session-name">{entry.name}</span>
                           {status.active || status.pending ? (
                             <span

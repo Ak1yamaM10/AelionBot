@@ -13,5 +13,5 @@
     "tests/*.test.ts"
   ],
   "project": ["src/**/*.{ts,tsx}", "shared/**/*.ts", "electron/**/*.ts", "scripts/**/*.{mjs,ts}", "tests/**/*.ts"],
-  "ignoreDependencies": ["@fontsource-variable/*", "markdown-it"]
+  "ignoreDependencies": ["@fontsource-variable/*", "markdown-it", "@larksuiteoapi/node-sdk"]
 }

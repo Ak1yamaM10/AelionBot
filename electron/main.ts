@@ -53,6 +53,9 @@ import { GroupChats } from './core/group/group-chats';
 import { LayaRuntime } from './core/model/laya-runtime';
 import { LayaFeature } from './core/model/laya-feature';
 import { ChatPinQueue } from './core/agent/chat-pins';
+import { Connectors } from './core/connectors/connector-hub';
+import { loadLarkSdk } from './core/connectors/adapters/feishu';
+import { BackgroundTray } from './windows/background-tray';
 import { TaskScheduler } from './core/scheduler/task-scheduler';
 import { groupPending } from '../shared/types/group-types';
 import { peerPending } from '../shared/types/peer-types';
@@ -110,6 +113,16 @@ let layaFeature: LayaFeature | undefined;
 let chatPins: ChatPinQueue | undefined;
 let scheduler: TaskScheduler | undefined;
 let greetings: BotGreetings | undefined;
+let connectors: Connectors | undefined;
+let tray: BackgroundTray | undefined;
+/** API keys and connector credentials, encrypted with the system key store. */
+const secretCodec = {
+  encrypt: (value: string) => {
+    if (!safeStorage.isEncryptionAvailable()) throw new Error('系统加密存储不可用，尚未保存 API Key');
+    return safeStorage.encryptString(value).toString('base64');
+  },
+  decrypt: (value: string) => safeStorage.decryptString(Buffer.from(value, 'base64')),
+};
 protocol.registerSchemesAsPrivileged([
   { scheme: 'aelion-preview', privileges: { standard: true, secure: true, supportFetchAPI: true, corsEnabled: true } },
 ]);
@@ -172,6 +185,7 @@ function snapshot(): Snapshot {
     computer: computer.state,
     dataDir: store.dir,
     integrations: integrations?.snapshot(),
+    connectors: connectors?.snapshot(),
     interactions: interactions?.snapshot() || [],
     cognition: cognition?.view(),
     peers: peerChats?.snapshot(),
@@ -286,17 +300,7 @@ async function initialize() {
   mkdirSync(dataDir, { recursive: true });
   store = new Store(dataDir, { incremental: true, deferWrites: true });
   startup.mark('state');
-  providers = new ModelProviders(
-    store,
-    {
-      encrypt: (value) => {
-        if (!safeStorage.isEncryptionAvailable()) throw new Error('系统加密存储不可用，尚未保存 API Key');
-        return safeStorage.encryptString(value).toString('base64');
-      },
-      decrypt: (value) => safeStorage.decryptString(Buffer.from(value, 'base64')),
-    },
-    changed,
-  );
+  providers = new ModelProviders(store, secretCodec, changed);
   commandPermissions = new CommandPermissions(
     join(dataDir, 'command-permissions.json'),
     (value) => host?.redact(value) ?? redactHost(value),
@@ -304,6 +308,7 @@ async function initialize() {
   interactions = new Interactions(
     () => {
       changed();
+      connectors?.interactionsChanged();
       if (
         window &&
         !window.isDestroyed() &&
@@ -776,7 +781,10 @@ async function initialize() {
       isRunning: (id, sessionId) => updatePreparing || harness.isRunning(id, sessionId),
       run: (id, input, options) => {
         greetings?.cancel(id);
-        return harness.run(id, input, options);
+        // Runs that answer a connector chat send their replies back to it.
+        return connectors
+          ? connectors.wrapRun(id, options, (wrapped) => harness.run(id, input, wrapped))
+          : harness.run(id, input, options);
       },
       // New input interrupts the Bot's work in that chat only; its other chats keep working.
       refresh: (id, sessionId) => {
@@ -793,6 +801,38 @@ async function initialize() {
     host,
   );
   chatPins.wake();
+  connectors = new Connectors({
+    store,
+    dataDir,
+    codec: secretCodec,
+    version: app.getVersion(),
+    attachments,
+    send: ({ connector, ...input }) => chatPins!.send(input, connector),
+    cancel: (botId, sessionId) => {
+      chatPins?.cancel(botId, sessionId);
+      harness.cancel(botId, sessionId);
+    },
+    isRunning: (botId, sessionId) =>
+      harness.isRunning(botId, sessionId) || Boolean(chatPins?.hasPending(botId, sessionId)),
+    setPermission: (botId, sessionId, mode) => {
+      if (hostApprovals.set({ kind: 'bot', id: botId, sessionId }, mode)) interactions.refreshHostPolicy();
+    },
+    interactions,
+    changed: () => {
+      changed();
+      tray?.refresh();
+    },
+    lark: () => loadLarkSdk(__dirname),
+  });
+  connectors.start();
+  tray = new BackgroundTray({
+    icon: join(app.getAppPath(), 'assets', process.platform === 'win32' ? 'icon.ico' : 'icon.png'),
+    window: () => window,
+    connectors: () => connectors?.snapshot().connectors || [],
+    translate: (source, values) => translateFor(store.data.language || 'zh-CN', source, values),
+    quit: () => app.quit(),
+  });
+  tray.refresh();
   harness.setGroupGateway(groupChats);
   groupChats.start();
   scheduler = new TaskScheduler(
@@ -962,6 +1002,13 @@ async function initialize() {
     return true;
   };
   window.on('close', (event) => {
+    // With connectors running, closing the window hides it; the tray brings it back or quits.
+    if (!exiting && connectors?.keepRunning) {
+      event.preventDefault();
+      window?.hide();
+      tray?.refresh();
+      return;
+    }
     if (!canDiscardPreview()) event.preventDefault();
   });
   // The cue windows of host Computer Use would otherwise keep the app open after its own window is gone.
@@ -1123,6 +1170,9 @@ async function initialize() {
     get chatPins() {
       return chatPins;
     },
+    get connectors() {
+      return connectors;
+    },
     get scheduler() {
       return scheduler;
     },
@@ -1189,6 +1239,7 @@ async function initialize() {
         () => videoInspector?.dispose(),
         () => webPreview?.close(),
         () => chatPins?.dispose(),
+        () => tray?.dispose(),
         () => peerChats?.dispose(),
         () => groupChats?.dispose(),
         () => interactions.dispose(),
@@ -1201,7 +1252,12 @@ async function initialize() {
           diagnostics?.record('app.shutdown-error', error);
         }
     },
-    closeWork: () => [harness.closeProcesses(), cognition.close(), integrations.close()],
+    closeWork: () => [
+      harness.closeProcesses(),
+      cognition.close(),
+      integrations.close(),
+      connectors?.dispose() ?? Promise.resolve(),
+    ],
     closeVm: () => vm.shutdownForExit(),
     closeState: () => {
       powershellParser.dispose();
@@ -1221,6 +1277,8 @@ async function initialize() {
     void shutdown.run();
   });
   app.on('window-all-closed', () => app.quit());
+  // macOS: the Dock icon brings back a window hidden while connectors keep running.
+  app.on('activate', () => tray?.open());
   vm.on('state', changed);
   const dev = process.env.AELION_DEV_URL;
   if (dev && new URL(dev).hostname !== '127.0.0.1') throw new Error('开发服务器必须在本机');

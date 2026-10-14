@@ -6,6 +6,7 @@ import type { HostComputer } from '../host/host';
 import type { Store } from '../storage/store';
 import type { HarnessRunOptions } from './peer-runtime-types';
 import type { BotMention, ChatMessage } from '../../../shared/types/core';
+import type { MessageConnectorSource } from '../../../shared/types/connector-types';
 import type { ScheduledTrigger } from '../../../shared/types/scheduled-types';
 import { chatInputText, validateChatInput } from './chat-input';
 import { pinDescription, updatePins, validPin, type PinActor, type PinInput } from '../../../shared/chat/reactions';
@@ -113,16 +114,20 @@ export class ChatPinQueue {
     this.changed();
     this.wake();
   }
-  send(input: {
-    designSessionId?: string;
-    botId: string;
-    sessionId?: string;
-    message: string;
-    previewPrompt?: string;
-    replyToMessageId?: string;
-    mentions?: BotMention[];
-    attachmentIds?: string[];
-  }) {
+  /** `connector` marks a message that arrived from a connector chat; the app's own input has none. */
+  send(
+    input: {
+      designSessionId?: string;
+      botId: string;
+      sessionId?: string;
+      message: string;
+      previewPrompt?: string;
+      replyToMessageId?: string;
+      mentions?: BotMention[];
+      attachmentIds?: string[];
+    },
+    connector?: MessageConnectorSource,
+  ) {
     if (this.closed) throw new Error('客户端正在退出');
     if (
       input.previewPrompt !== undefined &&
@@ -155,6 +160,7 @@ export class ChatPinQueue {
       ...(input.previewPrompt !== undefined ? { previewPrompt: input.previewPrompt } : {}),
       ...(reply ? { reply } : {}),
       ...(sessionId ? { sessionId } : {}),
+      ...(connector ? { connector } : {}),
       workspaceDir: effectiveWorkspace(this.store, this.host, {
         kind: 'bot',
         id: input.botId,

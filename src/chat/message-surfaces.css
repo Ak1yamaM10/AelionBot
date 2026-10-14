@@ -187,3 +187,10 @@
     border-color: CanvasText;
   }
 }
+/* A user message that arrived from a connector chat (Feishu, WeCom, WeChat). */
+.messages > .message-source {
+  margin: 6px 4px -2px;
+  text-align: right;
+  font-size: 11px;
+  color: light-dark(#999, #888);
+}
