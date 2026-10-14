@@ -55,6 +55,15 @@ jobs:
         run: |
           mkdir -p "$RUNNER_TEMP/aelion-tests"
           echo "TMPDIR=$RUNNER_TEMP/aelion-tests" >> "$GITHUB_ENV"
+      - name: Prepare Windows test temporary directory
+        if: runner.os == 'Windows'
+        shell: pwsh
+        # Tests create many temporary directories; RUNNER_TEMP is on the runner's faster D: drive.
+        run: |
+          $dir = Join-Path $env:RUNNER_TEMP 'aelion-tests'
+          New-Item -ItemType Directory -Force -Path $dir | Out-Null
+          "TEMP=$dir" >> $env:GITHUB_ENV
+          "TMP=$dir" >> $env:GITHUB_ENV
       - name: Install dependencies
         timeout-minutes: 8
         run: pnpm install --frozen-lockfile --reporter=append-only

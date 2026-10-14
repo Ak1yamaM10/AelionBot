@@ -140,9 +140,11 @@ for (const protocol of ['anthropic', 'responses', 'gemini'])
             delta: { type: 'input_json_delta', partial_json: '{"content":"' },
           });
         }
+        // 25 frames 40 ms apart run well past the 400 ms idle timeout, while each gap leaves ample room for
+        // timer jitter on a loaded CI runner.
         let n = 0;
         const timer = setInterval(() => {
-          if (++n <= 8) {
+          if (++n <= 25) {
             if (protocol === 'anthropic')
               event(res, {
                 type: 'content_block_delta',
@@ -169,7 +171,12 @@ for (const protocol of ['anthropic', 'responses', 'gemini'])
               type: 'response.completed',
               response: {
                 output: [
-                  { type: 'function_call', call_id: 'tool-1', name: 'file_write', arguments: '{"content":"xxxxxxxx"}' },
+                  {
+                    type: 'function_call',
+                    call_id: 'tool-1',
+                    name: 'file_write',
+                    arguments: JSON.stringify({ content: 'x'.repeat(25) }),
+                  },
                 ],
                 usage: { input_tokens: 12, output_tokens: 8 },
               },
@@ -178,7 +185,7 @@ for (const protocol of ['anthropic', 'responses', 'gemini'])
             event(res, {
               candidates: [
                 {
-                  content: { parts: [{ functionCall: { name: 'file_write', args: { content: 'xxxxxxxx' } } }] },
+                  content: { parts: [{ functionCall: { name: 'file_write', args: { content: 'x'.repeat(25) } } }] },
                   finishReason: 'STOP',
                 },
               ],
@@ -190,9 +197,9 @@ for (const protocol of ['anthropic', 'responses', 'gemini'])
       },
       protocol,
     );
-    const result = await model.complete([], [], new AbortController().signal, () => {}, { timeoutMs: 180, retries: 0 });
+    const result = await model.complete([], [], new AbortController().signal, () => {}, { timeoutMs: 400, retries: 0 });
     assert.equal(result.calls[0].function.name, 'file_write');
-    assert.equal(JSON.parse(result.calls[0].function.arguments).content, 'xxxxxxxx');
+    assert.equal(JSON.parse(result.calls[0].function.arguments).content, 'x'.repeat(25));
     assert.equal(result.content, '');
   });
 test('role-only JSON frames cannot keep a stalled request alive', async (t) => {

@@ -228,7 +228,8 @@ test('beginning exit prevents a pending startup from launching QEMU and clears d
 });
 test(
   'Windows process fallback cannot kill a process with a different UUID',
-  { skip: process.platform !== 'win32' },
+  // Each identity check starts PowerShell, which is slow on CI runners; four checks need more than the default.
+  { skip: process.platform !== 'win32', timeout: 180_000 },
   async (t) => {
     const f = fixture(t),
       script = join(f.root, 'child.cjs');

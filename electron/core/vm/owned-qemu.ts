@@ -12,7 +12,15 @@ interface QemuIdentity {
   systemDisk: string;
   workDisk: string;
 }
-async function processAction(input: QemuIdentity, stop: boolean): Promise<'owned' | 'missing' | 'foreign' | 'unknown'> {
+type Identity = 'owned' | 'missing' | 'foreign' | 'unknown';
+// A cold PowerShell start plus the CIM query regularly takes several seconds on a busy machine; a timeout reads
+// as 'unknown', which leaves a live VM unrecognised. Give it room and one more try before giving up.
+const CHECK_TIMEOUT_MS = 20_000;
+async function processAction(input: QemuIdentity, stop: boolean): Promise<Identity> {
+  const first = await processActionOnce(input, stop);
+  return first === 'unknown' ? processActionOnce(input, stop) : first;
+}
+async function processActionOnce(input: QemuIdentity, stop: boolean): Promise<Identity> {
   if (!Number.isSafeInteger(input.pid) || input.pid <= 0 || !/^[a-f0-9-]{36}$/i.test(input.id)) return 'unknown';
   const data = Buffer.from(JSON.stringify(input), 'utf8').toString('base64');
   const script = `$ErrorActionPreference='Stop'
@@ -36,7 +44,7 @@ ${stop ? '$p.Kill(); if (!$p.WaitForExit(3000)) { exit 4 }' : ''}
         '-EncodedCommand',
         Buffer.from(script, 'utf16le').toString('base64'),
       ],
-      { windowsHide: true, timeout: 6000 },
+      { windowsHide: true, timeout: CHECK_TIMEOUT_MS },
     );
     return 'owned';
   } catch (error) {
