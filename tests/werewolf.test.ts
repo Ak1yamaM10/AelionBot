@@ -283,9 +283,12 @@ test('AI pause hides operation timers and stop writes an operation record', asyn
     const resumed = runtime.control(s.id, 'resume');
     assert.equal(resumed.clock?.deadlineAt, undefined);
     assert(resumed.logs.some((e) => e.text === '你继续了对局。'));
+    assert.equal(resumed.endedAt, undefined, 'a live match has no end time');
     const stopped = runtime.control(s.id, 'stop');
     assert(stopped.logs.some((e) => e.text.includes('你结束了对局')));
     assert.equal(stopped.winner, undefined);
+    // The report card is placed by the time the match ended: the stop record.
+    assert.equal(stopped.endedAt, runtime.inspect(s.id).at(-1)!.time);
   } finally {
     runtime.dispose();
     rmSync(dir, { recursive: true, force: true });

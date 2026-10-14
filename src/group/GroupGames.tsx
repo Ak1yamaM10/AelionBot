@@ -60,6 +60,7 @@ export function GroupGames({
   members,
   initialOpen = false,
   cardContainer,
+  onCardTime,
   providers = [],
   defaultModel,
 }: {
@@ -68,6 +69,8 @@ export function GroupGames({
   members: Member[];
   initialOpen?: boolean;
   cardContainer?: HTMLElement | null;
+  /** When the shown match ended, or undefined while it is live; the host places the card by it. */
+  onCardTime?: (endedAt: number | undefined) => void;
   providers?: ModelProvider[];
   defaultModel?: ModelSelection;
 }) {
@@ -197,6 +200,8 @@ export function GroupGames({
       clearInterval(timer);
     };
   }, [groupId, omniscient]);
+  const endedAt = match?.status === 'finished' ? match.endedAt : undefined;
+  useEffect(() => onCardTime?.(endedAt), [endedAt, onCardTime]);
   const dialog = useRef<HTMLDialogElement>(null);
   useEffect(() => {
     if (initialOpen) setOpen(true);

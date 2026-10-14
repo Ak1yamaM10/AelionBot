@@ -113,6 +113,11 @@ export function GroupEditor({
             {t('你')} + {ids.length} Bot
           </small>
         </div>
+        {ids.length >= GROUP_LIMITS.bots && bots.length > ids.length && (
+          <p className="subtle">
+            {t('每个群最多 {count} 位 Bot，取消勾选一位后才能添加新成员。', { count: GROUP_LIMITS.bots })}
+          </p>
+        )}
         <div className="group-member-picker">
           {bots.map((bot) => (
             <label key={bot.id}>

@@ -500,6 +500,8 @@ export function view(s: WerewolfState, viewerId?: string, omniscient = false): G
       }),
     pending: s.requests.filter((r) => r.seatId === viewerId),
     winner: s.winner,
+    // A finished archive takes no more trace entries, so its last one is when the match ended.
+    ...(s.status === 'finished' && s.trace?.length ? { endedAt: s.trace.at(-1)!.time } : {}),
     error: s.error,
     humanId: s.seats.find((p) => p.human)?.id,
     ...(viewerId && s.notes?.[viewerId]?.length ? { notes: [...s.notes[viewerId]] } : {}),

@@ -93,6 +93,8 @@ export interface GameView {
   logs: GameLog[];
   pending: GameRequest[];
   winner?: 'wolves' | 'village';
+  /** When a finished match ended (ms); its report card sits at that point of the group timeline. */
+  endedAt?: number;
   error?: string;
   humanId?: string;
   clock?: { deadlineAt?: number; remainingMs?: number; seatId?: string };

@@ -246,6 +246,11 @@
 }
 
 /* ---------- chat card ---------- */
+/* The card's place in the message list: a row of the list, with the card centred in it as before. */
+.gg-card-slot {
+  display: flex;
+  justify-content: center;
+}
 .gg-chat-card {
   display: flex;
   flex-direction: column;

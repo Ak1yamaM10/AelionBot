@@ -24,7 +24,7 @@ import {
   type GroupSummary,
   type GroupsView,
 } from '../../../shared/types/group-types';
-import { hasSilenceMarker, normalized } from './group-response';
+import { hasSilenceMarker, normalized, unwrapSendArguments } from './group-response';
 import { isEmptyGroupReply } from '../../../shared/chat/group-empty-reply';
 import { rememberPublished, silentBotMessage } from './group-history';
 import { pinDescription, updatePins, validPin, type PinInput } from '../../../shared/chat/reactions';
@@ -532,7 +532,7 @@ export class GroupChats implements GroupGateway {
     if (!run?.groupOrigin) throw new Error('群聊任务已结束');
     const room = this.room(run.groupOrigin.groupId);
     this.member(room, botId);
-    return botMentions(content, this.identities(room), botId);
+    return botMentions(unwrapSendArguments(content), this.identities(room), botId);
   }
   publishProgress(botId: string, runId: string, content: string) {
     const run = this.store.data.runs.find((run) => run.id === runId && run.botId === botId && run.status === 'running');

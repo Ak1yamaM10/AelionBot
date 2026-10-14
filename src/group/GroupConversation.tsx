@@ -2,6 +2,7 @@ import { GroupDecisionTrail } from './GroupDecisionTrail';
 import { isEmptyGroupReply } from '../../shared/chat/group-empty-reply';
 import { unanswered } from '../../shared/chat/group-answers';
 import { GroupGames } from './GroupGames';
+import { cardIndex } from './game-view-model';
 import { DesignerTaskCard } from '../designer/DesignerTaskCard';
 import { activeDesignId } from '../designer/design-canvas-state';
 import { usePreviewWorkbench } from '../preview/PreviewWorkbench';
@@ -46,6 +47,8 @@ import { ScheduledTriggerCard } from '../chat/ScheduledTrigger';
 import type { BotActivities } from '../bots/bot-activity';
 import { useI18n } from '../i18n';
 
+/** Marks where the AI game card goes among the messages. */
+const CARD_SLOT: unique symbol = Symbol('game-card');
 const merge = <T extends { id: string }>(older: T[], newer: T[]) => [
   ...new Map([...older, ...newer].map((item) => [item.id, item])).values(),
 ];
@@ -76,7 +79,10 @@ export function GroupConversation({
   const [page, setPage] = useState<GroupPage>(),
     [error, setError] = useState(''),
     [sending, setSending] = useState(false),
-    [loading, setLoading] = useState(false);
+    [loading, setLoading] = useState(false),
+    // The match card: at the bottom while a match is live, at the point it ended once it is finished.
+    [cardSlot, setCardSlot] = useState<HTMLDivElement | null>(null),
+    [cardEndedAt, setCardEndedAt] = useState<number>();
   const body = useRef<HTMLDivElement>(null),
     follow = useRef(true),
     stickLock = useRef(0),
@@ -285,6 +291,19 @@ export function GroupConversation({
     );
     return { replyRuns, byMessage, quiet };
   }, [page]);
+  const timeline = useMemo((): Array<GroupMessage | typeof CARD_SLOT> => {
+    const visible = (page?.messages || []).filter(
+      (message) =>
+        !(
+          message.sender.kind === 'bot' &&
+          ['message', 'progress'].includes(message.kind) &&
+          !message.attachments?.length &&
+          isEmptyGroupReply(groupReplyContent(message.content, message.sender.id))
+        ),
+    );
+    const at = cardIndex(visible, cardEndedAt);
+    return [...visible.slice(0, at), CARD_SLOT, ...visible.slice(at)];
+  }, [page?.messages, cardEndedAt]);
   const actions = useStableHandlers<GroupRowActions>({
     reply: (message, content, author) =>
       drafts.set(group.id, {
@@ -334,17 +353,10 @@ export function GroupConversation({
               {t('加载更早消息')}
             </button>
           )}
-          {page?.messages
-            .filter(
-              (message) =>
-                !(
-                  message.sender.kind === 'bot' &&
-                  ['message', 'progress'].includes(message.kind) &&
-                  !message.attachments?.length &&
-                  isEmptyGroupReply(groupReplyContent(message.content, message.sender.id))
-                ),
-            )
-            .map((message) => (
+          {timeline.map((message) =>
+            message === CARD_SLOT ? (
+              <div key="game-card-slot" ref={setCardSlot} className="gg-card-slot" />
+            ) : (
               <GroupMessageRow
                 key={message.id}
                 message={message}
@@ -356,12 +368,13 @@ export function GroupConversation({
                 previewEntries={previewEntries}
                 unanswered={rows.quiet.has(message.id)}
                 deliveries={rows.byMessage.get(message.id) || NO_DELIVERIES}
-                laya={page.laya}
+                laya={page?.laya}
                 sessions={state.designer?.sessions}
                 vmReady={state.vm.status === 'ready'}
                 actions={actions}
               />
-            ))}
+            ),
+          )}
           {page &&
             !page.messages.some((message) => message.kind === 'message' || message.kind === 'progress') &&
             !group.activities?.length && <div className="group-empty">{t('暂无消息')}</div>}
@@ -407,7 +420,8 @@ export function GroupConversation({
               members={members}
               providers={state.providers}
               defaultModel={state.defaultModel}
-              cardContainer={body.current}
+              cardContainer={cardSlot}
+              onCardTime={setCardEndedAt}
             />
           }
           workspaceDir={
