@@ -13,6 +13,8 @@ import {
   mbtiOf,
   planRole,
   roundTraits,
+  styleText,
+  tendencies,
   traitsFromMbti,
   type Traits,
 } from '../../../shared/persona/persona-model';
@@ -266,6 +268,23 @@ export class PersonaService {
    * Persona lines for one group reply (§10.4): how this Bot regards the people in the conversation, and at most one
    * shared experience with them that was not recalled in the last 7 days. Empty when there is nothing to say.
    */
+  /**
+   * How this Bot's personality shapes what it says in a group (docs/ai-personality-module.md §10.4): the same
+   * expression guidance its game seats get, and a stance on agreeing. Only for Bots with a saved profile; a draft
+   * is never invented here. Group chats only: private chats keep the original SOUL (§D.14).
+   */
+  groupStyle(botId: string) {
+    const p = this.store.profile(botId);
+    if (!p) return '';
+    const conform = tendencies(p.traits).conform;
+    const stance =
+      conform < -0.3
+        ? '\n立场：不同意就直接说出来，不必为了和气附和。'
+        : conform > 0.3
+          ? '\n立场：同意别人时要补充新的信息或理由，不要只说「同意」。'
+          : '';
+    return '\n\n[你的说话方式，来自你的性格设定]\n' + styleText(p.traits) + '。' + stance;
+  }
   groupFragment(botId: string, people: { id: string; name: string }[]) {
     const others = people.filter((p) => p.id !== botId).slice(0, 2);
     if (!others.length) return '';

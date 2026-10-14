@@ -26,7 +26,7 @@ function fixture(t: test.TestContext) {
     undefined,
     undefined,
     undefined,
-    (botId, people) => persona.groupFragment(botId, people),
+    (botId, people) => persona.groupStyle(botId) + persona.groupFragment(botId, people),
   );
   groups.start();
   t.after(() => {
@@ -73,5 +73,29 @@ test('a woken Bot receives its relation and one shared memory about the sender',
   assert.ok(
     contexts.some((c) => c.includes('[你的关系与记忆，仅供参考]') && c.includes('一局狼人杀')),
     'the persona lines reach the group run',
+  );
+});
+
+test('a Bot with a personality profile speaks in its own style in the group; one without is unchanged', async (t) => {
+  const { store, persona, groups, contexts } = fixture(t);
+  const talker = store.createBot('阿岩', 'bold', '#aa5500'),
+    plain = store.createBot('小周', 'calm', '#0055aa');
+  // Outgoing, disagreeable, careless and touchy: talks long and says so when it disagrees.
+  persona.setTraits(talker.id, { E: 0.9, A: 0.1, C: 0.2, N: 0.8, O: 0.5 });
+  assert.equal(persona.groupStyle(plain.id), '', 'no profile, no invented personality');
+  const style = persona.groupStyle(talker.id);
+  assert.match(style, /\[你的说话方式，来自你的性格设定\]/);
+  assert.match(style, /发言不超过 198 字/);
+  assert.match(style, /不同意就直接说出来/);
+  persona.setTraits(plain.id, { E: 0.1, A: 0.9, C: 0.9, N: 0.2, O: 0.5 });
+  assert.match(persona.groupStyle(plain.id), /发言不超过 102 字/);
+  assert.match(persona.groupStyle(plain.id), /同意别人时要补充新的信息/);
+
+  const room = groups.create({ name: '闲聊群', botIds: [talker.id, plain.id] });
+  groups.send({ id: room.id, message: '周末去哪玩' });
+  await until(() => contexts.length > 0, { timeoutMs: 5000 });
+  assert.ok(
+    contexts.some((c) => c.includes('发言不超过 198 字')),
+    'the style reaches the group run',
   );
 });

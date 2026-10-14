@@ -1015,7 +1015,8 @@ export class GroupChats implements GroupGateway {
     else if (message.sender.kind === 'bot') add(message.sender.id, message.sender.name);
     for (const m of message.mentions || []) add(m.id, m.name);
     try {
-      return people.length ? this.persona(botId, people) : '';
+      // Called even when nobody else is involved: the Bot's own speaking style still applies.
+      return this.persona(botId, people);
     } catch {
       return ''; // persona data is optional context; its failure must not block a reply
     }
