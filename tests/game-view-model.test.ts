@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import type { GameLog, GameView } from '../shared/types/game-types';
 import {
+  cardIndex,
   matchMinutes,
   periodOf,
   personalClues,
@@ -150,4 +151,14 @@ test('fates, the report timeline and duration are read from shared log lines', (
   assert.ok(!reportTimeline(g).some((entry) => entry.text.includes('查验结果')));
   assert.equal(reportTimeline(g).length, 5);
   assert.equal(matchMinutes(g), 5);
+});
+
+test('a finished match card sits where the match ended; a live one stays at the end', () => {
+  const at = (iso: string) => ({ time: iso });
+  const messages = [at('2026-10-14T10:00:00Z'), at('2026-10-14T10:05:00Z'), at('2026-10-14T10:30:00Z')];
+  assert.equal(cardIndex(messages), 3);
+  assert.equal(cardIndex(messages, Date.parse('2026-10-14T10:10:00Z')), 2);
+  assert.equal(cardIndex(messages, Date.parse('2026-10-14T09:00:00Z')), 0);
+  assert.equal(cardIndex(messages, Date.parse('2026-10-14T11:00:00Z')), 3);
+  assert.equal(cardIndex([], Date.parse('2026-10-14T11:00:00Z')), 0);
 });

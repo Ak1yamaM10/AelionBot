@@ -133,3 +133,13 @@ export function matchMinutes(game: GameView) {
   const times = game.logs.map((log) => log.time).filter((time): time is number => typeof time === 'number');
   return times.length > 1 ? Math.max(1, Math.round((Math.max(...times) - Math.min(...times)) / 60000)) : undefined;
 }
+
+/**
+ * Where the match card goes among the shown messages: after the last message sent before a finished match
+ * ended, or at the end while the match is live (no end time).
+ */
+export function cardIndex(messages: { time: string }[], endedAt?: number) {
+  if (endedAt === undefined) return messages.length;
+  const after = messages.findIndex((message) => Date.parse(message.time) > endedAt);
+  return after < 0 ? messages.length : after;
+}
