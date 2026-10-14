@@ -1,4 +1,4 @@
-/* Connectors: the add dialog, the details page and the plugin list section. */
+/* The add-connector dialog. The cards and the details drawer are styled in plugins.css. */
 .connector-dialog {
   width: min(600px, 100%);
   max-height: min(88vh, 820px);
@@ -103,55 +103,4 @@
   width: 140px;
   text-align: center;
   letter-spacing: 2px;
-}
-.connector-detail .connector-fields {
-  margin: 20px 0 0;
-}
-.connector-list {
-  margin: 22px 0 0;
-}
-.connector-list h3 {
-  margin: 0 0 6px;
-  font-size: 12px;
-  font-weight: var(--weight-label);
-  color: light-dark(#777, #aaa);
-}
-.connector-list > div {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 9px 0;
-  border-bottom: 1px solid light-dark(#eee, #333);
-  font-size: 13px;
-}
-.connector-list > div > span {
-  flex: 1;
-  min-width: 0;
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  overflow-wrap: anywhere;
-}
-.connector-list > div > small {
-  color: light-dark(#999, #888);
-}
-.connector-list code {
-  font: 13px var(--font-code);
-  letter-spacing: 1px;
-  padding: 1px 6px;
-  border-radius: 6px;
-  background: light-dark(#f2f2f2, #2c2c2c);
-}
-.connector-keep-running {
-  margin-left: auto;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-weight: normal;
-}
-.connector-empty {
-  margin: 0 0 10px;
-  font-size: 13px;
-  line-height: 1.7;
-  color: light-dark(#888, #999);
 }

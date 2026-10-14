@@ -11,6 +11,7 @@ import {
   type HostPermissionMode,
 } from '../../shared/types/permission-types';
 import { Select } from '../ui/Select';
+import { ConnectorLogo } from './ConnectorLogo';
 import { ipcErrorText } from '../ui/ipc-error';
 import { useI18n } from '../i18n';
 import './connectors.css';
@@ -29,8 +30,8 @@ export function connectorStatusText(status: ConnectorStatus) {
             : '连接失败';
 }
 
-/** The Bot and permission mode a connector uses; shared by the add dialog and the details page. */
-export function ConnectorFields({
+/** The Bot and permission mode a new connector uses. */
+function ConnectorFields({
   bots,
   botId,
   mode,
@@ -82,15 +83,17 @@ const FEISHU_SCOPES = 'im:message、im:message.p2p_msg:readonly、im:message:sen
 
 export function AddConnectorDialog({
   state,
+  initialPlatform = 'feishu',
   onClose,
   onCreated,
 }: {
   state: Snapshot;
+  initialPlatform?: ConnectorPlatform;
   onClose: () => void;
   onCreated: (id: string) => void;
 }) {
   const { t } = useI18n();
-  const [platform, setPlatform] = useState<ConnectorPlatform>('feishu'),
+  const [platform, setPlatform] = useState<ConnectorPlatform>(initialPlatform),
     [method, setMethod] = useState<'scan' | 'manual'>('scan'),
     [botId, setBotId] = useState(state.bots[0]?.id || ''),
     [mode, setMode] = useState<HostPermissionMode>(DEFAULT_HOST_PERMISSION_MODE),
@@ -185,6 +188,7 @@ export function AddConnectorDialog({
                 setPlatform(item);
               }}
             >
+              <ConnectorLogo platform={item} size={16} />
               {t(CONNECTOR_PLATFORM_NAMES[item])}
               {item === 'weixin' && <small>{t('实验')}</small>}
             </button>

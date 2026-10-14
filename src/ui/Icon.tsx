@@ -53,6 +53,33 @@ export function Icon({ name, size = 20 }: { name: string; size?: number }) {
       </>
     ),
     back: <path d="m14 5-7 7 7 7" />,
+    code: <path d="m8 7-5 5 5 5m8-10 5 5-5 5M13.5 4l-3 16" />,
+    slides: (
+      <>
+        <rect x="3" y="4" width="18" height="12" rx="2" />
+        <path d="M12 16v4m-4 0h8M7.5 12.5l3-3 2.5 2.5 3.5-3.5" />
+      </>
+    ),
+    table: (
+      <>
+        <rect x="3.5" y="4" width="17" height="16" rx="2" />
+        <path d="M3.5 9.5h17m-17 5h17M9.5 4v16" />
+      </>
+    ),
+    pdf: (
+      <>
+        <path d="M6 3h8.5L19 7.5V21H6z" />
+        <path d="M14 3v5h5M9 17.5c2-1 4-4.6 3.6-6.6-.3-1.4-1.8-.4-.9 1.5.9 1.8 2.5 3.5 3.8 3.7" />
+      </>
+    ),
+    cloud: <path d="M7 19a4.5 4.5 0 0 1-.5-9 6 6 0 0 1 11.5 1.5A3.8 3.8 0 0 1 17.5 19z" />,
+    more: (
+      <>
+        <circle cx="6" cy="12" r=".8" />
+        <circle cx="12" cy="12" r=".8" />
+        <circle cx="18" cy="12" r=".8" />
+      </>
+    ),
     info: (
       <>
         <circle cx="12" cy="12" r="9" />

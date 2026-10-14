@@ -292,14 +292,27 @@ export class SkillLibrary {
   all(): Skill[] {
     // A snapshot may be requested between deleting a Bot and clearing its skill cache.
     const bots = new Set(this.store.data.bots.map((bot) => bot.id));
+    const states = new Map([...bots].map((id) => [id, this.metadata(id)]));
     return this.entries
       .filter((entry) => !entry.summary.botId || bots.has(entry.summary.botId))
       .map((entry) => {
-        const metadata = entry.summary.botId ? this.metadata(entry.summary.botId)[entry.summary.id] : undefined;
+        const id = entry.summary.id;
+        if (entry.summary.botId) {
+          const metadata = states.get(entry.summary.botId)?.[id];
+          return { ...entry.summary, ...metadata, enabled: this.enabled[id] !== false && !metadata?.archived };
+        }
+        // A shared skill's use is recorded per Bot; the plugins page shows the total.
+        let readCount = 0,
+          lastReadAt: string | undefined;
+        for (const state of states.values()) {
+          readCount += state[id]?.readCount || 0;
+          if (state[id]?.lastReadAt && (!lastReadAt || state[id].lastReadAt > lastReadAt))
+            lastReadAt = state[id].lastReadAt;
+        }
         return {
           ...entry.summary,
-          ...metadata,
-          enabled: this.enabled[entry.summary.id] !== false && !metadata?.archived,
+          ...(readCount ? { readCount, lastReadAt } : {}),
+          enabled: this.enabled[id] !== false,
         };
       });
   }
