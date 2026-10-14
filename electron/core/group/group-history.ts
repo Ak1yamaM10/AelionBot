@@ -10,6 +10,7 @@ import type { ModelClient, ToolDefinition } from '../model/model';
 import { groupReplyContent } from '../../../shared/chat/message-envelope';
 import { isEmptyGroupReply } from '../../../shared/chat/group-empty-reply';
 import { hasPendingHistoryCalls } from '../tools/tool-history';
+import { addressedTo } from './group-triage';
 
 /** A Bot message with no visible body: the group UI hides it, and so does every model context. */
 export const silentBotMessage = (message: GroupMessage) =>
@@ -21,6 +22,9 @@ export const silentBotMessage = (message: GroupMessage) =>
 export const groupContextKey = (groupId: string, botId: string) => `group:${groupId}:${botId}`;
 function groupMessageWire(store: Store, message: GroupMessage, botId: string): WireMessage {
   const content = groupReplyContent(message.content, message.sender.kind === 'bot' ? message.sender.id : undefined);
+  // @ and a reply both address a member; a reply must not read as open to everyone.
+  const room = store.data.groups.find((item) => item.id === message.groupId),
+    addressed = room ? [...addressedTo(room, message)] : [];
   return {
     role: message.sender.id === botId ? 'assistant' : 'user',
     groupMessageId: message.id,
@@ -40,6 +44,12 @@ function groupMessageWire(store: Store, message: GroupMessage, botId: string): W
         attachments: message.attachments,
         mentions: message.mentions,
         mentioned: message.mentions?.some((mention) => mention.id === botId) || false,
+        ...(addressed.length
+          ? {
+              addressedTo: addressed.map((id) => room!.members.find((member) => member.id === id)?.name || id),
+              addressedToYou: addressed.includes(botId),
+            }
+          : {}),
         reaction: message.reaction,
         event: message.event,
       }),

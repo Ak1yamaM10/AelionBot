@@ -42,6 +42,8 @@ export interface GroupDecisionInput {
   /** What the Bot is doing now, such as "在做：导出页面（计划 3/5）". */
   work: string;
   message: DecisionMessage;
+  /** Members the message addresses by @ or by replying to them; others answer only to add something. */
+  addressedTo?: string[];
   repliedTo?: DecisionMessage;
   /** The addressed Bot's first answer, when this Bot waited for it. */
   answer?: DecisionMessage;

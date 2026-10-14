@@ -74,6 +74,16 @@ export function answerFrom(room: GroupRoom, message: GroupMessage, memberId: str
           (item.reaction?.messageId === message.id && !item.reaction.removed)),
     );
 }
+/** Members a message is addressed to: those it @-mentions and the Bot whose message it replies to. */
+export function addressedTo(room: GroupRoom, message: GroupMessage) {
+  const addressed = new Set<string>(
+    (message.mentions || []).map((mention) => mention.id).filter((id) => id !== message.sender.id),
+  );
+  const target = replyTarget(message),
+    replied = target ? room.messages.find((item) => item.id === target) : undefined;
+  if (replied?.sender.kind === 'bot' && replied.sender.id !== message.sender.id) addressed.add(replied.sender.id);
+  return addressed;
+}
 function limit(room: GroupRoom, message: GroupMessage, recipientId: string): Triage | undefined {
   if (message.sender.kind !== 'bot') return;
   const earlier = sinceUser(room, room.messages.indexOf(message)).filter(
@@ -140,11 +150,8 @@ export function triage(delivery: GroupDelivery, context: TriageContext): Triage 
     if (writing && context.now < until) return { kind: 'hold', until };
     return { kind: 'wake', must: message.sender.kind === 'user' };
   }
-  // 3. Addressed to someone else: wait for them to answer first.
-  const addressed = new Set<string>(
-    (message.mentions || []).map((mention) => mention.id).filter((id) => id !== message.sender.id),
-  );
-  if (replied?.sender.kind === 'bot' && replied.sender.id !== message.sender.id) addressed.add(replied.sender.id);
+  // 3. Addressed to someone else (by @ or by replying to their message): wait for them to answer first.
+  const addressed = addressedTo(room, message);
   let answer: GroupMessage | undefined;
   if (addressed.size) {
     const until = Date.parse(message.time) + context.holdMs;

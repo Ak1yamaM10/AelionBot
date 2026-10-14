@@ -4,6 +4,7 @@ import type { Bot } from '../../../shared/types/core';
 import type { GroupMessage, GroupRoom } from '../../../shared/types/group-types';
 import type { LayaRuntime } from '../model/laya-runtime';
 import type { LayaDecisionLog } from '../model/laya-decision-log';
+import { addressedTo } from './group-triage';
 import type { GroupDecisionInput, GroupDecisionRecord, LayaVariant } from '../../../shared/types/laya-types';
 
 export interface GroupDecisions {
@@ -53,7 +54,7 @@ export class LayaGroupDecisions implements GroupDecisions {
       {
         type: 'choice',
         instructions:
-          '判断 bot 所指的当前 Bot 要不要回应 message。bot.role 是它的职责，work 是它手上的事，repliedTo 是 message 回复的消息，answer 是被点名成员已给出的答复。只判断 message 和它的职责或手上的事是否相关。',
+          '判断 bot 所指的当前 Bot 要不要回应 message。bot.role 是它的职责，work 是它手上的事，repliedTo 是 message 回复的消息，addressedTo 是 message 通过 @ 或回复点名的成员，answer 是被点名成员已给出的答复。只判断 message 和它的职责或手上的事是否相关；message 点名的是其他成员时，只是话题相近不算相关。',
         criteria,
       },
       signal,
@@ -91,12 +92,16 @@ export function buildGroupDecisionInput(
   work: string,
   answer?: GroupMessage,
 ): GroupDecisionInput {
-  const targetId = message.reply?.messageId || message.replyTo,
+  const addressed = [...addressedTo(room, message)].map(
+      (id) => room.members.find((member) => member.id === id)?.name || id,
+    ),
+    targetId = message.reply?.messageId || message.replyTo,
     repliedTo = targetId ? room.messages.find((item) => item.id === targetId) : undefined;
   return {
     bot: { name: bot.name, role: soulExcerpt(bot.soul, 300) },
     work,
     message: decisionMessage(message, 600),
+    ...(addressed.length ? { addressedTo: addressed } : {}),
     ...(repliedTo ? { repliedTo: decisionMessage(repliedTo, 300) } : {}),
     ...(answer ? { answer: decisionMessage(answer, 300) } : {}),
   };
