@@ -1,17 +1,15 @@
 import { BOARDS } from '../../../shared/games/game-boards';
 import { startTwelve, acceptTwelve, validateTwelve, isSpeech, type TwelveState } from './twelve';
 import { event } from './events';
+import { log, type MatchState } from './game-mode';
 import { randomUUID, randomInt } from 'node:crypto';
 import { seededRandom, shuffle } from '../../../shared/games/seeded-random';
 import type {
   GamePlayer,
   GameAction,
   GameRequest,
-  GameLog,
   GameView,
   GameRole,
-  GamePhase,
-  GameStatus,
   GameEvent,
 } from '../../../shared/types/game-types';
 import {
@@ -20,50 +18,22 @@ import {
   gamePersonality,
   isGameMbti,
 } from '../../../shared/games/game-personality';
-export interface WerewolfState {
-  /** Durable acknowledgement of all post-match effects; missing receipts are replayed after restart. */
-  settlementComplete?: boolean;
-  /** Latest pre-receipt checkpoint only: may already have an unkeyed legacy report. */
-  settlementLegacy?: boolean;
-  /** New decisions record model interpretations separately from long-term trait growth. */
-  personaPolicy?: 'model_semantic_v1';
+export interface WerewolfState extends MatchState {
+  mode?: 'werewolf';
   twelve?: TwelveState;
-  trace?: import('../../../shared/types/game-types').GameTrace[];
-  revision?: number;
   potions?: { save: boolean; poison: boolean };
   nightVictim?: string;
   nightStage?: 'wolf_discussion' | 'actions' | 'witch';
   wolfDiscussionIndex?: number;
-  id: string;
-  groupId: string;
-  day: number;
-  phase: GamePhase;
-  status: GameStatus;
-  seats: (GamePlayer & { alive: boolean; role: GameRole })[];
-  logs: GameLog[];
-  requests: GameRequest[];
   answers: Record<string, GameAction>;
-  accepted: string[];
   speechIndex: number;
   voteRound: number;
   winner?: 'wolves' | 'village';
-  error?: string;
   /** Structured exiles and saves for post-match settlement. */
   events?: GameEvent[];
-  /** Each seat's last few decision notes, kept across phases so the next decision can read its own plan. */
-  notes?: Record<string, string[]>;
-  /** Seed behind the deal, MBTI draw and accents; keeps draws reproducible. Never sent to clients. */
-  seed?: number;
-  /** Bot seats' persona for this match (personality doc §9.2). Private to each seat until the reveal. */
-  persona?: Record<string, import('./persona-play').SeatPersona>;
-  personaDraws?: number;
-  /** Key decisions made under personality, used for growth at settlement. */
-  decisions?: import('./persona-play').PersonaDecision[];
 }
 const NOTE_KEEP = 3;
-export function log(s: WerewolfState, text: string, seatId?: string, audience?: string[]) {
-  s.logs.push({ id: s.logs.length + 1, day: s.day, phase: s.phase, text, seatId, audience, time: Date.now() });
-}
+export { log };
 function request(s: WerewolfState, seatId: string, kind: GameRequest['kind'], targets: string[] = []) {
   s.requests.push({
     id: randomUUID(),
@@ -129,6 +99,7 @@ export function createWerewolf(
     };
   });
   const s: WerewolfState = {
+    mode: 'werewolf',
     potions: { save: true, poison: true },
     id: randomUUID(),
     groupId,
@@ -449,6 +420,7 @@ export function view(s: WerewolfState, viewerId?: string, omniscient = false): G
     : undefined;
   const reveal = s.status === 'finished' || (!s.seats.some((p) => p.human) && omniscient);
   return {
+    mode: 'werewolf',
     revision: s.revision,
     clock,
     board: s.twelve?.board,

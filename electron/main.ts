@@ -6,7 +6,8 @@ import { GameRuntime } from './core/games/runtime';
 import { PersonaService } from './core/persona/persona-service';
 import { settleFinishedGame } from './core/games/settlement';
 import { contextBudget } from './core/context/context-budget';
-import { gameInstructions, gamePrompt, parseGameAction } from './core/games/model-player';
+import { parseGameAction } from './core/games/model-player';
+import { gameMode } from './core/games/modes';
 import { BotRuntime } from './core/agent/bot-runtime';
 import { DesignWork } from './core/designer/design-work';
 import { DesignerFiles } from './core/designer/designer-files';
@@ -564,9 +565,11 @@ async function initialize() {
           options,
         );
       }
+      const mode = gameMode(context.mode);
       const instruction =
-        gameInstructions(context, request) + (options?.retryFeedback ? '\n上次校验失败：' + options.retryFeedback : '');
-      const input = gamePrompt(context, request);
+        mode.instructions(context, request) +
+        (options?.retryFeedback ? '\n上次校验失败：' + options.retryFeedback : '');
+      const input = mode.prompt(context, request);
       options?.onRequest?.({
         instruction,
         input,

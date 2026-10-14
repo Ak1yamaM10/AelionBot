@@ -1,5 +1,7 @@
 import type { ModelSelection } from './core';
 import type { GameBehaviorPolicy, GameMbti } from '../games/game-personality';
+/** Games the runtime can host; each has a game mode in electron/core/games/modes.ts. */
+export type GameModeId = 'werewolf';
 export type GameRole = 'wolf' | 'seer' | 'witch' | 'villager' | 'hunter' | 'idiot' | 'guard';
 export type GamePhase = 'night' | 'speech' | 'vote' | 'election' | 'resolution' | 'finished';
 export type GameStatus = 'running' | 'paused' | 'finished';
@@ -78,6 +80,8 @@ export interface GameLog {
   time?: number;
 }
 export interface GameView {
+  /** Missing on views from before game modes existed; those are all Werewolf. */
+  mode?: GameModeId;
   revision?: number;
   id: string;
   groupId: string;
@@ -112,6 +116,8 @@ interface GameSeatPersona {
   overrides?: number;
 }
 export interface GameCreate {
+  /** Defaults to Werewolf. */
+  mode?: GameModeId;
   groupId: string;
   board?: 'standard12' | 'guard12';
   players: GamePlayer[];
