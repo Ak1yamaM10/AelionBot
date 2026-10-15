@@ -35,6 +35,7 @@ AelionBot 的构建和运行依赖以下上游项目；第三方组件的许可�
 | 企业微信智能机器人 Node SDK | 企业微信连接器的长连接帧格式参考 | 参考 `@wecom/aibot-node-sdk@1.0.7`（MIT，[上游项目](https://github.com/WecomTeam/aibot-node-sdk)）与[官方文档](https://developer.work.weixin.qq.com/document/path/101463)自行实现，未打包上游代码 |
 | openclaw-weixin | 微信连接器（实验）的 iLink 协议参考 | 参考 `@tencent-weixin/openclaw-weixin@2.4.10` 自行实现，未打包上游代码；MIT 许可见 `docs/licenses/openclaw-weixin.txt` |
 | 平台标志 | 插件页里飞书、企业微信、微信的图标 | 企业微信图形取自 [TDesign Icons](https://github.com/Tencent/tdesign-icons) 的 `logo-wecom`（MIT，许可见 `docs/licenses/tdesign-icons.txt`），按官方图标上色；微信图形取自 [Simple Icons](https://github.com/simple-icons/simple-icons)（CC0）；飞书图形为飞书官方标志。各标志的商标权归其所有者，这里只用来标明对应平台 |
+| 应用标志 | 插件页“连接应用”里各应用的图标 | 取自 [Simple Icons](https://github.com/simple-icons/simple-icons) 15.0.0（CC0）；Neon 图形取自 Neon 官网的图标；monday.com 图形按其官方标志绘制。各标志的商标权归其所有者，这里只用来标明对应应用，不代表合作或认可 |
 
 首次启动安装的 Linux 内核、XFCE、Chromium、Python、Git 等由 Debian 软件源提供，对应信息保留在 guest 的 `/usr/share/doc` 和包管理数据库中。
 

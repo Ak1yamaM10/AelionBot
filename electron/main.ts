@@ -452,6 +452,7 @@ async function initialize() {
       writeFileSync(join(computer.imageDir, `${id}.png`), img.toPNG());
       return { id, width: size.width, height: size.height };
     },
+    secretCodec,
   );
   await integrations.refresh();
   model = new ModelClient(

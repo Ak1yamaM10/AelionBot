@@ -8,6 +8,9 @@ import type { HostPermissionDetails, McpServerView, ScreenReference } from '../.
 import { publicEndpoint, redactMcp, type McpConfig } from './mcp-config';
 import { hostname, networkInterfaces } from 'node:os';
 import { AppError } from '../../../shared/errors';
+import { UnauthorizedError } from '@modelcontextprotocol/sdk/client/auth.js';
+import { appConnectorFor } from '../../../shared/app-connectors';
+import { backgroundProvider, type McpAuthStore, type OwnClient } from './mcp-auth';
 
 type Transport = StdioClientTransport | StreamableHTTPClientTransport | SSEClientTransport;
 interface Connection {
@@ -20,6 +23,21 @@ export interface McpPreference {
   enabled: boolean;
   fingerprint: string;
 }
+/** Sign-in for remote servers; without it, servers that need authorization cannot be used. */
+export interface McpAuth {
+  store: McpAuthStore;
+  /** The person's own OAuth client for this address, where the service needs one (Google). */
+  ownClient(url: string): OwnClient | undefined;
+}
+const SIGN_IN_ISSUE = '需要登录';
+/** Servers the person can sign in to: remote ones whose config does not already send credentials. */
+function canSignIn(config: McpConfig) {
+  return (
+    (config.transport === 'http' || config.transport === 'sse') &&
+    Boolean(config.url) &&
+    !Object.keys(config.headers).some((key) => key.toLowerCase() === 'authorization')
+  );
+}
 export class McpRuntime {
   private configs = new Map<string, McpConfig>();
   private connections = new Map<string, Connection>();
@@ -27,10 +45,13 @@ export class McpRuntime {
   private starting = new Map<string, { client: Client; transport: Transport }>();
   private states = new Map<string, { status: McpServerView['status']; issue?: string }>();
   private closing = false;
+  /** Servers whose sign-in page is open in the browser. */
+  readonly signingIn = new Set<string>();
   constructor(
     private preferences: Record<string, McpPreference>,
     private changed: () => void,
     private imageSink?: (data: string, mime: string) => ScreenReference,
+    private auth?: McpAuth,
   ) {}
   async replace(configs: McpConfig[]) {
     const next = new Map(configs.map((config) => [config.id, config]));
@@ -60,8 +81,22 @@ export class McpRuntime {
         status: config.issue ? 'needs-config' : !enabled ? 'disabled' : state?.status || 'available',
         issue: config.issue || state?.issue,
         toolCount: connection?.tools.length,
+        ...(this.auth && canSignIn(config)
+          ? {
+              login: this.signingIn.has(config.id)
+                ? ('signing-in' as const)
+                : this.auth.store.signedIn(config.url!)
+                  ? ('signed-in' as const)
+                  : ('signed-out' as const),
+            }
+          : {}),
+        ...(appConnectorFor(config.url) ? { app: appConnectorFor(config.url)!.id } : {}),
       };
     });
+  }
+  /** The config of a server, for signing in. */
+  config(id: string) {
+    return this.find(id);
   }
   private find(id: string) {
     if (this.configs.has(id)) return this.configs.get(id)!;
@@ -128,7 +163,15 @@ export class McpRuntime {
     this.changed();
     const connectOnce = async (mode: 'stdio' | 'http' | 'sse') => {
       const client = new Client({ name: 'aelion-bot', version: '0.4.0' });
-      const requestInit = { headers: config.headers };
+      // A pasted token goes along as a bearer token; otherwise OAuth tokens are added and refreshed by the SDK.
+      const signIn = mode !== 'stdio' && this.auth && canSignIn(config),
+        pasted = signIn ? this.auth!.store.get(config.url!)?.token : undefined,
+        headers = pasted ? { ...config.headers, Authorization: `Bearer ${pasted}` } : config.headers,
+        authProvider =
+          signIn && !pasted
+            ? backgroundProvider(this.auth!.store, config.url!, this.auth!.ownClient(config.url!))
+            : undefined;
+      const requestInit = { headers };
       let transport: Transport;
       if (mode === 'stdio') {
         const stdio = new StdioClientTransport({
@@ -145,17 +188,19 @@ export class McpRuntime {
       } else if (mode === 'sse')
         transport = new SSEClientTransport(new URL(config.url!), {
           requestInit,
+          authProvider,
           eventSourceInit: {
             fetch: (url, init) =>
               fetch(url, {
                 ...init,
-                headers: { ...Object.fromEntries(new Headers(init?.headers).entries()), ...config.headers },
+                headers: { ...Object.fromEntries(new Headers(init?.headers).entries()), ...headers },
               }),
           },
         });
       else
         transport = new StreamableHTTPClientTransport(new URL(config.url!), {
           requestInit,
+          authProvider,
           reconnectionOptions: {
             maxRetries: 0,
             initialReconnectionDelay: 1000,
@@ -236,9 +281,11 @@ export class McpRuntime {
         return connection;
       } catch (error) {
         const code = Number((error as { code?: number }).code);
-        const auth = [401, 403].includes(code) || (error as Error).name === 'UnauthorizedError';
-        const issue = auth
-          ? '服务需要授权；本应用不自动读取其他 Agent 的 OAuth 登录缓存'
+        const unauthorized = [401, 403].includes(code) || error instanceof UnauthorizedError;
+        const issue = unauthorized
+          ? this.auth && canSignIn(config)
+            ? SIGN_IN_ISSUE
+            : '服务需要授权，请在配置里提供凭据'
           : 'MCP 连接或初始化失败，请检查来源配置、命令依赖及网络';
         this.states.set(config.id, { status: 'error', issue });
         this.changed();
@@ -364,6 +411,12 @@ export class McpRuntime {
       // Tool output is third-party data, like web pages: it can inform the task but never grant or change authorization.
       return { ...safe, server: config.id, tool: name, untrusted: true, ...(images.length ? { images } : {}) };
     } catch (error) {
+      // Some servers allow listing tools without an account and ask for one only when a tool runs.
+      if (error instanceof UnauthorizedError) {
+        this.states.set(config.id, { status: 'error', issue: SIGN_IN_ISSUE });
+        this.changed();
+        throw new AppError('mcp.signin_required', `需要先在插件页登录 ${config.name}，再重试这个操作`);
+      }
       throw Object.assign(
         new Error(
           signal.aborted

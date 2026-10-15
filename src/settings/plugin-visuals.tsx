@@ -1,6 +1,7 @@
 import type { Bot, McpServerView, Skill } from '../../shared/types/core';
 import { Avatar } from '../ui/Avatar';
 import { Icon } from '../ui/Icon';
+import { AppLogo } from './AppLogo';
 
 // Bundled skills, by folder name, get an icon for what they do; skills from elsewhere share one.
 const SKILL_ICONS: Record<string, string> = {
@@ -30,6 +31,12 @@ export function PluginIcon({
   size?: number;
 }) {
   const glyph = Math.round(size * 0.53);
+  if (server?.app)
+    return (
+      <span className="connector-mark plugin-app-mark" style={{ width: size, height: size }}>
+        <AppLogo app={server.app} size={Math.round(size * 0.6)} />
+      </span>
+    );
   if (skill?.botId && owner)
     return (
       <span className="plugin-icon is-bot" style={{ width: size, height: size }}>
@@ -52,6 +59,9 @@ export function PluginIcon({
   );
 }
 export function mcpStatusText(server: McpServerView) {
+  if (server.login === 'signing-in') return '登录中';
+  if (server.login === 'signed-out' && server.status !== 'needs-config' && server.status !== 'disabled')
+    return '未登录';
   return server.status === 'connected'
     ? '已连接'
     : server.status === 'connecting'

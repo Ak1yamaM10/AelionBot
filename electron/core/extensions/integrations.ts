@@ -1,6 +1,9 @@
 import { existsSync, mkdirSync, readFileSync, statSync } from 'node:fs';
 import { join, resolve } from 'node:path';
-import type { IntegrationsView, ScreenReference } from '../../../shared/types/core';
+import type { AppConnectorInput, IntegrationsView, ScreenReference } from '../../../shared/types/core';
+import { APP_CONNECTORS, appConnectorFor, sameServerUrl } from '../../../shared/app-connectors';
+import { AppError } from '../../../shared/errors';
+import { McpAuthStore, signIn, type SecretCodec } from './mcp-auth';
 import { atomicJson, Store } from '../storage/store';
 import { canonical, hashId, type IntegrationPaths } from './integration-paths';
 import { SkillLibrary } from './skill-library';
@@ -21,11 +24,15 @@ export class Integrations {
   private preferences: Preferences;
   private mcpSources: IntegrationsView['sources'] = [];
   private scannedAt = '';
+  /** Sign-in for remote servers; only where secrets can be encrypted (not in the headless CLI). */
+  private auth?: McpAuthStore;
+  private signIns = new Map<string, AbortController>();
   constructor(
     private store: Store,
     readonly paths: IntegrationPaths,
     private changed: () => void,
     imageSink?: (data: string, mime: string) => ScreenReference,
+    codec?: SecretCodec,
   ) {
     mkdirSync(paths.configDir, { recursive: true });
     mkdirSync(join(paths.homeDir, '.agents', 'skills'), { recursive: true });
@@ -52,7 +59,17 @@ export class Integrations {
     paths.extraSkillDirs = this.preferences.extraSkillDirs;
     paths.extraMcpFiles = this.preferences.extraMcpFiles;
     this.skills = new SkillLibrary(store, paths);
-    this.mcp = new McpRuntime(this.preferences.servers, changed, imageSink);
+    if (codec) this.auth = new McpAuthStore(join(paths.dataDir, 'mcp-auth.json'), codec);
+    const auth = this.auth;
+    this.mcp = new McpRuntime(
+      this.preferences.servers,
+      changed,
+      imageSink,
+      auth && {
+        store: auth,
+        ownClient: (url) => (appConnectorFor(url)?.auth === 'google' ? auth.ownClient('google') : undefined),
+      },
+    );
   }
   async refresh() {
     this.skills.refresh();
@@ -71,7 +88,111 @@ export class Integrations {
       sources: [...this.skills.sources, ...this.mcpSources],
       servers: this.mcp.views(),
       scannedAt: this.scannedAt,
+      ownClients: this.auth?.ownClient('google') ? ['google'] : [],
     };
+  }
+  private get mcpFile() {
+    return join(this.paths.configDir, 'mcp.json');
+  }
+  private readMcpFile() {
+    let current: any = { mcpServers: {} };
+    try {
+      if (existsSync(this.mcpFile)) current = JSON.parse(readFileSync(this.mcpFile, 'utf8').replace(/^\uFEFF/, ''));
+    } catch {}
+    if (!current || typeof current !== 'object' || Array.isArray(current)) current = { mcpServers: {} };
+    if (!current.mcpServers || typeof current.mcpServers !== 'object' || Array.isArray(current.mcpServers))
+      current.mcpServers = {};
+    return current as { mcpServers: Record<string, any> };
+  }
+  private requireAuth() {
+    if (!this.auth) throw new AppError('mcp.signin_unavailable', '这里不能登录 MCP 服务');
+    return this.auth;
+  }
+  /** Adds an app from the catalog to the app's own MCP config, with its token or Google client. */
+  async addApp(input: AppConnectorInput) {
+    const app = APP_CONNECTORS.find((item) => item.id === input?.app);
+    if (!app) throw new AppError('mcp.app_unknown', '未知的应用');
+    const token = typeof input.token === 'string' ? input.token.trim() : '';
+    if (app.auth === 'token' && (!token || token.length > 4000 || /\s/.test(token)))
+      throw new AppError('mcp.token_invalid', '请粘贴有效的访问令牌');
+    if (app.auth === 'google') {
+      const clientId = typeof input.clientId === 'string' ? input.clientId.trim() : '',
+        clientSecret = typeof input.clientSecret === 'string' ? input.clientSecret.trim() : '';
+      if (clientId || clientSecret) {
+        if (!/^[\w.-]+\.apps\.googleusercontent\.com$/.test(clientId) || !clientSecret || clientSecret.length > 200)
+          throw new AppError('mcp.google_client_invalid', '请填写 Google OAuth 客户端的 ID 和密钥');
+        this.requireAuth().setOwnClient('google', { client_id: clientId, client_secret: clientSecret });
+      } else if (!this.requireAuth().ownClient('google'))
+        throw new AppError('mcp.google_client_invalid', '请填写 Google OAuth 客户端的 ID 和密钥');
+    }
+    if (app.auth === 'token') this.requireAuth().update(app.url, (record) => (record.token = token));
+    const current = this.readMcpFile();
+    let name = Object.entries(current.mcpServers).find(
+      ([, raw]) => typeof raw?.url === 'string' && sameServerUrl(raw.url, app.url),
+    )?.[0];
+    if (!name) {
+      name = app.name;
+      for (let n = 2; current.mcpServers[name]; n++) name = `${app.name} ${n}`;
+      current.mcpServers[name] = { type: 'http', url: app.url };
+      atomicJson(this.mcpFile, current);
+    }
+    await this.refresh();
+    const server = this.mcp.views().find((item) => item.name === name && item.source.label === 'Aelion');
+    if (!server) throw new AppError('mcp.app_unknown', '没能添加这个应用');
+    if (!server.enabled) await this.setEnabled(server.id, true);
+    return server.id;
+  }
+  /** Opens the service's sign-in page and waits for the person to finish. */
+  async signIn(id: string, open: (url: URL) => void | Promise<void>) {
+    const auth = this.requireAuth(),
+      config = this.mcp.config(id),
+      view = this.mcp.views().find((item) => item.id === config.id);
+    if (!view?.login || !config.url) throw new AppError('mcp.signin_unavailable', '这个服务不需要登录');
+    if (this.signIns.has(config.id)) throw new AppError('mcp.signin_running', '登录页已经打开，请在浏览器里完成登录');
+    const app = appConnectorFor(config.url),
+      ownClient = app?.auth === 'google' ? auth.ownClient('google') : undefined;
+    if (app?.auth === 'google' && !ownClient)
+      throw new AppError('mcp.google_client_invalid', '请先填写 Google OAuth 客户端的 ID 和密钥');
+    const controller = new AbortController();
+    this.signIns.set(config.id, controller);
+    this.mcp.signingIn.add(config.id);
+    this.changed();
+    try {
+      await signIn(auth, {
+        serverUrl: config.url,
+        scope: app?.scope,
+        ownClient,
+        // Google issues a refresh token only when asked for offline access.
+        authorizationParams: app?.auth === 'google' ? { access_type: 'offline', prompt: 'consent' } : undefined,
+        open,
+        signal: controller.signal,
+      });
+      await this.mcp.disconnect(config.id);
+      if (!view.enabled) await this.setEnabled(config.id, true);
+    } finally {
+      this.signIns.delete(config.id);
+      this.mcp.signingIn.delete(config.id);
+      this.changed();
+    }
+  }
+  cancelSignIn(id: string) {
+    this.signIns.get(this.mcp.config(id).id)?.abort();
+  }
+  async signOut(id: string) {
+    const config = this.mcp.config(id);
+    if (config.url) this.requireAuth().delete(config.url);
+    await this.mcp.disconnect(config.id);
+    this.changed();
+  }
+  /** Removes a server from the app's own MCP config; servers from other apps' configs stay where they are. */
+  async remove(id: string) {
+    const config = this.mcp.config(id);
+    if (!config.native) throw new AppError('mcp.remove_external', '这个服务来自其他应用的配置，请在那里移除');
+    const current = this.readMcpFile();
+    delete current.mcpServers[config.name];
+    atomicJson(this.mcpFile, current);
+    if (config.url && this.auth) this.auth.delete(config.url);
+    await this.refresh();
   }
   private save() {
     atomicJson(this.preferencesFile, this.preferences);

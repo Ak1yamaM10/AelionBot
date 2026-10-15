@@ -60,4 +60,25 @@ export function registerIntegrations(ctx: IpcContext) {
     const result = await ctx.integrations.mcp.listTools(String(id));
     return { tools: result.tools.map((tool) => tool.name) };
   });
+  handle('addAppConnector', async (input) => {
+    if (ctx.harness.busy) throw new Error('请等待当前任务结束');
+    const id = await ctx.integrations.addApp(input);
+    ctx.changed();
+    return id;
+  });
+  // Signing in touches only that server, so it does not wait for Bots to finish.
+  handle('signInMcp', (id) =>
+    ctx.integrations.signIn(String(id), async (url) => {
+      if (url.protocol !== 'https:' && url.hostname !== '127.0.0.1' && url.hostname !== 'localhost')
+        throw new Error('登录页地址不安全');
+      await shell.openExternal(url.href);
+    }),
+  );
+  handle('cancelMcpSignIn', (id) => ctx.integrations.cancelSignIn(String(id)));
+  handle('signOutMcp', (id) => ctx.integrations.signOut(String(id)));
+  handle('removeMcpServer', async (id) => {
+    if (ctx.harness.busy) throw new Error('请等待当前任务结束');
+    await ctx.integrations.remove(String(id));
+    ctx.changed();
+  });
 }

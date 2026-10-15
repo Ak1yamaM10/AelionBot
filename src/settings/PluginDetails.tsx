@@ -5,6 +5,8 @@ import { useI18n } from '../i18n';
 import Markdown from '../chat/MessageMarkdown';
 import { SkillControls } from './IntegrationSettings';
 import { PluginIcon, mcpStatusText, sinceText } from './plugin-visuals';
+import { ipcErrorText } from '../ui/ipc-error';
+import { APP_CONNECTORS } from '../../shared/app-connectors';
 export function PluginSwitch({
   name,
   enabled,
@@ -107,7 +109,9 @@ export function PluginDetails({
     [error, setError] = useState(''),
     [loading, setLoading] = useState(false),
     [tab, setTab] = useState<'body' | 'files'>('body'),
-    [testResult, setTestResult] = useState('');
+    [testResult, setTestResult] = useState(''),
+    [signInError, setSignInError] = useState(''),
+    [confirmRemove, setConfirmRemove] = useState(false);
   useEffect(() => {
     if (!skill) return;
     let active = true;
@@ -132,8 +136,9 @@ export function PluginDetails({
   const reload = async () => {
     if (skill) setFull(await window.aelion.readSkill({ id: skill.id, botId: skill.botId }));
   };
+  const app = APP_CONNECTORS.find((item) => item.id === server?.app);
   const enabled = skill ? (skill.enabled ?? !skill.archived) : Boolean(server?.enabled),
-    name = skill?.name || server?.name || '';
+    name = skill?.name || (app ? t(app.name) : server?.name) || '';
   const toggle = () =>
     void act(() =>
       skill
@@ -258,25 +263,58 @@ export function PluginDetails({
     );
   }
   const mcp = server!;
+  // Signing in waits for the browser, so it does not hold the page busy.
+  const signIn = () => {
+    setSignInError('');
+    window.aelion.signInMcp(mcp.id).catch((error) => {
+      if ((error as { code?: string }).code !== 'mcp.signin_cancelled') setSignInError(ipcErrorText(error));
+    });
+  };
   return (
     <PluginDrawer
       label={name}
       onClose={onClose}
       aside={toggleControl}
       footer={
-        <>
-          <code className="plugin-drawer-path" title={mcp.source.path}>
-            {mcp.source.path}
-          </code>
-          <button
-            className="secondary-button"
-            disabled={busy}
-            onClick={() => void act(() => window.aelion.openIntegrationPath({ kind: 'source', id: mcp.id }))}
-          >
-            <Icon name="folder" size={14} />
-            {t('查看来源')}
-          </button>
-        </>
+        confirmRemove ? (
+          <>
+            <span className="plugin-drawer-warning">{t('移除后 Bot 不能再用这个服务，登录信息也会删除。')}</span>
+            <button className="secondary-button" disabled={busy} onClick={() => setConfirmRemove(false)}>
+              {t('取消')}
+            </button>
+            <button
+              className="danger-button"
+              disabled={busy}
+              onClick={() =>
+                void act(async () => {
+                  await window.aelion.removeMcpServer(mcp.id);
+                  onClose();
+                })
+              }
+            >
+              {t('确认移除')}
+            </button>
+          </>
+        ) : (
+          <>
+            <code className="plugin-drawer-path" title={mcp.source.path}>
+              {mcp.source.path}
+            </code>
+            <button
+              className="secondary-button"
+              disabled={busy}
+              onClick={() => void act(() => window.aelion.openIntegrationPath({ kind: 'source', id: mcp.id }))}
+            >
+              <Icon name="folder" size={14} />
+              {t('查看来源')}
+            </button>
+            {!mcp.source.readonly && (
+              <button className="text-button danger-text" disabled={busy} onClick={() => setConfirmRemove(true)}>
+                {t('移除')}
+              </button>
+            )}
+          </>
+        )
       }
     >
       <header className="plugin-hero">
@@ -290,9 +328,58 @@ export function PluginDetails({
           </p>
         </div>
       </header>
-      {mcp.issue && (
+      {app && <p className="plugin-hero-description">{t(app.description)}</p>}
+      {mcp.issue && mcp.login !== 'signed-out' && (
         <p className="computer-notice" role="alert">
           {mcp.issue}
+        </p>
+      )}
+      {mcp.login && (
+        <div className="plugin-account">
+          <span>
+            <strong>
+              {mcp.login === 'signed-in' ? t('已登录') : mcp.login === 'signing-in' ? t('登录中') : t('未登录')}
+            </strong>
+            <small>
+              {mcp.login === 'signed-in'
+                ? app?.auth === 'token'
+                  ? t('使用你提供的访问令牌，加密保存在这台电脑上')
+                  : t('登录凭据加密保存在这台电脑上，过期后自动续期')
+                : mcp.login === 'signing-in'
+                  ? t('在浏览器里完成登录')
+                  : t('登录后 Bot 才能使用这个服务')}
+            </small>
+          </span>
+          {mcp.login === 'signing-in' ? (
+            <button className="secondary-button" onClick={() => void window.aelion.cancelMcpSignIn(mcp.id)}>
+              {t('取消')}
+            </button>
+          ) : mcp.login === 'signed-in' ? (
+            // A pasted token is changed by removing the app and adding it again.
+            app?.auth !== 'token' && (
+              <>
+                <button className="text-button" onClick={signIn}>
+                  {t('重新登录')}
+                </button>
+                <button
+                  className="secondary-button"
+                  disabled={busy}
+                  onClick={() => void act(() => window.aelion.signOutMcp(mcp.id))}
+                >
+                  {t('退出登录')}
+                </button>
+              </>
+            )
+          ) : app?.auth === 'token' ? null : (
+            <button className="primary-button" onClick={signIn}>
+              {t('登录')}
+            </button>
+          )}
+        </div>
+      )}
+      {signInError && (
+        <p className="computer-notice" role="alert">
+          {signInError}
         </p>
       )}
       <dl className="plugin-meta">

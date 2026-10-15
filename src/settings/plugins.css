@@ -1054,3 +1054,42 @@
     animation: none;
   }
 }
+
+/* Apps from the catalog: brand marks on white tiles, and the sign-in state in the drawer. */
+.plugin-app-mark {
+  border-radius: 9px;
+}
+.app-card.is-off .connector-mark {
+  opacity: 0.5;
+}
+.app-card .connector-card-foot .secondary-button {
+  padding-block: 4px;
+}
+.plugin-account {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 14px;
+  border: 1px solid var(--plugin-line);
+  border-radius: 12px;
+}
+.plugin-account > span {
+  display: grid;
+  flex: 1;
+  min-width: 0;
+  font-size: 13px;
+}
+.plugin-account strong {
+  font-weight: var(--weight-label);
+}
+.plugin-account small {
+  font-size: 12px;
+  color: var(--plugin-muted);
+}
+.app-card {
+  grid-template-columns: minmax(0, 1fr);
+  align-content: start;
+}
+.app-card .connector-card-foot {
+  min-height: 41px;
+}

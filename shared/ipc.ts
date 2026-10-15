@@ -143,6 +143,11 @@ export const INVOKE_CHANNELS = {
   readSkill: 'skills:read',
   setMcpEnabled: 'mcp:enabled',
   testMcp: 'mcp:test',
+  addAppConnector: 'mcp:add-app',
+  signInMcp: 'mcp:sign-in',
+  cancelMcpSignIn: 'mcp:sign-in-cancel',
+  signOutMcp: 'mcp:sign-out',
+  removeMcpServer: 'mcp:remove',
   // Connectors
   addConnector: 'connectors:add',
   startConnectorSetup: 'connectors:setup-start',

@@ -284,6 +284,15 @@ export interface IntegrationSource {
   count: number;
   issue?: string;
 }
+export interface AppConnectorInput {
+  /** An ID from APP_CONNECTORS. */
+  app: string;
+  /** For token apps. */
+  token?: string;
+  /** For Google: the person's own OAuth client, kept for every Google app. */
+  clientId?: string;
+  clientSecret?: string;
+}
 export interface McpServerView {
   id: string;
   name: string;
@@ -294,6 +303,10 @@ export interface McpServerView {
   status: 'disabled' | 'available' | 'connecting' | 'connected' | 'error' | 'needs-config';
   issue?: string;
   toolCount?: number;
+  /** For remote servers the person can sign in to. */
+  login?: 'signed-in' | 'signed-out' | 'signing-in';
+  /** The app connector at this address (see shared/app-connectors). */
+  app?: string;
 }
 export interface IntegrationsView {
   sharedSkillDir: string;
@@ -303,6 +316,8 @@ export interface IntegrationsView {
   sources: IntegrationSource[];
   servers: McpServerView[];
   scannedAt: string;
+  /** Providers whose own OAuth client the person has saved, such as Google. */
+  ownClients: string[];
 }
 export const WORKSTATION_VERSION = '6';
 export interface InstallationProgress {
@@ -715,6 +730,14 @@ export interface AelionAPI {
   }): Promise<void>;
   setMcpEnabled(input: { id: string; enabled: boolean }): Promise<void>;
   testMcp(id: string): Promise<{ tools: string[] }>;
+  /** Adds an app from the catalog; returns its server ID. */
+  addAppConnector(input: AppConnectorInput): Promise<string>;
+  /** Opens the service's sign-in page and resolves once the person has signed in. */
+  signInMcp(id: string): Promise<void>;
+  cancelMcpSignIn(id: string): Promise<void>;
+  signOutMcp(id: string): Promise<void>;
+  /** Removes a server the app added to its own MCP config, with its sign-in. */
+  removeMcpServer(id: string): Promise<void>;
   /** Resolves to the new connector's ID. */
   addConnector(input: ConnectorCreateInput): Promise<string>;
   /** Starts a QR flow; its progress appears in Snapshot.connectors.setups. Resolves to the setup ID. */

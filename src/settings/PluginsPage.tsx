@@ -10,6 +10,9 @@ import { PluginDetails, PluginDrawer, PluginSwitch, StatusDot } from './PluginDe
 import { AddConnectorDialog, connectorStatusText } from './AddConnectorDialog';
 import { ConnectorDetails } from './ConnectorDetails';
 import { ConnectorLogo } from './ConnectorLogo';
+import { AppConnectorDialog } from './AppConnectorDialog';
+import { AppLogo } from './AppLogo';
+import { APP_CONNECTORS } from '../../shared/app-connectors';
 import { PluginIcon, mcpStatusText, sinceText } from './plugin-visuals';
 import { Avatar } from '../ui/Avatar';
 import { Icon } from '../ui/Icon';
@@ -20,6 +23,9 @@ export type PluginFilter = 'all' | 'skills' | 'mcp' | 'connectors';
 type Selected = { kind: 'skill' | 'mcp' | 'connector' | 'sources'; id: string };
 type SkillGroup = { key: string; title: string; note: string; path?: string; bot?: Bot; skills: Skill[] };
 const PLATFORMS: ConnectorPlatform[] = ['feishu', 'wecom', 'weixin'];
+/** Apps shown on the empty "apps" card, to say what kind of thing can be connected. */
+const FEATURED_APPS = ['notion', 'github', 'gmail', 'linear', 'supabase', 'figma-desktop'];
+const appOf = (server: McpServerView) => APP_CONNECTORS.find((app) => app.id === server.app);
 /** How many skills of a group the overview shows before "show more". */
 const OVERVIEW_SKILLS = 6;
 export function PluginsPage({
@@ -41,9 +47,10 @@ export function PluginsPage({
   const [query, setQuery] = useState(''),
     [filter, setFilter] = useState<PluginFilter>(initialFilter),
     [selected, setSelected] = useState<Selected>(),
-    [adding, setAdding] = useState<'menu' | 'mcp' | ConnectorPlatform>(),
+    [adding, setAdding] = useState<'menu' | 'mcp' | 'app' | ConnectorPlatform>(),
     [expanded, setExpanded] = useState<Set<string>>(new Set()),
     [connectorError, setConnectorError] = useState(''),
+    [appError, setAppError] = useState(''),
     heading = useRef<HTMLHeadingElement>(null),
     search = useRef<HTMLInputElement>(null);
   useEffect(() => heading.current?.focus({ preventScroll: true }), []);
@@ -68,7 +75,15 @@ export function PluginsPage({
       .toLowerCase()
       .includes(words),
   );
-  const shownServers = servers.filter((server) =>
+  // Servers added from the app catalog are listed as apps; the MCP list keeps the rest.
+  const apps = servers.filter((server) => server.app),
+    plainServers = servers.filter((server) => !server.app);
+  const shownApps = apps.filter((server) =>
+    `${server.name} ${t(appOf(server)?.name || '')} ${t(appOf(server)?.description || '')}`
+      .toLowerCase()
+      .includes(words),
+  );
+  const shownServers = plainServers.filter((server) =>
     `${server.name} ${t(server.source.label)}`.toLowerCase().includes(words),
   );
   const shownConnectors = connectors.filter((connector) =>
@@ -79,14 +94,14 @@ export function PluginsPage({
   const tabs: Array<{ id: PluginFilter; name: string; count?: number }> = [
     { id: 'all', name: t('概览') },
     { id: 'skills', name: t('技能'), count: skills.length },
-    { id: 'mcp', name: 'MCP', count: servers.length },
-    { id: 'connectors', name: t('连接器'), count: connectors.length },
+    { id: 'connectors', name: t('连接器'), count: apps.length + connectors.length },
+    { id: 'mcp', name: 'MCP', count: plainServers.length },
   ];
   const show = (kind: PluginFilter) => filter === 'all' || filter === kind,
     nothing =
       (!show('skills') || !shownSkills.length) &&
       (!show('mcp') || !shownServers.length) &&
-      (!show('connectors') || !shownConnectors.length),
+      (!show('connectors') || (!shownConnectors.length && !shownApps.length)),
     toggleExpanded = (key: string) =>
       setExpanded((current) => {
         const next = new Set(current);
@@ -103,6 +118,13 @@ export function PluginsPage({
       setConnectorError(ipcErrorText(error));
     }
   };
+  // Signing in waits for the browser, so it runs beside the page instead of holding it busy.
+  const signIn = (id: string) => {
+    setAppError('');
+    window.aelion.signInMcp(id).catch((error) => {
+      if ((error as { code?: string }).code !== 'mcp.signin_cancelled') setAppError(ipcErrorText(error));
+    });
+  };
   const skillGroups = groupSkills(shownSkills, state, t);
   const mcpGroups = [
     ...shownServers
@@ -113,7 +135,7 @@ export function PluginsPage({
       .values(),
   ];
   const usedSkills = skills.filter((skill) => skill.enabled ?? !skill.archived).length,
-    connectedServers = servers.filter((server) => server.status === 'connected').length;
+    connectedServers = plainServers.filter((server) => server.status === 'connected').length;
   return (
     <main className="plugins-page" aria-labelledby="plugins-heading">
       <div className="plugins-content">
@@ -150,7 +172,7 @@ export function PluginsPage({
               if (kind === 'skills') {
                 setAdding(undefined);
                 void act(() => window.aelion.addIntegrationSource('skills'));
-              } else setAdding(kind === 'mcp' ? 'mcp' : 'feishu');
+              } else setAdding(kind === 'mcp' ? 'mcp' : kind === 'app' ? 'app' : 'feishu');
             }}
           />
           <button className="icon-button" aria-label={t('返回聊天')} onClick={onClose}>
@@ -182,10 +204,53 @@ export function PluginsPage({
             <Icon name="restart" size={15} />
           </button>
         </nav>
+        {show('connectors') && (shownApps.length > 0 || !words) && (
+          <section className="plugins-section" aria-labelledby="plugins-apps-title">
+            <div className="plugins-section-head">
+              <h2 id="plugins-apps-title">{t('应用')}</h2>
+              <span>{t('让 Bot 读写 Notion、GitHub、Google 等应用里的内容')}</span>
+            </div>
+            {appError && (
+              <p className="computer-notice" role="alert">
+                {appError}
+              </p>
+            )}
+            <div className="connector-grid">
+              {shownApps.map((server) => (
+                <AppCard
+                  key={server.id}
+                  server={server}
+                  busy={busy}
+                  act={act}
+                  onSignIn={() => signIn(server.id)}
+                  onOpen={() => setSelected({ kind: 'mcp', id: server.id })}
+                />
+              ))}
+              {!words && (
+                <button
+                  type="button"
+                  className="connector-card is-add"
+                  disabled={busy}
+                  onClick={() => setAdding('app')}
+                >
+                  <span className="connector-add-logos">
+                    {FEATURED_APPS.slice(0, apps.length ? 3 : 6).map((app) => (
+                      <span className="connector-mark is-small" key={app}>
+                        <AppLogo app={app} size={14} />
+                      </span>
+                    ))}
+                  </span>
+                  <strong>{t('连接应用')}</strong>
+                  <small>{t('{count} 个应用可选', { count: APP_CONNECTORS.length })}</small>
+                </button>
+              )}
+            </div>
+          </section>
+        )}
         {show('connectors') && (shownConnectors.length > 0 || !words) && (
           <section className="plugins-section" aria-labelledby="plugins-connectors-title">
             <div className="plugins-section-head">
-              <h2 id="plugins-connectors-title">{t('连接器')}</h2>
+              <h2 id="plugins-connectors-title">{t('消息渠道')}</h2>
               <span>{t('在手机上给 Bot 发消息')}</span>
               {state.connectors && connectors.length > 0 && (
                 <label className="plugins-head-switch">
@@ -258,7 +323,7 @@ export function PluginsPage({
                         </span>
                       ))}
                     </span>
-                    <strong>{t('添加连接器')}</strong>
+                    <strong>{t('添加消息渠道')}</strong>
                     <small>{t('飞书、企业微信或微信')}</small>
                   </button>
                 )}
@@ -271,7 +336,7 @@ export function PluginsPage({
             <div className="plugins-section-head">
               <h2 id="plugins-mcp-title">{t('MCP 服务')}</h2>
               <span>
-                {t('{count} 个 · {connected} 个已连接', { count: servers.length, connected: connectedServers })}
+                {t('{count} 个 · {connected} 个已连接', { count: plainServers.length, connected: connectedServers })}
               </span>
             </div>
             <div className="mcp-list">
@@ -282,6 +347,7 @@ export function PluginsPage({
                     server={group[0]}
                     busy={busy}
                     act={act}
+                    onSignIn={() => signIn(group[0].id)}
                     onOpen={() => setSelected({ kind: 'mcp', id: group[0].id })}
                   />
                 ) : (
@@ -292,6 +358,7 @@ export function PluginsPage({
                     onToggle={() => toggleExpanded('mcp:' + group[0].name)}
                     busy={busy}
                     act={act}
+                    onSignIn={signIn}
                     onOpen={(id) => setSelected({ kind: 'mcp', id })}
                   />
                 ),
@@ -420,6 +487,16 @@ export function PluginsPage({
           onClose={() => setSelected(undefined)}
         />
       ) : null}
+      {adding === 'app' && (
+        <AppConnectorDialog
+          state={state}
+          onClose={() => setAdding(undefined)}
+          onAdded={(id) => {
+            setAdding(undefined);
+            setSelected({ kind: 'mcp', id });
+          }}
+        />
+      )}
       {adding === 'mcp' && (
         <McpSnippetDialog
           busy={busy}
@@ -427,7 +504,7 @@ export function PluginsPage({
           onImport={(text) => window.aelion.importMcpSnippet(text)}
         />
       )}
-      {adding && adding !== 'menu' && adding !== 'mcp' && (
+      {adding && adding !== 'menu' && adding !== 'mcp' && adding !== 'app' && (
         <AddConnectorDialog
           state={state}
           initialPlatform={adding}
@@ -487,7 +564,7 @@ function AddMenu({
   open: boolean;
   busy: boolean;
   onOpen: (open: boolean) => void;
-  onPick: (kind: 'connector' | 'mcp' | 'skills') => void;
+  onPick: (kind: 'app' | 'connector' | 'mcp' | 'skills') => void;
 }) {
   const { t } = useI18n();
   const root = useRef<HTMLDivElement>(null),
@@ -502,7 +579,8 @@ function AddMenu({
     return () => document.removeEventListener('mousedown', away);
   }, [open]);
   const items = [
-    { id: 'connector', icon: 'message', name: t('连接器'), note: t('在飞书、企业微信或微信里和 Bot 对话') },
+    { id: 'app', icon: 'globe', name: t('应用'), note: t('连接 Notion、GitHub、Google 等应用') },
+    { id: 'connector', icon: 'message', name: t('消息渠道'), note: t('在飞书、企业微信或微信里和 Bot 对话') },
     { id: 'mcp', icon: 'plugin', name: t('MCP 服务'), note: t('粘贴配置，给 Bot 接上外部工具') },
     { id: 'skills', icon: 'book', name: t('技能文件夹'), note: t('从本地文件夹读取技能，所有 Bot 共享') },
   ] as const;
@@ -612,12 +690,81 @@ function ConnectorCard({
     </article>
   );
 }
+/** An app from the catalog: its brand, whether it is signed in, and the sign-in button when it is not. */
+function AppCard({
+  server,
+  busy,
+  act,
+  onOpen,
+  onSignIn,
+}: {
+  server: McpServerView;
+  busy: boolean;
+  act: (operation: () => Promise<unknown>) => Promise<void>;
+  onOpen: () => void;
+  onSignIn: () => void;
+}) {
+  const { t } = useI18n();
+  const app = appOf(server),
+    name = app ? t(app.name) : server.name,
+    problem = server.status === 'needs-config' || server.status === 'error';
+  return (
+    <article className={`connector-card app-card ${server.enabled ? '' : 'is-off'}`} data-plugin-id={server.id}>
+      <div className="connector-card-top">
+        <span className="connector-mark">
+          <AppLogo app={server.app} size={22} />
+        </span>
+        <span className="connector-card-name">
+          <button type="button" className="plugin-open" onClick={onOpen}>
+            {name}
+          </button>
+          {app && <small title={t(app.description)}>{t(app.description)}</small>}
+        </span>
+        <PluginSwitch
+          name={name}
+          enabled={server.enabled}
+          disabled={busy || server.status === 'connecting'}
+          onChange={() => void act(() => window.aelion.setMcpEnabled({ id: server.id, enabled: !server.enabled }))}
+        />
+      </div>
+      <p className={`connector-card-state ${problem && server.login !== 'signed-out' ? 'is-problem' : ''}`}>
+        <StatusDot status={server.login === 'signed-out' ? 'disabled' : server.status} />
+        <span>
+          {t(mcpStatusText(server))}
+          {server.toolCount !== undefined && ' · ' + t('{count} 个工具', { count: server.toolCount })}
+        </span>
+      </p>
+      <div className="connector-card-foot">
+        {server.login === 'signing-in' ? (
+          <>
+            <span>{t('在浏览器里完成登录')}</span>
+            <span className="plugins-tabs-spacer" />
+            <button type="button" className="text-button" onClick={() => void window.aelion.cancelMcpSignIn(server.id)}>
+              {t('取消')}
+            </button>
+          </>
+        ) : server.login === 'signed-out' ? (
+          <>
+            <span>{t('登录后 Bot 才能使用')}</span>
+            <span className="plugins-tabs-spacer" />
+            <button type="button" className="secondary-button" onClick={onSignIn}>
+              {t('登录')}
+            </button>
+          </>
+        ) : (
+          <span>{server.login === 'signed-in' ? t('已登录') : app?.local ? t('在这台电脑上运行') : t('无需登录')}</span>
+        )}
+      </div>
+    </article>
+  );
+}
 function McpRow({
   server,
   label,
   busy,
   act,
   onOpen,
+  onSignIn,
 }: {
   server: McpServerView;
   /** Shown instead of the name when the row sits inside a group of servers sharing that name. */
@@ -625,6 +772,7 @@ function McpRow({
   busy: boolean;
   act: (operation: () => Promise<unknown>) => Promise<void>;
   onOpen: () => void;
+  onSignIn: () => void;
 }) {
   const { t } = useI18n();
   const problem = server.status === 'needs-config' || server.status === 'error';
@@ -646,10 +794,16 @@ function McpRow({
           {!label && <span>· {t('来自 {source}', { source: t(server.source.label) })}</span>}
         </p>
       </div>
-      {problem && (
-        <button type="button" className="text-button" onClick={onOpen}>
-          {server.status === 'needs-config' ? t('去配置') : t('查看')}
+      {server.login === 'signed-out' ? (
+        <button type="button" className="text-button" onClick={onSignIn}>
+          {t('登录')}
         </button>
+      ) : (
+        problem && (
+          <button type="button" className="text-button" onClick={onOpen}>
+            {server.status === 'needs-config' ? t('去配置') : t('查看')}
+          </button>
+        )
       )}
       <PluginSwitch
         name={server.name}
@@ -667,6 +821,7 @@ function McpGroup({
   onToggle,
   busy,
   act,
+  onSignIn,
   onOpen,
 }: {
   servers: McpServerView[];
@@ -674,6 +829,7 @@ function McpGroup({
   onToggle: () => void;
   busy: boolean;
   act: (operation: () => Promise<unknown>) => Promise<void>;
+  onSignIn: (id: string) => void;
   onOpen: (id: string) => void;
 }) {
   const { t } = useI18n();
@@ -711,6 +867,7 @@ function McpGroup({
             label={t(server.source.label)}
             busy={busy}
             act={act}
+            onSignIn={() => onSignIn(server.id)}
             onOpen={() => onOpen(server.id)}
           />
         ))}
