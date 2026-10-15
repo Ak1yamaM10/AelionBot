@@ -1,4 +1,4 @@
-import { useEffect, useState, type PointerEvent, type RefObject } from 'react';
+import { useEffect, useState, type RefObject } from 'react';
 
 export function useMotionPreference() {
   const [reduced, setReduced] = useState(() => window.matchMedia('(prefers-reduced-motion: reduce)').matches);
@@ -43,7 +43,7 @@ export function useSiteMotion(rootRef: RefObject<HTMLDivElement | null>, enabled
     const onScroll = () => {
       if (!scrollFrame) scrollFrame = requestAnimationFrame(updateScroll);
     };
-    const onPointer = (event: globalThis.PointerEvent) => {
+    const onPointer = (event: PointerEvent) => {
       if (!enabled || event.pointerType !== 'mouse') return;
       clientX = event.clientX;
       clientY = event.clientY;
@@ -105,21 +105,4 @@ export function useSiteMotion(rootRef: RefObject<HTMLDivElement | null>, enabled
       root.style.removeProperty('--eye-y');
     };
   }, [rootRef, enabled]);
-}
-
-export function trackSurface(event: PointerEvent<HTMLElement>) {
-  if (event.pointerType !== 'mouse' || event.currentTarget.closest('[data-motion="off"]')) return;
-  const surface = event.currentTarget,
-    rect = surface.getBoundingClientRect();
-  const x = Math.min(1, Math.max(0, (event.clientX - rect.left) / rect.width));
-  const y = Math.min(1, Math.max(0, (event.clientY - rect.top) / rect.height));
-  surface.style.setProperty('--pointer-x', `${(x * 100).toFixed(1)}%`);
-  surface.style.setProperty('--pointer-y', `${(y * 100).toFixed(1)}%`);
-  surface.style.setProperty('--tilt-x', `${((0.5 - y) * 3).toFixed(2)}deg`);
-  surface.style.setProperty('--tilt-y', `${((x - 0.5) * 4).toFixed(2)}deg`);
-}
-
-export function resetSurface(event: PointerEvent<HTMLElement>) {
-  event.currentTarget.style.setProperty('--tilt-x', '0deg');
-  event.currentTarget.style.setProperty('--tilt-y', '0deg');
 }

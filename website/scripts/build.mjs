@@ -1,5 +1,6 @@
 import { build } from 'vite';
-import { readFileSync, readdirSync, unlinkSync, rmdirSync } from 'node:fs';
+import { readFileSync, readdirSync, unlinkSync, rmdirSync, writeFileSync } from 'node:fs';
+import { createHash } from 'node:crypto';
 import { join, extname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { loadPosts } from '../blog/content.mjs';
@@ -24,12 +25,11 @@ validateMedia(join(root, 'public/blog-media'));
 await build({ configFile: join(root, 'vite.config.ts') });
 const output = join(root, 'dist'),
   template = readFileSync(join(output, 'blog.html'), 'utf8');
-const manifest = JSON.parse(readFileSync(join(output, '.vite/manifest.json'), 'utf8'));
-const logo = Object.values(manifest).find(
-  (item) => item.src?.endsWith('docs/assets/logo-light.svg') || item.name === 'logo-light.svg',
-);
-if (!logo?.file) throw new Error('博客构建未找到官网 Logo。');
-const count = writeBlogPages({ output, template, site, logo: `/${logo.file}`, posts });
+// The blog keeps the light logo; the homepage no longer imports it, so copy it with a content hash here.
+const logoBytes = readFileSync(join(root, '../docs/assets/logo-light.svg'));
+const logo = `assets/logo-light-${createHash('sha256').update(logoBytes).digest('hex').slice(0, 8)}.svg`;
+writeFileSync(join(output, logo), logoBytes);
+const count = writeBlogPages({ output, template, site, logo: `/${logo}`, posts });
 unlinkSync(join(output, 'blog.html'));
 unlinkSync(join(output, '.vite/manifest.json'));
 rmdirSync(join(output, '.vite'));

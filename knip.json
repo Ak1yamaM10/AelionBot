@@ -10,8 +10,22 @@
     "electron/core/code-worker.ts",
     "electron/core/context/token-worker.ts",
     "scripts/*.{mjs,ts}",
-    "tests/*.test.ts"
+    "tests/*.test.ts",
+    "website/src/main.tsx",
+    "website/src/blog/client.ts",
+    "website/scripts/*.mjs",
+    "website/blog/*.mjs"
   ],
-  "project": ["src/**/*.{ts,tsx}", "shared/**/*.ts", "electron/**/*.ts", "scripts/**/*.{mjs,ts}", "tests/**/*.ts"],
+  "project": [
+    "src/**/*.{ts,tsx}",
+    "shared/**/*.ts",
+    "electron/**/*.ts",
+    "scripts/**/*.{mjs,ts}",
+    "tests/**/*.ts",
+    "website/src/**/*.{ts,tsx,mjs}",
+    "website/scripts/**/*.mjs",
+    "website/blog/**/*.mjs",
+    "website/tests/**/*.mjs"
+  ],
   "ignoreDependencies": ["@fontsource-variable/*", "markdown-it", "@larksuiteoapi/node-sdk"]
 }

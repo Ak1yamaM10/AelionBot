@@ -1,4 +1,4 @@
-export const supportedLanguages = ['en', 'zh-CN', 'zh-TW'];
+const supportedLanguages = ['en', 'zh-CN', 'zh-TW'];
 export function resolveSiteLanguage(search = '', saved = null) {
   const requested = new URLSearchParams(search).get('lang');
   return requested && supportedLanguages.includes(requested)

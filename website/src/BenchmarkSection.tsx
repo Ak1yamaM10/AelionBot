@@ -7,9 +7,9 @@ import './benchmark.css';
 export function BenchmarkSection({ language, methodUrl }: { language: SiteLanguage; methodUrl: string }) {
   const copy = benchmarkCopy[language];
   return (
-    <section className="benchmark-section section-shell" id="benchmark" aria-labelledby="benchmark-title">
+    <section className="benchmark-section shell" id="benchmark" aria-labelledby="benchmark-title">
       <div className="benchmark-copy">
-        <p className="section-kicker">{copy.kicker}</p>
+        <p className="kicker">{copy.kicker}</p>
         <h2 id="benchmark-title">{copy.title}</h2>
         <p className="benchmark-description">{copy.description}</p>
         <ul>
