@@ -1283,7 +1283,8 @@ async function initialize() {
     event.preventDefault();
     if (exiting || !canDiscardPreview()) return;
     exiting = true;
-    void shutdown.run();
+    // Installing an update: the installer is already waiting for this process and ends it if it lingers.
+    void shutdown.run(updatePreparing ? 2000 : undefined);
   });
   app.on('window-all-closed', () => app.quit());
   // macOS: the Dock icon brings back a window hidden while connectors keep running.

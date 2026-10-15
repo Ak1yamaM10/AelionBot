@@ -63,6 +63,28 @@ test('hung work cleanup cannot prevent VM shutdown, including broken diagnostic 
   await close.run();
   assert.deepEqual(events, ['vm', 'exit']);
 });
+test('an exit for an update waits less for open work, and the first exit decides', async () => {
+  const hooks = (events: string[]) => ({
+    stop: () => {},
+    closeWork: () => [new Promise(() => {})],
+    closeVm: async () => {
+      events.push('vm');
+    },
+    closeState: () => {},
+    exit: () => {
+      events.push('exit');
+    },
+    report: () => {},
+  });
+  const events: string[] = [],
+    close = new Shutdown(hooks(events), 60_000),
+    started = Date.now();
+  const first = close.run(30);
+  assert.equal(close.run(), first);
+  await first;
+  assert.ok(Date.now() - started < 5_000);
+  assert.deepEqual(events, ['vm', 'exit']);
+});
 test('owned VM shutdown uses graceful poweroff first and bounded verified fallback', async () => {
   let alive = true,
     time = 0;

@@ -100,7 +100,6 @@
       "assets/laya/**",
       "assets/skills/**",
       "assets/game-skills/**",
-      "assets/design-systems/**",
       "assets/design-craft/**",
       "node_modules/node-pty/**"
     ]
