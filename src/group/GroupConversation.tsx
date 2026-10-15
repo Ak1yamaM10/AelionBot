@@ -36,6 +36,7 @@ import { sameProps } from '../ui/equality';
 import { useStableHandlers } from '../ui/use-stable-handlers';
 import { ConversationInteractions } from '../chat/InteractionPrompts';
 import { GroupAvatar } from './GroupAvatar';
+import { GroupPersonaPanel, PersonaHoverCard } from './GroupPersonaPanel';
 import { ComputerCardToggle } from '../computer/ComputerCardToggle';
 import { readScrollAnchor, restoreScrollAnchor, type ScrollAnchor } from '../app/scroll-anchor';
 import { useFloatingComposer } from '../chat/use-floating-composer';
@@ -77,6 +78,7 @@ export function GroupConversation({
   visible: boolean;
 }) {
   const { t } = useI18n();
+  const [personaPanel, setPersonaPanel] = useState(false);
   const [page, setPage] = useState<GroupPage>(),
     [error, setError] = useState(''),
     [sending, setSending] = useState(false),
@@ -339,12 +341,22 @@ export function GroupConversation({
           <span className="group-member-count">{t('{count} 人', { count: members.length + 1 })}</span>
         </button>
         <div className="header-actions no-drag">
+          <button
+            className="icon-button"
+            aria-label={t('成员与性格')}
+            title={t('成员与性格')}
+            aria-pressed={personaPanel}
+            onClick={() => setPersonaPanel((open) => !open)}
+          >
+            <Icon name="user" />
+          </button>
           <button className="icon-button" aria-label={t('群聊设置')} onClick={onManage}>
             <Icon name="settings" />
           </button>
           <ComputerCardToggle />
         </div>
       </header>
+      {personaPanel && <GroupPersonaPanel members={members} onClose={() => setPersonaPanel(false)} />}
       <div className="group-design-tasks">
         {state.designer?.sessions
           .filter(
@@ -539,7 +551,11 @@ const GroupMessageRow = memo(function GroupMessageRow({
         className={`group-message ${message.sender.kind === 'user' ? 'from-user' : ''}`}
         data-group-message-id={message.id}
       >
-        {bot && <Avatar bot={bot} size={31} />}
+        {bot && (
+          <PersonaHoverCard bot={bot}>
+            <Avatar bot={bot} size={31} />
+          </PersonaHoverCard>
+        )}
         <div className="group-message-copy">
           <div className="group-message-author">{author}</div>
           <MessageActions

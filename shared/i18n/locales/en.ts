@@ -2934,4 +2934,10 @@ export const en: Record<string, string> = {
   '第 {day} 轮 · 投票结果': 'Round {day} · Votes',
   '私有事件：由规则按可见权限投递，例如本人拿到的词。':
     'Private events: delivered by the rules according to visibility, such as the word this player was dealt.',
+  成员与性格: 'Members & personality',
+  未确认: 'Unconfirmed',
+  '对你：{word}': 'Toward you: {word}',
+  '对 {name}：{word}': 'Toward {name}: {word}',
+  '正在读取性格…': 'Loading personality…',
+  性格均衡: 'Balanced',
 };
