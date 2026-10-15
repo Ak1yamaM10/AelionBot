@@ -86,11 +86,11 @@ export class McpRuntime {
         status: config.issue ? 'needs-config' : !enabled ? 'disabled' : state?.status || 'available',
         issue: config.issue || state?.issue,
         toolCount: connection?.tools.length,
-        ...(this.auth && canSignIn(config)
+        ...(this.needsLogin(config, state?.issue)
           ? {
               login: this.signingIn.has(config.id)
                 ? ('signing-in' as const)
-                : this.auth.store.signedIn(config.url!)
+                : this.auth!.store.signedIn(config.url!)
                   ? ('signed-in' as const)
                   : ('signed-out' as const),
             }
@@ -98,6 +98,17 @@ export class McpRuntime {
         ...(appConnectorFor(config.url) ? { app: appConnectorFor(config.url)!.id } : {}),
       };
     });
+  }
+  /**
+   * Whether a server has a sign-in to show. Catalog apps say so themselves; any other server only once it has
+   * refused a connection without one, or has been signed in to. Servers open to everyone, such as Hugging Face's,
+   * never show one.
+   */
+  private needsLogin(config: McpConfig, issue?: string) {
+    if (!this.auth || !canSignIn(config)) return false;
+    const app = appConnectorFor(config.url);
+    if (app) return app.auth !== 'none';
+    return issue === SIGN_IN_ISSUE || this.signingIn.has(config.id) || this.auth.store.signedIn(config.url!);
   }
   /** The config of a server, for signing in. */
   config(id: string) {

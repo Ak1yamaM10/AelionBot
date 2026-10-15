@@ -127,8 +127,10 @@ test('signing in to a remote MCP server registers the app, keeps encrypted token
   const { paths, integrations } = setup(t, { notes: { type: 'http', url: remote.base + '/mcp' } });
   await integrations.refresh();
   const id = integrations.snapshot().servers[0].id;
-  assert.equal(integrations.snapshot().servers[0].login, 'signed-out');
+  // A server outside the catalog shows a sign-in only once it has asked for one.
+  assert.equal(integrations.snapshot().servers[0].login, undefined);
   await assert.rejects(integrations.mcp.listTools(id), /需要登录/);
+  assert.equal(integrations.snapshot().servers[0].login, 'signed-out');
 
   // The browser: follow the sign-in page back to the app's loopback address.
   let opened = 0;
@@ -155,8 +157,8 @@ test('signing in to a remote MCP server registers the app, keeps encrypted token
   assert.equal(opened, 1);
 
   await integrations.signOut(id);
-  assert.equal(integrations.snapshot().servers[0].login, 'signed-out');
   await assert.rejects(integrations.mcp.listTools(id), /需要登录/);
+  assert.equal(integrations.snapshot().servers[0].login, 'signed-out');
 });
 
 test('a cancelled sign-in stops waiting and leaves the server signed out', async (t) => {
@@ -164,6 +166,7 @@ test('a cancelled sign-in stops waiting and leaves the server signed out', async
   const { integrations } = setup(t, { notes: { type: 'http', url: remote.base + '/mcp' } });
   await integrations.refresh();
   const id = integrations.snapshot().servers[0].id;
+  await assert.rejects(integrations.mcp.listTools(id), /需要登录/);
   // The person never comes back from the browser.
   const pending = integrations.signIn(id, () => {
     setImmediate(() => integrations.cancelSignIn(id));
@@ -193,6 +196,10 @@ test('catalog apps are added to the app config with their token or Google client
   const drive = await integrations.addApp({ app: 'google-drive' });
   view = integrations.snapshot().servers.find((server) => server.id === drive)!;
   assert.equal(view.login, 'signed-out');
+  // Apps open to everyone show no sign-in.
+  const huggingface = await integrations.addApp({ app: 'huggingface' });
+  view = integrations.snapshot().servers.find((server) => server.id === huggingface)!;
+  assert.equal(view.login, undefined);
 
   await integrations.remove(github);
   assert.ok(!integrations.snapshot().servers.some((server) => server.app === 'github'));
