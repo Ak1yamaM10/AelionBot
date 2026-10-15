@@ -1,8 +1,11 @@
+import type { PersonaContent, PresetId } from '../persona/presets';
 import type { Features, Scope, Traits } from '../persona/persona-model';
 import type { GrowthReviewState } from './persona-growth-types';
 
 /** One Bot's personality (personality doc §13 PersonaProfile). `anchor` is trait0, the value growth is pulled back to. */
-export interface PersonaProfile {
+/** A named preset and the learned contents it set; see shared/persona/presets.ts. */
+export interface PersonaProfile extends PersonaContent {
+  preset?: PresetId;
   botId: string;
   traits: Traits;
   anchor: Traits;
@@ -10,7 +13,7 @@ export interface PersonaProfile {
   n: number;
   locked: boolean;
   /** Where the anchor came from: a preset MBTI, the model answering the BFI-2 facets, or the user. */
-  source: 'mbti' | 'bfi2' | 'user';
+  source: 'mbti' | 'bfi2' | 'user' | 'preset';
   confirmed: boolean;
   /** BFI-2 facet settings (E1…O3, 0–1) from the SOUL estimate, kept so narrower differences are not averaged away. */
   facets?: Record<string, number>;
@@ -69,5 +72,7 @@ export type PersonaAction =
   | { action: 'reset' }
   | { action: 'reviewGrowth' }
   | { action: 'undoGrowthReview'; reviewId: string }
-  | { action: 'draft' };
+  | { action: 'draft' }
+  /** Apply a named preset, or clear it with an empty preset. `focus` is the member a 舔狗 is fixated on. */
+  | { action: 'preset'; preset: string; focus?: string };
 export type PersonaUpdate = { botId: string; mbti?: string } & PersonaAction;

@@ -913,3 +913,35 @@
     transition: none !important;
   }
 }
+
+/* ---------- presets ---------- */
+.gp-preset-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 8px;
+}
+.gp-preset {
+  padding: 6px 12px;
+  border: 1px solid light-dark(#e6e7e9, #3e3945);
+  border-radius: 999px;
+  background: light-dark(#fff, #201e24);
+  color: inherit;
+  cursor: pointer;
+}
+.gp-preset.is-on {
+  border-color: light-dark(#9177ac, #b9a3d0);
+  background: light-dark(#f3eff8, #2c2535);
+  font-weight: var(--weight-label, 600);
+}
+.gp-preset-summary,
+.gp-preset-focus {
+  margin: 10px 0 0;
+  color: light-dark(#6f7680, #bdbac0);
+  font-size: calc(13px * var(--appearance-text-scale, 1));
+}
+.gp-preset-focus {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}

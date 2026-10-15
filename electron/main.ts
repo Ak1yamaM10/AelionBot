@@ -4,6 +4,7 @@ import { LayaGroupDecisions } from './core/group/laya-decision';
 import { gameProviders } from './core/games/providers';
 import { GameRuntime } from './core/games/runtime';
 import { PersonaService } from './core/persona/persona-service';
+import { userDisplayName } from '../shared/chat/user-profile';
 import { appraiser, groupSocialHooks } from './core/persona/group-relations';
 import { settleFinishedGame } from './core/games/settlement';
 import { contextBudget } from './core/context/context-budget';
@@ -800,7 +801,12 @@ async function initialize() {
     attachments,
     host,
     new LayaGroupDecisions(laya, layaLog),
-    (botId, people) => (persona ? persona.groupStyle(botId) + persona.groupFragment(botId, people) : ''),
+    (botId, people) =>
+      persona
+        ? persona.groupStyle(botId, (id) =>
+            id === 'user' ? userDisplayName(store.data.userProfile) : store.data.bots.find((b) => b.id === id)?.name,
+          ) + persona.groupFragment(botId, people)
+        : '',
     persona
       ? groupSocialHooks(
           persona,

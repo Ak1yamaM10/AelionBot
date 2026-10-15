@@ -8,6 +8,7 @@
  * (McCullough et al., 2001; Hodge et al., 2020, r = .44 and −.28). Base values are product settings to calibrate.
  */
 import type { Traits } from '../../../shared/persona/persona-model';
+import type { PersonaContent } from '../../../shared/persona/presets';
 
 export const APPRAISAL_TYPES = ['insult', 'offense', 'argument', 'thanks', 'help', 'apology', 'none'] as const;
 export type AppraisalType = (typeof APPRAISAL_TYPES)[number];
@@ -94,4 +95,17 @@ export function appraisalModifier(a: Appraisal, traits: Traits) {
     value: Math.round(value * 1000) / 1000,
     durationDays: Math.round((value < 0 ? kind.days * grudgeFactor(traits) : kind.days) * 10) / 10,
   };
+}
+
+/**
+ * How much this Bot's learned contents amplify or dampen an event (群聊人格方案 §4.2 ① 解读):
+ * a fragile self-view makes slights hurt more (Kernis, 2003); a strong need for recognition makes praise count
+ * more, a strong need for closeness makes help and apologies count more; the one member a Bot is fixated on
+ * barely costs it anything and gains it a lot (anxious attachment, Brennan et al., 1998). Ordinary values give 1.
+ */
+export function contentWeight(type: Exclude<AppraisalType, 'none'>, value: number, c: PersonaContent, actorId: string) {
+  const focused = !!c.focus && c.focus === actorId;
+  if (value < 0) return (0.5 + (c.selfView?.fragility ?? 0.5)) * (focused ? 0.2 : 1);
+  const need = type === 'thanks' ? (c.motives?.agency ?? 0.5) : (c.motives?.communion ?? 0.5);
+  return (0.5 + need) * (focused ? 2 : 1);
 }

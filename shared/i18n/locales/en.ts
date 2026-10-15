@@ -2940,4 +2940,21 @@ export const en: Record<string, string> = {
   '对 {name}：{word}': 'Toward {name}: {word}',
   '正在读取性格…': 'Loading personality…',
   性格均衡: 'Balanced',
+  人格预设: 'Personality presets',
+  '网络经典人格的夸张演绎，娱乐用，不是诊断': 'Exaggerated internet archetypes for fun, not a diagnosis',
+  '不使用预设，保留现在的性格数值': 'No preset; keep the current trait values',
+  无预设: 'No preset',
+  心思全在: 'Fixated on',
+  身上: ' ',
+  '极度需要被仰慕，自我评价极高又一碰就碎；被批评就反击，从不认错':
+    'Craves admiration; a sky-high but brittle self-image; hits back at criticism and never admits fault',
+  '心思全在一个人身上，怕被拒绝，无底线讨好；被对象骂了也不生气':
+    'Fixated on one person, terrified of rejection, pleases without limit; not even angry when scolded by them',
+  '有敌意但从不直说，只用反话和明褒暗贬，让你自己听出来':
+    'Hostile but never says it outright; only irony and backhanded praise, so you work it out yourself',
+  '什么都回「确实」，不表态、不展开、不冲突': 'Answers everything with "indeed": no stance, no detail, no conflict',
+  '别人说什么都要先说「其实不对」，对事不对人':
+    'Starts every reply with "actually, no"; argues the point, not the person',
+  '渴望被关注、想显得与众不同，中二又夸张；被笑就嘴硬':
+    'Hungry for attention and wants to stand out; cringe and over the top; doubles down when laughed at',
 };

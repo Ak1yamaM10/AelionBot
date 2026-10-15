@@ -4,8 +4,9 @@ import type { GrowthObservation } from '../../../shared/types/persona-growth-typ
 import { GrowthRunner, type GrowthReviewerHooks } from './growth-runner';
 import { settleMatch } from './settle';
 import type { MatchFacts } from './match-facts';
-import { APPRAISAL_KINDS, appraisalModifier, type Appraisal, type AppraisalType } from './appraisal';
+import { APPRAISAL_KINDS, appraisalModifier, contentWeight, type Appraisal, type AppraisalType } from './appraisal';
 import { birthPrompt, facetsFrom } from './birth';
+import { PRESETS, contentText, isPresetId } from '../../../shared/persona/presets';
 import {
   NEUTRAL,
   TRAITS,
@@ -110,10 +111,13 @@ export class PersonaService {
     sourceId: string;
   }) {
     if (e.botId === e.actorId || this.store.isForgotten(e.botId) || this.store.isForgotten(e.actorId)) return;
-    const traits = this.store.profile(e.botId)?.traits || NEUTRAL;
-    const change = appraisalModifier(e.appraisal, traits);
-    if (!change) return;
+    const profile = this.store.profile(e.botId);
+    const base = appraisalModifier(e.appraisal, profile?.traits || NEUTRAL);
+    if (!base) return;
     const type = e.appraisal.type as Exclude<AppraisalType, 'none'>;
+    const weighted = base.value * contentWeight(type, base.value, profile || {}, e.actorId);
+    const change = { ...base, value: Math.round(Math.max(-1, Math.min(1, weighted)) * 1000) / 1000 };
+    if (!change.value) return;
     const at = this.now();
     const held = this.store.affinity(e.botId, e.actorId);
     if (held.some((m) => m.source.startsWith(`chat:${type}:`) && m.createdAt >= dayStart(at))) return;
@@ -265,8 +269,15 @@ export class PersonaService {
       // Facets describe the estimate they came from; a hand-set profile no longer matches them.
       if (facets) p.facets = facets;
       else delete p.facets;
+      // Hand-set or re-estimated traits no longer match the preset's name; its learned contents stay.
+      if (source !== 'preset') delete p.preset;
       this.store.saveProfile(p);
-      this.store.addHistory(botId, t, source === 'user' ? '手动设定' : '角色设定估计', at);
+      this.store.addHistory(
+        botId,
+        t,
+        source === 'user' ? '手动设定' : source === 'preset' ? '应用预设' : '角色设定估计',
+        at,
+      );
     });
     return this.view(botId);
   }
@@ -304,6 +315,36 @@ export class PersonaService {
         this.estimating.delete(b.id);
       }
     }
+  }
+  /**
+   * Give this Bot a named preset (群聊人格方案 §4.6): its traits become the birth personality and its learned
+   * contents are set to the preset's. An empty id clears the preset's contents and keeps the traits.
+   * Experience keeps changing both afterwards unless growth is locked.
+   */
+  applyPreset(botId: string, id: string, focus?: string) {
+    if (!id) {
+      const p = this.ensureProfile(botId);
+      for (const k of ['preset', 'motives', 'selfView', 'strategies', 'expression', 'focus'] as const) delete p[k];
+      p.updatedAt = this.now();
+      this.store.saveProfile(p);
+      return this.view(botId);
+    }
+    if (!isPresetId(id)) throw Error('未知的人格预设');
+    const preset = PRESETS[id];
+    this.setTraits(botId, preset.traits, 'preset');
+    const p = this.store.profile(botId)!;
+    Object.assign(p, {
+      preset: id,
+      confirmed: true,
+      motives: preset.motives,
+      selfView: preset.selfView,
+      strategies: preset.strategies,
+      expression: preset.expression,
+      ...(preset.focus ? { focus: focus || preset.focus } : {}),
+    });
+    if (!preset.focus) delete p.focus;
+    this.store.saveProfile(p);
+    return this.view(botId);
   }
   /** Accept the draft as this Bot's birth personality. */
   confirm(botId: string, mbti?: string) {
@@ -349,7 +390,7 @@ export class PersonaService {
    * expression guidance its game seats get, and a stance on agreeing. Only for Bots with a saved profile; a draft
    * is never invented here. Group chats only: private chats keep the original SOUL (§D.14).
    */
-  groupStyle(botId: string) {
+  groupStyle(botId: string, nameOf: (id: string) => string | undefined = () => undefined) {
     const p = this.store.profile(botId);
     if (!p) return '';
     const conform = tendencies(p.traits).conform;
@@ -359,7 +400,7 @@ export class PersonaService {
         : conform > 0.3
           ? '\n立场：同意别人时要补充新的信息或理由，不要只说「同意」。'
           : '';
-    return '\n\n[你的说话方式，来自你的性格设定]\n' + styleText(p.traits) + '。' + stance;
+    return '\n\n[你的说话方式，来自你的性格设定]\n' + styleText(p.traits) + '。' + stance + contentText(p, nameOf);
   }
   groupFragment(botId: string, people: { id: string; name: string }[]) {
     const others = people.filter((p) => p.id !== botId).slice(0, 2);

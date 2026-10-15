@@ -4,6 +4,7 @@ import type { PersonaView } from '../../shared/types/persona-types';
 import { Avatar } from '../ui/Avatar';
 import { Icon } from '../ui/Icon';
 import { useI18n } from '../i18n';
+import { PRESETS } from '../../shared/persona/presets';
 import { PersonaPage } from './PersonaPage';
 import { TRAIT_POLES, relationWord, traitName } from './persona-view-model';
 
@@ -39,6 +40,15 @@ function usePersonaViews(ids: string[], active: boolean) {
   return views;
 }
 
+/** A preset's name, or else the one or two most pronounced traits. */
+function labelOf(view: PersonaView, t: (key: string) => string) {
+  if (view.profile.preset) return PRESETS[view.profile.preset].name;
+  return (
+    personaLabel(view.profile.traits)
+      .map((w) => t(w))
+      .join(' · ') || t('性格均衡')
+  );
+}
 /** The one or two traits furthest from average, in everyday words, e.g. 「外向 · 敏感」. */
 function personaLabel(traits: Traits) {
   return TRAITS.map((k) => ({ k, d: traits[k] - 0.5 }))
@@ -95,13 +105,7 @@ export function GroupPersonaPanel({ members, onClose }: { members: Member[]; onC
               <div>
                 <div className="gp-name">
                   <b>{m.name}</b>
-                  {view && (
-                    <small>
-                      {personaLabel(view.profile.traits)
-                        .map((w) => t(w))
-                        .join(' · ') || t('性格均衡')}
-                    </small>
-                  )}
+                  {view && <small>{labelOf(view, t)}</small>}
                   {view && !view.profile.confirmed && <span className="gp-tag">{t('未确认')}</span>}
                 </div>
                 {view ? (
@@ -186,11 +190,7 @@ export function PersonaHoverCard({ bot, children }: { bot: Member; children: Rea
       {open && view && (
         <span className="gp-hover-card" role="tooltip">
           <b>{bot.name}</b>
-          <small>
-            {personaLabel(view.profile.traits)
-              .map((w) => t(w))
-              .join(' · ') || t('性格均衡')}
-          </small>
+          <small>{labelOf(view, t)}</small>
           <TraitBars traits={view.profile.traits} />
           <span>{t('对你：{word}', { word: t(relationWord(toYou)) })}</span>
           {memory && <span className="gp-memory">{memory.summary}</span>}

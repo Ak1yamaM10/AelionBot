@@ -32,6 +32,11 @@ export function registerPersona(ctx: IpcContext) {
       if (typeof input.reviewId !== 'string') throw Error('成长评估编号无效');
       return persona.undoGrowthReview(b.id, input.reviewId);
     }
+    if (input.action === 'preset') {
+      const focus = typeof input.focus === 'string' ? input.focus : undefined;
+      if (focus && focus !== 'user' && !ctx.store.data.bots.some((x) => x.id === focus)) throw Error('对象不存在');
+      return persona.applyPreset(b.id, typeof input.preset === 'string' ? input.preset : '', focus);
+    }
     if (input.action === 'draft')
       return persona.draft(b.id, b.name, b.soul, async (system, user) => {
         const result = await ctx.model.complete(
