@@ -1,4 +1,6 @@
 import { createContext, useCallback, useContext, useRef, useState, useMemo, type ReactNode } from 'react';
+import { nextPinNumber } from '../../shared/preview/preview-annotations';
+import type { PreviewAnnotation } from '../../shared/types/preview-editor-types';
 import type { AttachmentScope } from '../../shared/types/attachment-types';
 import type { ArtifactPreview } from '../../shared/types/core';
 import { FilePreview } from './FilePreview';
@@ -31,10 +33,27 @@ export type RegisterPreviewGuard = (guard: PreviewGuard) => () => void;
 interface PreviewOptions {
   expanded?: boolean;
   scope?: AttachmentScope | null;
+  /** Pins a Bot placed with preview_mark on the item being opened. */
+  marks?: PreviewAnnotation[];
+}
+type PinCache = Record<string, PreviewAnnotation[]>;
+/**
+ * Adds a Bot's pins to an item's cached pins, numbered after those already there. A web page reads them as its own;
+ * a file preview takes them from the pending list when their page is shown.
+ */
+function withBotPins(cache: PinCache = {}, itemId: string, marks: PreviewAnnotation[]): PinCache {
+  const web = 'web:' + itemId,
+    pending = 'pending:' + itemId,
+    existing = Object.entries(cache)
+      .filter(([key]) => key === web || key === pending || key.startsWith(itemId + ':'))
+      .flatMap(([, value]) => value);
+  let next = nextPinNumber(existing);
+  const numbered = marks.map((mark) => ({ ...mark, n: next++ }));
+  return { ...cache, [web]: [...(cache[web] || []), ...numbered], [pending]: [...(cache[pending] || []), ...numbered] };
 }
 interface Session {
   closed?: boolean;
-  annotationCache?: Record<string, import('../../shared/types/preview-editor-types').PreviewAnnotation[]>;
+  annotationCache?: PinCache;
   items: PreviewItem[];
   index: number;
   expanded?: boolean;
@@ -112,7 +131,11 @@ export function FilePreviewProvider({ children }: { children: ReactNode }) {
     };
   }, []);
   const annotations = useMemo<PreviewAnnotationControls>(
-    () => ({ remove: (id) => marks.current?.remove(id), select: (id) => marks.current?.select(id) }),
+    () => ({
+      remove: (id) => marks.current?.remove(id),
+      select: (id) => marks.current?.select(id),
+      status: (updates) => marks.current?.status(updates),
+    }),
     [],
   );
   const infoRef = useRef(info);
@@ -150,15 +173,17 @@ export function FilePreviewProvider({ children }: { children: ReactNode }) {
       <Context.Provider
         value={(items, index = 0, options) =>
           navigate(() => {
-            const next: Session = {
-              annotationCache: cache.current.get(scopeKey(options?.scope || undefined))?.annotationCache,
-              closed: false,
-              items,
-              index,
-              expanded: options?.expanded,
-              scope: options?.scope || undefined,
-              generation: ++generation.current,
-            };
+            const saved = cache.current.get(scopeKey(options?.scope || undefined))?.annotationCache,
+              next: Session = {
+                annotationCache:
+                  options?.marks?.length && items[index] ? withBotPins(saved, items[index].id, options.marks) : saved,
+                closed: false,
+                items,
+                index,
+                expanded: options?.expanded,
+                scope: options?.scope || undefined,
+                generation: ++generation.current,
+              };
             cache.current.set(scopeKey(next.scope), next);
             show(next);
           })

@@ -350,9 +350,11 @@ export function WebPreview({
       },
       primaryLabel: pageEditor ? (pageEditor.write ? t('保存修改') : t('另存为')) : t('发送修改'),
       saveLabel: pageEditor ? (pageEditor.write ? t('保存并继续') : t('另存为并继续')) : t('发送修改并继续'),
+      zoom: state?.zoomFactor || 1,
+      capture: async () => (await window.aelion.captureWebPreviewMenu({ id: id.current }).catch(() => null))?.image,
     });
     return () => runtime.setWeb(undefined);
-  }, [ready, state?.loading, state?.localDocument, editorState, command, fileEditor, busy]);
+  }, [ready, state?.loading, state?.localDocument, state?.zoomFactor, editorState, command, fileEditor, busy]);
   useEffect(() => {
     const currentId = id.current;
     const transition = new PreviewMenuTransition({

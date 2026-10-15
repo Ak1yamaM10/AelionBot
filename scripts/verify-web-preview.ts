@@ -278,15 +278,16 @@ async function run() {
         id: 'sample',
         editVersion: 0,
         text: '',
-        pending: false,
-        status: '',
-        failed: false,
+        number: '1',
+        title: '按钮 · 免费试用',
+        tunable: true,
         language: 'zh-CN',
         fontFamily: 'sans-serif',
         fontSize: '14px',
         fontWeight: '400',
+        dark: false,
       },
-      rect: { x: 100, y: 480, width: 500, height: 54 },
+      rect: { x: 100, y: 300, width: 296, height: 150 },
       visible: true,
     };
     assert.equal(browser.feedback(floating), true);
@@ -315,19 +316,17 @@ async function run() {
       'old snapshots must not erase typing',
     );
     browser.feedback({ ...floating, state: { ...floating.state, text: '调整这里的排版', editVersion: version } });
-    await overlay.webContents.executeJavaScript(
-      'document.querySelector("form").dispatchEvent(new Event("submit",{cancelable:true,bubbles:true}));',
-    );
+    await overlay.webContents.executeJavaScript('document.getElementById("done").click();');
     await new Promise((resolve) => setTimeout(resolve, 40));
-    assert.equal(inputs.at(-1)?.kind, 'send');
+    assert.equal(inputs.at(-1)?.kind, 'done');
     browser.feedback(null);
     assert.equal(overlay.getVisible(), false);
     browser.feedback({
       ...floating,
-      state: { ...floating.state, editVersion: inputs.at(-1).editVersion, text: '', pending: false },
+      state: { ...floating.state, editVersion: inputs.at(-1).editVersion, text: '' },
     });
     assert.equal(overlay.getVisible(), true);
-    console.log('PASS: transparent overlay, text-only bridge, Chinese input, stale-state protection and send');
+    console.log('PASS: transparent comment bubble, text-only bridge, Chinese input, stale-state protection and done');
     console.log('phase: navigation verified');
     try {
       const png = await browser.capture({ x: 10, y: 120, width: 700, height: 450 });

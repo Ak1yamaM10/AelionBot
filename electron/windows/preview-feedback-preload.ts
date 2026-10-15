@@ -1,4 +1,5 @@
 import { contextBridge, ipcRenderer } from 'electron';
+import { FEEDBACK_OVERLAY_KINDS, type FeedbackOverlayKind } from '../../shared/preview/preview-feedback-overlay';
 let id = '',
   editVersion = 0;
 contextBridge.exposeInMainWorld('feedbackOverlay', {
@@ -9,8 +10,8 @@ contextBridge.exposeInMainWorld('feedbackOverlay', {
       callback(state);
     });
   },
-  act: (kind: string, text: string) => {
-    if (['change', 'send', 'escape'].includes(kind) && typeof text === 'string' && text.length <= 12000) {
+  act: (kind: FeedbackOverlayKind, text: string) => {
+    if (FEEDBACK_OVERLAY_KINDS.includes(kind) && typeof text === 'string' && text.length <= 12000) {
       const version = ++editVersion;
       ipcRenderer.send('preview-feedback-overlay:input', { id, kind, text, editVersion: version });
       return version;

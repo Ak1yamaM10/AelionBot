@@ -61,6 +61,26 @@ test('preview tool accepts file or attachment targets, validates schema, and nev
   const batch = TOOLS.find((tool) => tool.function.name === 'tools_batch')!;
   assert.ok(!JSON.stringify(batch).includes('open_preview'));
 });
+test('preview_mark opens the preview with the Bot pins, and rejects pins without a place or a note', async (t) => {
+  const tool = TOOLS.find((tool) => tool.function.name === 'preview_mark')!;
+  validateToolArguments(tool, { ...args, marks: [{ selector: 'h1', note: 'Keep?' }] });
+  assert.throws(() => validateToolArguments(tool, args));
+  const f = fixture(t),
+    result = await f.previews.open(
+      f.bot.id,
+      f.run.id,
+      { ...args, marks: [{ box: [0.1, 0.1, 0.2, 0.2], note: 'Too tight?' }] },
+      signal(),
+    );
+  assert.equal((result as any).marks, 1);
+  const [request] = f.previews.snapshot();
+  assert.equal(request.marks?.[0].botNote, 'Too tight?');
+  assert.equal(request.marks?.[0].author, 'bot');
+  await assert.rejects(
+    f.previews.open(f.bot.id, f.run.id, { ...args, marks: [{ note: 'Where?' }] }, signal()),
+    (error: any) => error.code === 'preview.mark_invalid',
+  );
+});
 test('VM previews normalize their own absolute paths and only queue the current conversation', async (t) => {
   const f = fixture(t),
     result = await f.previews.open(f.bot.id, f.run.id, { ...args, path: '/work/' + f.bot.id + '/result.md' }, signal());

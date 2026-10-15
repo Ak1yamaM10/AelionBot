@@ -16,6 +16,7 @@ export const GROUP_LIMITS = {
 } as const;
 const conversationTools = new Set([
   'open_preview',
+  'preview_mark',
   'code_exec',
   'request_user_input',
   'user_input_wait',
@@ -78,6 +79,8 @@ export interface GroupLifecycleEvent {
 export interface GroupMessage {
   designSessionId?: string;
   previewPrompt?: string;
+  /** The pins a preview comment sent; replies refer to them as #n. */
+  previewMarks?: import('../preview/preview-annotations').PreviewMarkRef[];
   reply?: MessageReply;
   workItemId?: string;
   workspaceDir?: string | null;

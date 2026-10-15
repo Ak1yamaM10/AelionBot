@@ -170,6 +170,8 @@ export interface ChatMessage {
   /** Sent from a connector chat rather than from this app. */
   connector?: MessageConnectorSource;
   previewPrompt?: string;
+  /** The pins a preview comment sent; the Bot's reply refers to them as #n. */
+  previewMarks?: import('../preview/preview-annotations').PreviewMarkRef[];
   operationDenial?: import('../chat/operation-denial').OperationDenial;
   questionAnswer?: import('../chat/question-answers').QuestionAnswerData;
   reply?: MessageReply;

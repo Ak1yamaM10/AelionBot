@@ -2,6 +2,8 @@ import { commentsFromAnnotations } from '../../shared/preview/designer-canvas';
 import { applyDomEdits } from '../core/preview/html-preview-edits';
 import { PreviewFeedbackService, designFeedbackFile } from '../core/preview/preview-feedback';
 import { feedbackCaptureRect } from '../../shared/preview/preview-feedback';
+import { markRefs } from '../../shared/preview/preview-annotations';
+import type { NativeImage } from 'electron';
 import type { IpcContext } from './context';
 
 export function registerPreview(ctx: IpcContext) {
@@ -21,6 +23,20 @@ export function registerPreview(ctx: IpcContext) {
       path = designFeedbackFile(input, design);
     if (path && design.location === 'host') ctx.designerFiles.absolute(design, path);
     return design;
+  };
+  /** The app window as an image, within ten seconds. */
+  const captureWindow = async (): Promise<NativeImage> => {
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const capture = await Promise.race([
+      ctx.window!.webContents.capturePage(undefined, { stayHidden: true }),
+      new Promise<never>((_, reject) => {
+        timer = setTimeout(() => reject(Error('预览截图超时，请重试')), 10000);
+      }),
+    ]).finally(() => {
+      if (timer) clearTimeout(timer);
+    });
+    if (capture.isEmpty()) throw Error('未能截取预览画面，请重试');
+    return capture;
   };
   const previewFeedback = new PreviewFeedbackService({
     validate: (scope) => {
@@ -47,16 +63,7 @@ export function registerPreview(ctx: IpcContext) {
       feedbackCaptureRect(input.rect, input.viewport, input.viewport);
       const webCapture = await ctx.webPreview?.capture(input.rect);
       if (webCapture) return webCapture;
-      let timer: ReturnType<typeof setTimeout> | undefined;
-      const capture = await Promise.race([
-        ctx.window.webContents.capturePage(undefined, { stayHidden: true }),
-        new Promise<never>((_, reject) => {
-          timer = setTimeout(() => reject(Error('预览截图超时，请重试')), 10000);
-        }),
-      ]).finally(() => {
-        if (timer) clearTimeout(timer);
-      });
-      if (capture.isEmpty()) throw Error('未能截取预览画面，请重试');
+      const capture = await captureWindow();
       let cropped = capture.crop(feedbackCaptureRect(input.rect, input.viewport, capture.getSize()));
       const size = cropped.getSize();
       if (Math.max(size.width, size.height) > 2560)
@@ -64,6 +71,31 @@ export function registerPreview(ctx: IpcContext) {
           size.width >= size.height ? { width: 2560, quality: 'best' } : { height: 2560, quality: 'best' },
         );
       return cropped.toPNG();
+    },
+    // A page shows each pin by scrolling to it; a file preview cuts the pins on screen out of the window.
+    closeUps: async (input, ids) => {
+      const page = await ctx.webPreview?.closeUps(ids);
+      if (page) return page;
+      const rects = (input.pinRects || []).filter((pin) => ids.includes(pin.id));
+      if (!rects.length || !ctx.window || ctx.window.isDestroyed()) return [];
+      const image = await captureWindow(),
+        pad = 40,
+        area = input.rect;
+      return rects.flatMap(({ id, rect }) => {
+        const x = Math.max(area.x, rect.x - pad),
+          y = Math.max(area.y, rect.y - pad),
+          box = {
+            x,
+            y,
+            width: Math.min(area.x + area.width, rect.x + rect.width + pad) - x,
+            height: Math.min(area.y + area.height, rect.y + rect.height + pad) - y,
+          };
+        try {
+          return [{ id, bytes: image.crop(feedbackCaptureRect(box, input.viewport, image.getSize())).toPNG() }];
+        } catch {
+          return [];
+        }
+      });
     },
     attach: (scope, name, bytes) => ctx.attachments.importFiles(scope, [{ name, bytes }])[0],
     discard: (scope, id) => ctx.attachments.discardUnsentDraft(scope, id),
@@ -89,6 +121,7 @@ export function registerPreview(ctx: IpcContext) {
           mentions: input?.mentions?.map((m) => ({ ...m, start: m.start + offset, end: m.end + offset })),
           replyToMessageId: input?.replyToMessageId,
           previewPrompt,
+          ...(input?.annotations?.length ? { previewMarks: markRefs(input.annotations) } : {}),
         };
       if (scope.kind === 'bot')
         ctx.chatPins!.send({

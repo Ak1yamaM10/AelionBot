@@ -8,6 +8,7 @@ import { artifactPath, type ArtifactService } from '../attachments/artifacts';
 import type { Attachments } from '../attachments/attachments';
 import type { HostComputer } from '../host/host';
 import { officeExtensions } from '../designer/office-preview';
+import { botPins } from '../../../shared/preview/preview-annotations';
 const LIMIT = 25 * 1024 * 1024;
 const HISTORY_PER_SCOPE = 20,
   HISTORY_TOTAL = 400;
@@ -83,6 +84,7 @@ export class AgentPreviews {
       throw Error('请只填写 path、attachmentId 或 url');
     if (args.placement !== undefined && !['side', 'full'].includes(String(args.placement)))
       throw Error('placement 必须是 side 或 full');
+    const marks = args.marks === undefined ? undefined : botPins(args.marks);
     const scope: AgentPreviewRequest['scope'] = run.groupOrigin
       ? { kind: 'group', id: run.groupOrigin.groupId }
       : { kind: 'bot', id: botId };
@@ -160,6 +162,7 @@ export class AgentPreviews {
         size,
         placement: args.placement === 'full' ? 'full' : 'side',
         createdAt: new Date().toISOString(),
+        ...(marks ? { marks } : {}),
       };
     // Keep only the newest pending request in each conversation.
     this.pending.delete(key);
@@ -172,8 +175,10 @@ export class AgentPreviews {
       scope,
       name,
       placement: request.placement,
-      message:
-        '预览已排队，将在用户查看此会话且界面可用时展示；这不代表用户已经查看或文件已经验收。仍需发送最终说明，交付附件请用 message_attach。',
+      ...(marks ? { marks: marks.length } : {}),
+      message: marks
+        ? '评论已排队，会在用户查看此会话时随预览显示。用户在钉上的回复会按编号随下一条消息发给你；不要等待或催促。'
+        : '预览已排队，将在用户查看此会话且界面可用时展示；这不代表用户已经查看或文件已经验收。仍需发送最终说明，交付附件请用 message_attach。',
     };
   }
 }

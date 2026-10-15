@@ -16,4 +16,38 @@ export const PREVIEW_TOOLS: ToolDefinition[] = [
     },
     [],
   ),
+  tool(
+    'preview_mark',
+    '在预览中的具体位置钉评论，请用户在那里做决定或确认，比如“这里的两种配色选哪个？”。会像 open_preview 一样打开这份预览（参数相同，path、attachmentId、url 三选一，path 要写 location），并显示你的钉。marks 每条写 note；HTML 用 selector（CSS 选择器或 [data-design-id="…"]）定位，其他文件用 box [x, y, w, h]（相对整页或 PDF 某一页的 0–1 比例，PDF 加 page）。用户在钉上的回复会按编号随下一条消息发给你。只在需要用户针对某个位置作答时使用，不要用来罗列已完成的修改。',
+    {
+      path: string,
+      url: string,
+      location: { type: 'string', enum: ['vm', 'host'] },
+      attachmentId: string,
+      placement: { type: 'string', enum: ['side', 'full'] },
+      marks: {
+        type: 'array',
+        minItems: 1,
+        maxItems: 20,
+        items: {
+          type: 'object',
+          properties: {
+            note: { type: 'string', description: '钉上显示的问题或说明，不超过 1000 字' },
+            selector: { type: 'string', description: 'HTML 元素的 CSS 选择器' },
+            box: {
+              type: 'array',
+              minItems: 4,
+              maxItems: 4,
+              items: { type: 'number', minimum: 0, maximum: 1 },
+              description: '[x, y, w, h]，相对整页或当前页的比例',
+            },
+            page: { type: 'integer', minimum: 1, description: 'PDF 页码' },
+          },
+          required: ['note'],
+          additionalProperties: false,
+        },
+      },
+    },
+    ['marks'],
+  ),
 ];

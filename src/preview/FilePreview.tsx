@@ -13,7 +13,7 @@ import type { PreviewChatInput } from './PreviewWorkbench';
 import { usePreviewWorkbench } from './PreviewWorkbench';
 import { PreviewToolbar } from './PreviewToolbar';
 import { PreviewContent } from './PreviewContent';
-import { PreviewFeedback, type FeedbackFocusRequest } from './PreviewFeedback';
+import { PreviewFeedback } from './PreviewFeedback';
 import type { AttachmentScope } from '../../shared/types/attachment-types';
 import { draftChanged, editedPreview, usePreviewEdits } from './use-preview-edits';
 import { WorkspaceFileTree } from '../files/WorkspaceFileTree';
@@ -27,6 +27,8 @@ import { previewErrorText, previewKind } from './preview-utils';
 import { useI18n } from '../i18n';
 import { PreviewIcon } from './PreviewIcon';
 import { UnsavedDialog } from './UnsavedDialog';
+import { PinBubble, useWebPinBubble, type PinBubbleActions } from './PinBubble';
+import { pinNumber } from '../../shared/preview/preview-annotations';
 import './file-preview.css';
 import './file-preview-compact.css';
 import './preview-workbench.css';
@@ -34,6 +36,8 @@ import './preview-editing-tools.css';
 import './preview-shell.css';
 
 const SourceEditor = lazy(() => import('./SourceEditor'));
+/** The page as it looked when its comments were sent, by item, kept for this app session to compare against. */
+const sentSnapshots = new Map<string, { image: string; pins: string[] }>();
 export function FilePreview({
   items: initialItems,
   initialIndex = 0,
@@ -145,7 +149,10 @@ export function FilePreview({
   };
   const annotations = web ? (mode === 'edit' ? [] : web.state.annotations) : fileAnnotations;
   const [selectedAnnotationId, setSelectedAnnotationId] = useState<string>(),
-    [feedbackFocus, setFeedbackFocus] = useState<FeedbackFocusRequest>({ sequence: 0 });
+    // The pin whose comment bubble is open.
+    [bubble, setBubble] = useState<string>();
+  const bubbleRef = useRef(bubble);
+  bubbleRef.current = bubble;
   const seenAnnotations = useRef(new Set<string>());
   const setAnnotations = async (value: PreviewAnnotation[]) => {
     if (webRef.current) await webRef.current.command({ type: 'annotations', annotations: value });
@@ -153,39 +160,100 @@ export function FilePreview({
   };
   const selectAnnotation = (id: string) => {
     setSelectedAnnotationId(id);
+    setBubble(id);
     if (webRef.current)
-      void webRef.current.command({ type: 'annotation-select', id }).catch((error) => setNotice(error.message));
+      void webRef.current
+        .command({ type: 'reveal', id })
+        .then(() => webRef.current?.command({ type: 'annotation-select', id }))
+        .catch((error) => setNotice(error.message));
   };
+  const selectRef = useRef(selectAnnotation);
+  selectRef.current = selectAnnotation;
   useEffect(() => {
     const selected = web?.state.selectedAnnotationId;
     if (selected) setSelectedAnnotationId(selected);
   }, [web?.state.selectedAnnotationId]);
+  // A pin clicked or made in the page opens its bubble.
+  const pinSeq = useRef(web?.state.pinSeq || 0);
+  useEffect(() => {
+    const seq = web?.state.pinSeq || 0;
+    if (seq > pinSeq.current && web?.state.selectedAnnotationId) setBubble(web.state.selectedAnnotationId);
+    pinSeq.current = seq;
+  }, [web?.state.pinSeq]);
   useEffect(() => {
     const added = annotations.filter((mark) => !seenAnnotations.current.has(mark.id));
     seenAnnotations.current = new Set(annotations.map((mark) => mark.id));
+    // A new pin stays where it is, with its bubble open to say what should change there.
     if (added.length && mode === 'annotate') {
       const mark = added.at(-1)!;
       setSelectedAnnotationId(mark.id);
-      if (tool === 'rect' || tool === 'element' || tool === 'text') {
-        setMode('browse');
-        setFeedbackFocus((value) => ({ sequence: value.sequence + 1, note: tool === 'text' }));
-      }
+      setBubble(mark.id);
     } else if (selectedAnnotationId && !annotations.some((mark) => mark.id === selectedAnnotationId))
       setSelectedAnnotationId(annotations.at(-1)?.id);
+    if (bubble && !annotations.some((mark) => mark.id === bubble) && !(web && mode === 'edit')) setBubble(undefined);
   }, [annotations, mode, tool]);
   const annotationsRef = useRef(annotations);
   annotationsRef.current = annotations;
+  const pinActions: PinBubbleActions = {
+    // Saving the same text twice (the bubble saves on 好了 and again as it closes) leaves the pins as they are.
+    commit: (id, value) => {
+      const mark = annotationsRef.current.find((item) => item.id === id),
+        text = value.trim() ? value : '';
+      if (!mark || (mark.text || '') === text) return;
+      // A sent pin with new words goes out again with the next message.
+      const next = annotationsRef.current.map((item) =>
+        item.id === id
+          ? { ...item, text: text || undefined, ...(text && item.status ? { status: undefined } : {}) }
+          : item,
+      );
+      void setAnnotations(next).catch((error) => setNotice(previewErrorText(error)));
+    },
+    close: () => setBubble(undefined),
+    remove: (id) => {
+      setBubble(undefined);
+      void setAnnotations(annotationsRef.current.filter((mark) => mark.id !== id)).catch((error) =>
+        setNotice(previewErrorText(error)),
+      );
+    },
+    ...(web
+      ? {
+          tune: (id: string) => {
+            setBubble(undefined);
+            pendingTune.current = id;
+            setMode('edit');
+          },
+        }
+      : {}),
+  };
+  const pendingTune = useRef<string | undefined>(undefined);
+  useEffect(() => {
+    const id = pendingTune.current;
+    if (!id || web?.state.mode !== 'edit') return;
+    pendingTune.current = undefined;
+    void web.command({ type: 'select-pin', id }).catch((error) => setNotice(error.message));
+  }, [web?.state.mode]);
   useEffect(
     () =>
       workbench?.registerAnnotations({
         remove: (id) => void setAnnotations(annotationsRef.current.filter((mark) => mark.id !== id)),
-        select: (id) => selectAnnotation(id),
+        select: (id) => selectRef.current(id),
+        status: (updates) => {
+          let changed = false;
+          const next = annotationsRef.current.map((mark) => {
+            const update = updates[mark.id];
+            // Only pins that went out take the reply's word; one being written again stays as it is.
+            if (!update || !mark.status || (mark.status === update.status && mark.reply === update.reply)) return mark;
+            changed = true;
+            return { ...mark, status: update.status, ...(update.reply ? { reply: update.reply } : {}) };
+          });
+          if (changed) void setAnnotations(next).catch(() => {});
+        },
       }),
     [workbench?.registerAnnotations, web],
   );
   const captureAnnotations = async () => {
     const view = webRef.current;
-    if (!view) return { annotations: fileAnnotations };
+    if (!view) return { annotations: annotationsRef.current };
     const result = await view.command({ type: 'feedback-state' });
     return { annotations: result.state.annotations, view: result.state.viewport };
   };
@@ -193,6 +261,7 @@ export function FilePreview({
     setMode('browse');
     setFileAnnotations([]);
     setSelectedAnnotationId(undefined);
+    setBubble(undefined);
     seenAnnotations.current = new Set();
   }, [index]);
   const [feedbackSending, setFeedbackSending] = useState(false),
@@ -243,12 +312,16 @@ export function FilePreview({
     { key: 'preview', label: t('预览') },
     ...(page && item.editor ? [{ key: 'source', label: t('源码') }] : []),
     ...(page ? [{ key: 'edit', label: t('编辑') }] : item.editor ? [{ key: 'source', label: t('编辑') }] : []),
-    { key: 'annotate', label: t('标注') },
+    { key: 'annotate', label: t('评论') },
   ];
+  const pinCount = web ? web.state.annotations.length : fileAnnotations.length,
+    // 选取 picks an element on a page, or a spot or region on a file; 画笔 draws.
+    selectTool: AnnotationTool = page ? 'element' : 'rect';
   const segment = draft?.editing ? 'source' : mode === 'edit' ? 'edit' : mode === 'annotate' ? 'annotate' : 'preview';
   const toolsOpen = !draft?.editing && (mode === 'annotate' || (Boolean(web) && mode === 'edit'));
   const chooseSegment = (key: string) => {
     if (key === segment) return;
+    setBubble(undefined);
     if (key === 'source') {
       setMode('browse');
       request(() => void edits.edit(item));
@@ -256,8 +329,42 @@ export function FilePreview({
     }
     if (draft?.editing) void edits.edit(item);
     setMode(key === 'edit' ? 'edit' : key === 'annotate' ? 'annotate' : 'browse');
-    if (key === 'annotate' && !page && tool === 'element') setTool('rect');
+    if (key === 'annotate') setTool(tool === 'pen' ? 'pen' : selectTool);
   };
+  const comment = (next: AnnotationTool) => {
+    setBubble(undefined);
+    if (draft?.editing) void edits.edit(item);
+    setMode('annotate');
+    setTool(next);
+  };
+  const commentRef = useRef(comment);
+  commentRef.current = comment;
+  const bubbleIndex = bubble ? annotations.findIndex((mark) => mark.id === bubble) : -1,
+    bubbleMark = bubbleIndex >= 0 ? annotations[bubbleIndex] : undefined;
+  useWebPinBubble({
+    web,
+    mark: web ? bubbleMark : undefined,
+    index: bubbleIndex,
+    slot: () => panel.current?.querySelector<HTMLElement>('.web-preview-slot'),
+    zoom: web?.zoom || 1,
+    hidden:
+      feedbackSending ||
+      Boolean(edits.pending) ||
+      Boolean(domPending) ||
+      Boolean(draft?.editing) ||
+      mode === 'edit' ||
+      (directoryOpen && !wide),
+    actions: pinActions,
+  });
+  const snapshotKey = (feedbackScope ? feedbackScope.kind + ':' + feedbackScope.id + ':' : '') + item.id,
+    snapshot = web ? sentSnapshots.get(snapshotKey) : undefined,
+    // Worth comparing once the Bot has answered at least one of the pins sent with that version.
+    answered = Boolean(
+      snapshot &&
+      annotations.some((mark) => snapshot.pins.includes(mark.id) && (mark.status === 'done' || mark.status === 'kept')),
+    ),
+    [compare, setCompare] = useState(false),
+    comparing = compare && answered && !draft?.editing && mode !== 'edit';
   const previewKindLabel = t(previewKind(item.name)),
     directoryBotId = item.workspace?.botId || item.directoryBotId;
   useEffect(
@@ -367,6 +474,35 @@ export function FilePreview({
         if (!edits.pending) void edits.save(item.id);
         return;
       }
+      // C and P pick the comment tools; a number opens that comment.
+      if (
+        !event.ctrlKey &&
+        !event.metaKey &&
+        !event.altKey &&
+        !event.isComposing &&
+        !previewTextInput(event) &&
+        !(event.target as HTMLElement | null)?.closest?.('.cm-editor') &&
+        mode !== 'edit' &&
+        !draft?.editing &&
+        !feedbackLock.current &&
+        !domPending &&
+        !edits.pending
+      ) {
+        const letter = event.key.toLowerCase();
+        if (letter === 'c' || letter === 'p') {
+          event.preventDefault();
+          commentRef.current(letter === 'p' ? 'pen' : page ? 'element' : 'rect');
+          return;
+        }
+        if (/^[1-9]$/.test(event.key)) {
+          const mark = annotationsRef.current.find((value, i) => pinNumber(value, i) === Number(event.key));
+          if (mark) {
+            event.preventDefault();
+            selectRef.current(mark.id);
+          }
+          return;
+        }
+      }
       if (event.key === 'Escape') {
         if (
           document.querySelector(
@@ -374,6 +510,12 @@ export function FilePreview({
           )
         )
           return;
+        if (bubbleRef.current) {
+          event.preventDefault();
+          event.stopImmediatePropagation();
+          setBubble(undefined);
+          return;
+        }
         if (domPending) {
           event.preventDefault();
           if (!domSaving && !webRef.current?.busy) setDomPending(undefined);
@@ -394,7 +536,7 @@ export function FilePreview({
       live = false;
       window.removeEventListener('keydown', key, true);
     };
-  }, [modal, expanded, wide, mode, onClose, edits.pending, edits.saving, draft, domPending, domSaving, item.id]);
+  }, [modal, expanded, wide, mode, onClose, edits.pending, edits.saving, draft, domPending, domSaving, item.id, page]);
   const act = async (task: () => Promise<unknown>, success = '') => {
     setBusy(true);
     setNotice('');
@@ -628,6 +770,11 @@ export function FilePreview({
                     onClick={() => chooseSegment(option.key)}
                   >
                     {option.label}
+                    {option.key === 'annotate' && pinCount > 0 && (
+                      <span className="fp-mode-count" aria-label={t('{count} 条', { count: pinCount })}>
+                        {pinCount}
+                      </span>
+                    )}
                   </button>
                 ))}
               </div>
@@ -640,6 +787,19 @@ export function FilePreview({
                 >
                   <PreviewIcon name="pages" />
                 </button>
+                {answered && (
+                  <button
+                    aria-pressed={comparing}
+                    aria-label={t('对比上一版')}
+                    title={t('对比上一版')}
+                    onClick={() => {
+                      setBubble(undefined);
+                      setCompare((value) => !value);
+                    }}
+                  >
+                    <PreviewIcon name="compare" />
+                  </button>
+                )}
                 <button
                   className="fp-reload"
                   onClick={() =>
@@ -695,53 +855,35 @@ export function FilePreview({
                 inert={Boolean(edits.pending) || Boolean(domPending) || feedbackSending}
               >
                 {mode === 'annotate' && (
-                  <div className="fp-tool-group">
-                    {(['rect', ...(web ? ['element'] : [])] as AnnotationTool[]).map((type) => (
-                      <button
-                        key={type}
-                        aria-pressed={mode === 'annotate' && tool === type}
-                        onClick={() => {
-                          setMode('annotate');
-                          setTool(type);
-                        }}
-                      >
-                        <PreviewIcon name={type === 'rect' ? 'rect' : 'comment'} />
-                        {type === 'rect' ? l('圈选', 'Region') : l('元素', 'Element')}
-                      </button>
-                    ))}
-                  </div>
-                )}
-                {mode === 'annotate' && (
-                  <div className="fp-tool-group" role="group" aria-label={l('标记工具', 'Markup tools')}>
-                    {(['arrow', 'pen', 'text'] as const).map((type) => (
-                      <button
-                        key={type}
-                        aria-pressed={mode === 'annotate' && tool === type}
-                        title={l(
-                          { arrow: '箭头', pen: '画笔', text: '文字标注' }[type],
-                          { arrow: 'Arrow', pen: 'Pen', text: 'Text note' }[type],
-                        )}
-                        aria-label={l(
-                          { arrow: '箭头', pen: '画笔', text: '文字标注' }[type],
-                          { arrow: 'Arrow', pen: 'Pen', text: 'Text note' }[type],
-                        )}
-                        onClick={() => {
-                          setMode('annotate');
-                          setTool(type);
-                        }}
-                      >
-                        <PreviewIcon name={{ arrow: 'arrow', pen: 'edit', text: 'text' }[type]} />
-                      </button>
-                    ))}
+                  <div className="fp-tool-group" role="group" aria-label={t('评论工具')}>
+                    <button
+                      aria-pressed={tool !== 'pen'}
+                      title={page ? t('点一个元素钉评论，拖动圈出一块区域') : t('点一下钉评论，拖动圈出一块区域')}
+                      onClick={() => comment(selectTool)}
+                    >
+                      <PreviewIcon name="comment" />
+                      {t('选取')}
+                      <kbd>C</kbd>
+                    </button>
+                    <button
+                      aria-pressed={tool === 'pen'}
+                      title={t('随手画出来，画直线会变成箭头')}
+                      onClick={() => comment('pen')}
+                    >
+                      <PreviewIcon name="edit" />
+                      {t('画笔')}
+                      <kbd>P</kbd>
+                    </button>
                   </div>
                 )}
                 {mode === 'annotate' && (
                   <div className="fp-tool-group">
                     <button
                       disabled={web ? !web.state.annotationCanUndo : !annotations.length}
-                      title={t('撤销标注')}
-                      aria-label={t('撤销标注')}
+                      title={t('撤销')}
+                      aria-label={t('撤销')}
                       onClick={() => {
+                        setBubble(undefined);
                         if (web)
                           void web.command({ type: 'annotation-undo' }).catch((error) => setNotice(error.message));
                         else void setAnnotations(annotations.slice(0, -1));
@@ -752,15 +894,17 @@ export function FilePreview({
                     {web && (
                       <button
                         disabled={!web.state.annotationCanRedo}
-                        title={l('重做标注', 'Redo annotation')}
-                        aria-label={l('重做标注', 'Redo annotation')}
-                        onClick={() =>
-                          void web.command({ type: 'annotation-redo' }).catch((error) => setNotice(error.message))
-                        }
+                        title={t('重做')}
+                        aria-label={t('重做')}
+                        onClick={() => {
+                          setBubble(undefined);
+                          void web.command({ type: 'annotation-redo' }).catch((error) => setNotice(error.message));
+                        }}
                       >
                         <PreviewIcon name="right" />
                       </button>
                     )}
+                    <span className="fp-tool-hint">{t('数字键打开对应评论')}</span>
                   </div>
                 )}
                 {web && mode === 'edit' && (
@@ -849,7 +993,16 @@ export function FilePreview({
                   )}
                 </aside>
               )}
-              <div className={`fp-content ${draft ? 'has-editor-session' : ''}`}>
+              <div
+                className={`fp-content ${draft ? 'has-editor-session' : ''}`}
+                data-compare={comparing ? 'on' : undefined}
+              >
+                {comparing && snapshot && (
+                  <div className="fp-compare-before" aria-label={t('上一版')}>
+                    <span className="fp-compare-label">{t('上一版 · 发送评论时')}</span>
+                    <img src={snapshot.image} alt={t('上一版')} />
+                  </div>
+                )}
                 {draft?.editing ? (
                   draft.loading ? (
                     <div className="fp-state" role="status">
@@ -919,6 +1072,9 @@ export function FilePreview({
                   selectedAnnotationId={selectedAnnotationId}
                   onSelectAnnotation={selectAnnotation}
                 />
+                {!web && bubbleMark && !feedbackSending && (
+                  <PinBubble key={bubbleMark.id} mark={bubbleMark} index={bubbleIndex} actions={pinActions} />
+                )}
                 {/* Source-editing controls. A page saved from 编辑 also leaves a clean draft behind; it needs no
                     second save button in the header, so the group shows only with the source open or unsaved. */}
                 {draft && !draft.loading && draft.revision && (draft.editing || dirty) && (
@@ -963,11 +1119,22 @@ export function FilePreview({
                   selectedAnnotationId={selectedAnnotationId}
                   onSelectAnnotation={selectAnnotation}
                   onAnnotationsChange={setAnnotations}
-                  focusRequest={feedbackFocus}
                   captureState={captureAnnotations}
                   registerSend={registerFeedbackSend}
                   composer={modal}
+                  onSent={(pins) => {
+                    if (!web || !pins.length) return;
+                    // Kept to compare with once the Bot has answered.
+                    void web.capture().then((image) => {
+                      if (!image) return;
+                      sentSnapshots.delete(snapshotKey);
+                      sentSnapshots.set(snapshotKey, { image, pins });
+                      while (sentSnapshots.size > 12) sentSnapshots.delete(sentSnapshots.keys().next().value!);
+                    });
+                  }}
                   onBusy={(value) => {
+                    // Closing the bubble saves what was typed in it before the comments are read.
+                    if (value) setBubble(undefined);
                     feedbackLock.current = value;
                     setFeedbackSending(value);
                     if (!value && afterFeedback.current) {

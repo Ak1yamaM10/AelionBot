@@ -62,7 +62,7 @@ export function useAgentPreview(
       };
     }
     item.designSessionId = request.designSessionId;
-    show([item], 0, { expanded: request.placement === 'full', scope: request.scope });
+    show([item], 0, { expanded: request.placement === 'full', scope: request.scope, marks: request.marks });
     void window.aelion.acknowledgePreview(request.id).catch(onError);
   }, [requests, scope.kind, scope.id, blocked, show, focus, onError]);
 }

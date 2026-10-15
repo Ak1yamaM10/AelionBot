@@ -297,7 +297,7 @@
   color-scheme: inherit;
 }
 
-/* ---------- caption strip: marks are sent from the conversation composer ---------- */
+/* ---------- status strip: with a conversation composer beside the preview, only the send status shows here ---------- */
 .fp-feedback-wrap[hidden] {
   display: none !important;
 }
@@ -305,26 +305,6 @@
   padding: 8px 12px;
   background: var(--pv-bg);
   border-top: 1px solid var(--pv-line);
-}
-.fp-layer .fp-feedback-wrap.is-captions .fp-annotation-chips {
-  display: none;
-}
-.fp-layer .fp-feedback-wrap.is-captions .fp-feedback-context {
-  gap: 8px;
-}
-.fp-layer .fp-feedback-wrap.is-captions .fp-annotation-caption {
-  flex: 1;
-  width: auto;
-  max-width: none;
-  height: 30px;
-  border: 1px solid var(--pv-line);
-  border-radius: 9px;
-  background: var(--pv-bg);
-  color: var(--pv-ink);
-}
-.fp-layer .fp-feedback-wrap.is-captions .fp-annotation-caption:focus {
-  outline: none;
-  border-color: var(--pv-accent);
 }
 
 /* ---------- phone frames: one device, or two side by side at the same scale ---------- */

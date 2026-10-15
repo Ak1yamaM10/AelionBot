@@ -1,6 +1,11 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { translate } from '../../shared/i18n';
+import { nextPinNumber, PIN, pinColor, pinNumber, straightStroke } from '../../shared/preview/preview-annotations';
 import type { AnnotationTool, PreviewAnnotation, PreviewMode } from '../../shared/types/preview-editor-types';
+/**
+ * Comment pins over a file preview (PDF page, image, document, code). The select tool drops a pin where it is
+ * clicked or around a dragged region; the pen draws, and a straight stroke becomes an arrow. Each pin is numbered.
+ */
 export function FileAnnotationLayer({
   itemId,
   revision,
@@ -83,7 +88,22 @@ export function FileAnnotationLayer({
           key = itemId + ':' + revision + ':' + page + ':' + (target.matches('.cm-content') ? 'editor' : 'preview');
         if (targets.current.key !== key) {
           targets.current.key = key;
-          setMarks(cache.current.get(key) || []);
+          let value = cache.current.get(key);
+          // Pins a Bot placed with preview_mark wait under the item until its page is shown.
+          const pending = cache.current.get('pending:' + itemId);
+          if (pending?.length && !target.matches('.cm-content')) {
+            const here = pending.filter((mark) => (mark.page || 1) === Number(page));
+            if (here.length) {
+              value = [...(value || []), ...here];
+              cache.current.set(key, value);
+              cache.current.set(
+                'pending:' + itemId,
+                pending.filter((mark) => !here.includes(mark)),
+              );
+              onCacheChange?.(Object.fromEntries(cache.current));
+            }
+          }
+          setMarks(value || []);
           setShape(undefined);
           drawing.current = undefined;
         }
@@ -142,37 +162,35 @@ export function FileAnnotationLayer({
       x = p.x,
       y = p.y,
       w = (a.w || 0) * geometry.width,
-      h = (a.h || 0) * geometry.height;
+      h = (a.h || 0) * geometry.height,
+      draft = i < 0,
+      color = draft ? PIN.focus : pinColor(a),
+      focus = draft || selectedAnnotationId === a.id,
+      angle = end ? Math.atan2(end.y - y, end.x - x) : 0;
     return (
-      <g
-        key={a.id}
-        style={{ pointerEvents: mode === 'browse' ? 'visiblePainted' : 'none', cursor: 'pointer' }}
-        onPointerDown={(event) => {
-          if (mode === 'browse') {
-            event.stopPropagation();
-            onSelectAnnotation?.(a.id);
-          }
-        }}
-      >
-        {(a.type === 'rect' || a.type === 'element') && (
+      <g key={a.id} data-annotation-id={draft ? undefined : a.id}>
+        {(a.type === 'rect' || a.type === 'element') && (w > 0 || h > 0) && (
           <rect
-            x={x}
-            y={y}
-            width={w}
-            height={h}
-            fill={a.color + '0b'}
-            stroke={a.color}
-            strokeWidth={selectedAnnotationId === a.id ? 3 : 2}
+            x={x - 3}
+            y={y - 3}
+            width={w + 6}
+            height={h + 6}
+            rx={6}
+            fill={color + (focus ? '12' : '08')}
+            stroke={focus ? PIN.focus : color}
+            strokeWidth={focus ? 2 : 1.5}
           />
-        )}{' '}
+        )}
         {a.type === 'arrow' && end && (
           <>
-            <line x1={x} y1={y} x2={end.x} y2={end.y} stroke={a.color} strokeWidth={2} />
+            <line x1={x} y1={y} x2={end.x} y2={end.y} stroke={color} strokeWidth={2} strokeLinecap="round" />
             <path
-              d={`M ${end.x - 10 * Math.cos(Math.atan2(end.y - y, end.x - x) - 0.45)} ${end.y - 10 * Math.sin(Math.atan2(end.y - y, end.x - x) - 0.45)} L ${end.x} ${end.y} L ${end.x - 10 * Math.cos(Math.atan2(end.y - y, end.x - x) + 0.45)} ${end.y - 10 * Math.sin(Math.atan2(end.y - y, end.x - x) + 0.45)}`}
+              d={`M ${end.x - 11 * Math.cos(angle - 0.45)} ${end.y - 11 * Math.sin(angle - 0.45)} L ${end.x} ${end.y} L ${end.x - 11 * Math.cos(angle + 0.45)} ${end.y - 11 * Math.sin(angle + 0.45)}`}
               fill="none"
-              stroke={a.color}
+              stroke={color}
               strokeWidth={2}
+              strokeLinecap="round"
+              strokeLinejoin="round"
             />
           </>
         )}
@@ -183,34 +201,41 @@ export function FileAnnotationLayer({
               .map((p) => p.x + ',' + p.y)
               .join(' ')}
             fill="none"
-            stroke={a.color}
-            strokeWidth={3}
+            stroke={color}
+            strokeWidth={2.5}
             strokeLinecap="round"
             strokeLinejoin="round"
           />
         )}
-        {a.type === 'text' && (
-          <>
-            <rect
-              x={x}
-              y={y}
-              width={Math.max(65, (a.text || '标注').length * 14 + 16)}
-              height={28}
-              fill="#fff"
-              rx={4}
-            />
-            <text x={x + 8} y={y + 20} fontSize={14} fill={a.color}>
-              {a.text || '标注'}
+        {!draft && (
+          <g
+            data-pin-id={a.id}
+            style={{ pointerEvents: mode === 'edit' ? 'none' : 'visiblePainted', cursor: 'pointer' }}
+            onPointerDown={(event) => {
+              if (event.button !== 0) return;
+              event.stopPropagation();
+              event.preventDefault();
+              onSelectAnnotation?.(a.id);
+            }}
+          >
+            {focus && <circle cx={x} cy={y} r={15} fill={PIN.focus + '2e'} />}
+            <circle cx={x} cy={y} r={11} fill={color} stroke="#fff" strokeWidth={2} />
+            {a.status === 'working' && (
+              <circle
+                className="file-annotation-working"
+                cx={x}
+                cy={y}
+                r={15}
+                fill="none"
+                stroke={color}
+                strokeWidth={1.5}
+                strokeDasharray="4 4"
+              />
+            )}
+            <text x={x} y={y + 3.5} textAnchor="middle" fontSize={10} fontWeight={600} fill="#fff">
+              {pinNumber(a, i)}
             </text>
-          </>
-        )}
-        {i >= 0 && (
-          <>
-            <circle cx={x + 9} cy={y + 9} r={9} fill={a.color} />
-            <text x={x + 9} y={y + 13} textAnchor="middle" fontSize={11} fill="#fff">
-              {i + 1}
-            </text>
-          </>
+          </g>
         )}
       </g>
     );
@@ -223,11 +248,9 @@ export function FileAnnotationLayer({
       ...a,
       ...(a.type === 'rect'
         ? { x: Math.min(a.x, p.x), y: Math.min(a.y, p.y), w: Math.abs(p.x - a.x), h: Math.abs(p.y - a.y) }
-        : a.type === 'arrow'
-          ? { end: p }
-          : a.type === 'pen'
-            ? { points: [...(last.points || []).slice(-2998), p] }
-            : {}),
+        : a.type === 'pen'
+          ? { points: [...(last.points || []).slice(-2998), p] }
+          : {}),
     };
     latestShape.current = next;
     setShape(next);
@@ -249,17 +272,34 @@ export function FileAnnotationLayer({
     svg.addEventListener('wheel', wheel, { passive: false });
     return () => svg.removeEventListener('wheel', wheel);
   }, []);
+  /** What the gesture leaves behind, or nothing for a stray click with the pen. */
+  const finish = (a: PreviewAnnotation): PreviewAnnotation | undefined => {
+    const { width, height } = targets.current;
+    if (a.type === 'pen') {
+      const points = a.points || [];
+      if (points.length < 3) return;
+      return straightStroke(points, width, height) ? { ...a, type: 'arrow', end: points.at(-1), points: undefined } : a;
+    }
+    // A short drag is a click: a pin at that point.
+    if ((a.w || 0) * width < 6 && (a.h || 0) * height < 6) {
+      const start = drawing.current || a;
+      return { ...a, x: start.x, y: start.y, w: 0, h: 0 };
+    }
+    return a;
+  };
   return (
     <svg
       ref={root}
       className="file-annotation-layer"
+      data-tool={tool}
       style={{
         display: geometry.enabled ? undefined : 'none',
         pointerEvents: mode === 'annotate' ? 'auto' : 'none',
         visibility: mode === 'edit' ? 'hidden' : undefined,
+        cursor: mode === 'annotate' ? 'crosshair' : undefined,
       }}
       viewBox={`0 0 ${geometry.hostWidth} ${geometry.hostHeight}`}
-      aria-label={translate('文件标注')}
+      aria-label={translate('文件评论')}
       onPointerDown={(e) => {
         if (e.button !== 0 || mode !== 'annotate' || marks.length >= 100 || pointer.current !== undefined) return;
         const target = targets.current;
@@ -278,11 +318,11 @@ export function FileAnnotationLayer({
             ) || undefined;
         const a: PreviewAnnotation = {
           id: crypto.randomUUID(),
-          type: tool === 'element' ? 'rect' : tool,
+          type: tool === 'pen' ? 'pen' : 'rect',
           ...p,
           w: 0,
           h: 0,
-          color: '#3975c6',
+          color: PIN.mine,
           ...(page ? { page } : {}),
           ...(tool === 'pen' ? { points: [p] } : {}),
         };
@@ -298,19 +338,9 @@ export function FileAnnotationLayer({
       }}
       onPointerUp={(e) => {
         if (pointer.current !== e.pointerId) return;
-        const a = move(point(e));
-        if (
-          a &&
-          (a.type === 'text' ||
-            (a.type === 'pen' && (a.points?.length || 0) > 2) ||
-            (a.type === 'rect' &&
-              (a.w || 0) * targets.current.width >= 3 &&
-              (a.h || 0) * targets.current.height >= 3) ||
-            (a.type === 'arrow' &&
-              a.end &&
-              Math.hypot((a.end.x - a.x) * targets.current.width, (a.end.y - a.y) * targets.current.height) >= 3))
-        )
-          update([...marks, a]);
+        const drawn = move(point(e)),
+          a = drawn && finish(drawn);
+        if (a) update([...marks, { ...a, n: nextPinNumber(marks) }]);
         pointer.current = undefined;
         drawing.current = undefined;
         latestShape.current = undefined;

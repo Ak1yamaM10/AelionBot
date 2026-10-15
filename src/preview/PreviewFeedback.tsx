@@ -4,9 +4,11 @@ import type { AttachmentScope } from '../../shared/types/attachment-types';
 import type { PreviewItem } from './FilePreviewContext';
 import type { PreviewFeedbackInput } from '../../shared/preview/preview-feedback';
 import type { PreviewAnnotation, PreviewViewport } from '../../shared/types/preview-editor-types';
+import { unsentPins } from '../../shared/preview/preview-annotations';
 import { useI18n } from '../i18n';
 import { translate } from '../../shared/i18n';
 import { previewErrorText } from './preview-utils';
+import { PinChips } from './PreviewAnnotationChips';
 import './preview-feedback.css';
 const paint = () =>
   new Promise<void>((resolve, reject) => {
@@ -18,9 +20,20 @@ const paint = () =>
       }),
     );
   });
-export interface FeedbackFocusRequest {
-  sequence: number;
-  note?: boolean;
+/** Pins on screen in a file preview, in window pixels, for the close-ups cut from the screenshot. */
+function filePinRects(content: Element | null | undefined, ids: string[]) {
+  const rects: NonNullable<PreviewFeedbackInput['pinRects']> = [];
+  for (const id of ids) {
+    const node = content?.querySelector(`.file-annotation-layer [data-annotation-id="${CSS.escape(id)}"]`);
+    if (!node) continue;
+    const r = node.getBoundingClientRect(),
+      x = Math.max(0, r.left),
+      y = Math.max(0, r.top),
+      width = Math.min(innerWidth, r.right) - x,
+      height = Math.min(innerHeight, r.bottom) - y;
+    if (width >= 1 && height >= 1) rects.push({ id, rect: { x, y, width, height } });
+  }
+  return rects;
 }
 export function PreviewFeedback({
   scope,
@@ -29,15 +42,14 @@ export function PreviewFeedback({
   unsaved,
   onBusy,
   annotations = [],
-  selectedAnnotationId,
   onSelectAnnotation,
   onAnnotationsChange,
-  focusRequest,
   captureState,
   registerSend,
+  onSent,
   composer = true,
 }: {
-  /** False when a conversation composer sits beside the preview; marks and captions stay here, text goes there. */
+  /** False when a conversation composer sits beside the preview; the pins show there, and text is typed there. */
   composer?: boolean;
   scope: AttachmentScope;
   item: PreviewItem;
@@ -48,9 +60,10 @@ export function PreviewFeedback({
   selectedAnnotationId?: string;
   onSelectAnnotation?: (id: string) => void;
   onAnnotationsChange?: (value: PreviewAnnotation[]) => Promise<unknown> | void;
-  focusRequest?: FeedbackFocusRequest;
   captureState?: () => Promise<{ annotations: PreviewAnnotation[]; view?: PreviewViewport }>;
   registerSend?: (sender: (input: PreviewChatInput) => Promise<unknown>) => () => void;
+  /** The pins that just went out. */
+  onSent?: (pins: string[]) => void;
 }) {
   const workbench = usePreviewWorkbench(),
     sendRef = useRef<((input: PreviewChatInput) => Promise<unknown>) | undefined>(undefined);
@@ -59,19 +72,14 @@ export function PreviewFeedback({
     [pending, setPending] = useState(false),
     [status, setStatus] = useState(''),
     [failed, setFailed] = useState(false);
-  const selected = annotations.find((mark) => mark.id === selectedAnnotationId) || annotations.at(-1);
-  const [note, setNote] = useState(''),
-    noteRef = useRef<HTMLInputElement>(null),
-    noteSave = useRef<Promise<unknown>>(Promise.resolve());
-  const marksRef = useRef(annotations);
-  marksRef.current = annotations;
   const wrapper = useRef<HTMLDivElement>(null),
     input = useRef<HTMLTextAreaElement>(null),
     lock = useRef(false),
     attempt = useRef<{ key: string; id: string } | undefined>(undefined);
-  const text = drafts[item.id] || '';
-  const cleanNote = (value?: string) => (value === '标注' || value === 'Annotation' ? '' : value || '');
-  useEffect(() => setNote(cleanNote(selected?.text)), [selected?.id, selected?.text]);
+  const text = drafts[item.id] || '',
+    outgoing = unsentPins(annotations),
+    // Pins with words can go out on their own.
+    pinsSay = outgoing.some((mark) => mark.text?.trim());
   useLayoutEffect(() => {
     const node = input.current;
     if (node) {
@@ -84,24 +92,6 @@ export function PreviewFeedback({
     setFailed(false);
     attempt.current = undefined;
   }, [item.id]);
-  useEffect(() => {
-    if (!focusRequest?.sequence) return;
-    let live = true,
-      frame = 0;
-    void Promise.resolve(window.aelion.focusPreviewFeedback?.())
-      .catch(() => {})
-      .then(() => {
-        if (live)
-          frame = requestAnimationFrame(() => {
-            const target = focusRequest.note || !composer ? noteRef.current : input.current;
-            target?.focus({ preventScroll: true });
-          });
-      });
-    return () => {
-      live = false;
-      cancelAnimationFrame(frame);
-    };
-  }, [focusRequest?.sequence]);
   useEffect(() => {
     const node = wrapper.current,
       layer = panel.current?.closest<HTMLElement>('.fp-layer');
@@ -120,29 +110,8 @@ export function PreviewFeedback({
     const timer = setTimeout(() => setStatus(''), 4000);
     return () => clearTimeout(timer);
   }, [status, failed]);
-  const commitNote = () => {
-    if (!selected || !onAnnotationsChange || note === cleanNote(selected.text)) return noteSave.current;
-    const id = selected.id,
-      value = note;
-    noteSave.current = noteSave.current
-      .catch(() => {})
-      .then(() =>
-        onAnnotationsChange(marksRef.current.map((mark) => (mark.id === id ? { ...mark, text: value } : mark))),
-      );
-    return noteSave.current;
-  };
-  const changeMarks = async (value: PreviewAnnotation[]) => {
-    try {
-      await noteSave.current;
-      await onAnnotationsChange?.(value);
-    } catch (error) {
-      setFailed(true);
-      setStatus(previewErrorText(error));
-    }
-  };
   const send = async (submittedText = text, extras?: PreviewChatInput) => {
-    const message = submittedText.trim() ? submittedText : note.trim();
-    if (lock.current || !message) return;
+    if (lock.current) return;
     const host = panel.current;
     if (!host) return;
     lock.current = true;
@@ -153,11 +122,19 @@ export function PreviewFeedback({
     try {
       if (!window.aelion.sendPreviewFeedback) throw Error(t('此版本暂不支持截图反馈，请更新应用。'));
       if (!layer || !host.isConnected) throw Error(t('预览已关闭，请重新打开后发送。'));
-      await commitNote();
       layer.dataset.feedbackCapture = 'true';
+      // Closes any open bubble, which saves what was typed in it.
       onBusy(true);
       await paint();
-      const snapshot = await captureState?.();
+      const snapshot = await captureState?.(),
+        all = snapshot?.annotations || annotations,
+        marks = unsentPins(all),
+        message = submittedText.trim()
+          ? submittedText
+          : marks.some((mark) => mark.text?.trim())
+            ? t('请按下面的评论修改。')
+            : '';
+      if (!message) return;
       const content = host.querySelector<HTMLElement>('.fp-content'),
         area =
           content?.querySelector<HTMLElement>('.web-preview-slot') ||
@@ -173,6 +150,7 @@ export function PreviewFeedback({
       const page = Number(content?.querySelector<HTMLElement>('[data-preview-page]')?.dataset.previewPage) || undefined;
       const url = content?.querySelector<HTMLElement>('[data-preview-url]')?.dataset.previewUrl;
       const unbound = content?.querySelector<HTMLElement>('[data-preview-local-document=false]');
+      const web = Boolean(content?.querySelector('.web-preview'));
       const file = {
         name: (unbound?.dataset.previewName || item.name).slice(0, 300),
         ...(url ? { url } : {}),
@@ -183,13 +161,20 @@ export function PreviewFeedback({
         ...(page ? { page } : {}),
         ...(unsaved ? { unsaved: true } : {}),
       };
+      const pinRects = web
+        ? []
+        : filePinRects(
+            content,
+            marks.map((mark) => mark.id),
+          );
       const partial = {
         scope: extras?.scope || scope,
         text: message,
         file,
         language,
-        annotations: snapshot?.annotations || annotations,
+        annotations: marks,
         ...(snapshot?.view ? { view: snapshot.view } : {}),
+        ...(pinRects.length ? { pinRects } : {}),
         ...(extras
           ? {
               attachmentIds: extras.attachmentIds,
@@ -212,8 +197,14 @@ export function PreviewFeedback({
       setDrafts((value) => ({ ...value, [item.id]: '' }));
       attempt.current = undefined;
       setStatus(t('已发送'));
-      await Promise.resolve(onAnnotationsChange?.([])).catch(() => {});
-      setNote('');
+      // The pins stay where they are, marked sent, until the Bot's reply says what happened to each.
+      if (marks.length) {
+        const sent = new Set(marks.map((mark) => mark.id));
+        await Promise.resolve(
+          onAnnotationsChange?.(all.map((mark) => (sent.has(mark.id) ? { ...mark, status: 'sent' as const } : mark))),
+        ).catch(() => {});
+        onSent?.([...sent]);
+      }
     } catch (error) {
       setFailed(true);
       setStatus(previewErrorText(error));
@@ -223,7 +214,7 @@ export function PreviewFeedback({
       lock.current = false;
       setPending(false);
       onBusy(false);
-      input.current?.focus({ preventScroll: true });
+      if (composer) input.current?.focus({ preventScroll: true });
     }
   };
   sendRef.current = (input) => send(input.text, input);
@@ -236,84 +227,20 @@ export function PreviewFeedback({
       b?.();
     };
   }, [workbench?.registerSender, registerSend, scope.kind, scope.id, item.id]);
-  const name = (mark: PreviewAnnotation, index: number) =>
-    '#' +
-    (index + 1) +
-    ' ' +
-    (mark.elementLabel || t({ rect: '区域', element: '元素', arrow: '箭头', pen: '画笔', text: '文字' }[mark.type]));
   return (
-    <div
-      className={`fp-feedback-wrap ${composer ? '' : 'is-captions'}`}
-      ref={wrapper}
-      hidden={!composer && !status && !annotations.length}
-    >
+    <div className={`fp-feedback-wrap ${composer ? '' : 'is-captions'}`} ref={wrapper} hidden={!composer && !status}>
       {status && (
         <div className={`fp-feedback-status ${failed ? 'is-error' : ''}`} role={failed ? 'alert' : 'status'}>
           {status}
         </div>
       )}
-      {annotations.length > 0 && (
-        <div className="fp-feedback-context">
-          <div className="fp-annotation-chips" role="group" aria-label={t('已标注的位置')}>
-            {annotations.map((mark, index) => (
-              <button
-                type="button"
-                key={mark.id}
-                disabled={pending}
-                aria-pressed={selected?.id === mark.id}
-                title={mark.elementText || mark.text || name(mark, index)}
-                onClick={() => {
-                  void commitNote()
-                    .then(() => onSelectAnnotation?.(mark.id))
-                    .catch((error) => {
-                      setFailed(true);
-                      setStatus(previewErrorText(error));
-                    });
-                }}
-              >
-                {name(mark, index)}
-              </button>
-            ))}
-          </div>
-          <button
-            type="button"
-            className="fp-annotation-remove"
+      {composer && outgoing.length > 0 && (
+        <div className="fp-feedback-pins">
+          <PinChips
+            marks={annotations}
             disabled={pending}
-            aria-label={t('删除选中标注')}
-            title={t('删除选中标注')}
-            onClick={() => void changeMarks(annotations.filter((mark) => mark.id !== selected?.id))}
-          >
-            ×
-          </button>
-          <button type="button" className="fp-annotation-clear" disabled={pending} onClick={() => void changeMarks([])}>
-            {t('清空')}
-          </button>
-          <input
-            ref={noteRef}
-            className="fp-annotation-caption"
-            value={note}
-            readOnly={pending}
-            maxLength={1000}
-            aria-label={t('标注说明')}
-            placeholder={selected?.type === 'text' ? t('标注文字') : t('这一处的说明（可选）')}
-            onChange={(event) => setNote(event.target.value)}
-            onBlur={() =>
-              void commitNote().catch((error) => {
-                setFailed(true);
-                setStatus(previewErrorText(error));
-              })
-            }
-            onKeyDown={(event) => {
-              if (event.key === 'Enter' && !event.nativeEvent.isComposing) {
-                event.preventDefault();
-                void commitNote()
-                  .then(() => input.current?.focus())
-                  .catch((error) => {
-                    setFailed(true);
-                    setStatus(previewErrorText(error));
-                  });
-              }
-            }}
+            onSelect={(id) => onSelectAnnotation?.(id)}
+            onRemove={(id) => void onAnnotationsChange?.(annotations.filter((mark) => mark.id !== id))}
           />
         </div>
       )}
@@ -333,7 +260,7 @@ export function PreviewFeedback({
             value={text}
             readOnly={pending}
             aria-label={t('输入问题或修改意见')}
-            placeholder={annotations.length ? t('针对标注提问或提出修改…') : t('输入问题或修改意见…')}
+            placeholder={outgoing.length ? t('补充说明，或直接发送评论…') : t('输入问题或修改意见…')}
             onChange={(event) => setDrafts((value) => ({ ...value, [item.id]: event.target.value }))}
             onKeyDown={(event) => {
               if (event.key === 'Enter' && !event.shiftKey && !event.nativeEvent.isComposing && event.keyCode !== 229) {
@@ -344,7 +271,7 @@ export function PreviewFeedback({
           />
           <button
             type="submit"
-            disabled={pending || (!text.trim() && !note.trim())}
+            disabled={pending || (!text.trim() && !pinsSay)}
             aria-label={t('发送问题和截图')}
             title={t('发送问题和截图')}
           >

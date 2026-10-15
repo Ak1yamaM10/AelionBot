@@ -26,6 +26,7 @@ import { share } from '../../shared/state-sync';
 import { Avatar } from '../ui/Avatar';
 import { Icon } from '../ui/Icon';
 import { MentionContent } from '../ui/MentionContent';
+import { PinThreadContext, usePinRefs, usePinThread } from '../preview/pin-thread';
 import type { FileItem } from '../ui/FileCard';
 import { groupReplyContent } from '../../shared/chat/message-envelope';
 import { botMentions } from '../../shared/chat/mentions';
@@ -92,6 +93,20 @@ export function GroupConversation({
     active = useRef(true),
     sendLock = useRef(false);
   const previewWorkbench = usePreviewWorkbench();
+  const threadMessages = useMemo(
+      () =>
+        (page?.messages || [])
+          .filter((message) => message.kind === 'message')
+          .map((message) => ({
+            id: message.id,
+            content: message.content,
+            fromUser: message.sender.kind === 'user',
+            previewMarks: message.previewMarks,
+          })),
+      [page?.messages],
+    ),
+    pinScope = useMemo(() => ({ kind: 'group' as const, id: group.id }), [group.id]),
+    pinThread = usePinThread(threadMessages, group.pending > 0 || Boolean(group.activities?.length), pinScope);
   const composerWrap = useFloatingComposer();
   const stickToBottom = () => {
     const element = body.current;
@@ -342,44 +357,46 @@ export function GroupConversation({
             <DesignerTaskCard key={s.id} session={s} />
           ))}
       </div>
-      <ConversationTimeProvider messages={page?.messages || []}>
-        <section
-          ref={body}
-          className="messages group-messages"
-          onScroll={(event) => onMessagesScroll(event.currentTarget)}
-        >
-          {page?.before && (
-            <button className="peer-chat-load" disabled={loading} onClick={() => void older()}>
-              {t('加载更早消息')}
-            </button>
-          )}
-          {timeline.map((message) =>
-            message === CARD_SLOT ? (
-              <div key="game-card-slot" ref={setCardSlot} className="gg-card-slot" />
-            ) : (
-              <GroupMessageRow
-                key={message.id}
-                message={message}
-                bots={state.bots}
-                members={members}
-                displayName={displayName}
-                runId={rows.replyRuns.get(message.id)}
-                artifacts={state.artifacts}
-                previewEntries={previewEntries}
-                unanswered={rows.quiet.has(message.id)}
-                deliveries={rows.byMessage.get(message.id) || NO_DELIVERIES}
-                laya={page?.laya}
-                sessions={state.designer?.sessions}
-                vmReady={state.vm.status === 'ready'}
-                actions={actions}
-              />
-            ),
-          )}
-          {page &&
-            !page.messages.some((message) => message.kind === 'message' || message.kind === 'progress') &&
-            !group.activities?.length && <div className="group-empty">{t('暂无消息')}</div>}
-        </section>
-      </ConversationTimeProvider>
+      <PinThreadContext.Provider value={pinThread}>
+        <ConversationTimeProvider messages={page?.messages || []}>
+          <section
+            ref={body}
+            className="messages group-messages"
+            onScroll={(event) => onMessagesScroll(event.currentTarget)}
+          >
+            {page?.before && (
+              <button className="peer-chat-load" disabled={loading} onClick={() => void older()}>
+                {t('加载更早消息')}
+              </button>
+            )}
+            {timeline.map((message) =>
+              message === CARD_SLOT ? (
+                <div key="game-card-slot" ref={setCardSlot} className="gg-card-slot" />
+              ) : (
+                <GroupMessageRow
+                  key={message.id}
+                  message={message}
+                  bots={state.bots}
+                  members={members}
+                  displayName={displayName}
+                  runId={rows.replyRuns.get(message.id)}
+                  artifacts={state.artifacts}
+                  previewEntries={previewEntries}
+                  unanswered={rows.quiet.has(message.id)}
+                  deliveries={rows.byMessage.get(message.id) || NO_DELIVERIES}
+                  laya={page?.laya}
+                  sessions={state.designer?.sessions}
+                  vmReady={state.vm.status === 'ready'}
+                  actions={actions}
+                />
+              ),
+            )}
+            {page &&
+              !page.messages.some((message) => message.kind === 'message' || message.kind === 'progress') &&
+              !group.activities?.length && <div className="group-empty">{t('暂无消息')}</div>}
+          </section>
+        </ConversationTimeProvider>
+      </PinThreadContext.Provider>
       <div ref={composerWrap} className={`composer-wrap floating-composer ${requests.length ? 'with-request' : ''}`}>
         {error && (
           <div className="group-error" role="alert">
@@ -484,6 +501,7 @@ const GroupMessageRow = memo(function GroupMessageRow({
   actions: GroupRowActions;
 }) {
   const { t } = useI18n();
+  const pins = usePinRefs(message.id);
   if (message.scheduled)
     return (
       <>
@@ -534,7 +552,12 @@ const GroupMessageRow = memo(function GroupMessageRow({
             after={bare ? undefined : <AttachmentList files={message.attachments} only="files" />}
           >
             {message.reply && <MessageQuote reply={message.reply} />}
-            <MentionContent content={formatted.content} mentions={formatted.mentions} markdown />
+            <MentionContent
+              content={formatted.content}
+              mentions={formatted.mentions}
+              markdown
+              pins={message.sender.kind === 'bot' ? pins : undefined}
+            />
             <AttachmentList files={message.attachments} only={bare ? undefined : 'images'} />
           </MessageActions>
           {unanswered && <div className="group-unanswered">{t('没有 Bot 回应，可以 @ 一个')}</div>}

@@ -1,3 +1,4 @@
+import { PinThreadContext, usePinThread } from '../preview/pin-thread';
 import { memo, useLayoutEffect, useMemo, type RefObject } from 'react';
 import type {
   Artifact,
@@ -153,6 +154,19 @@ export function BotConversation({
     ),
     scope = workspaceKey(attachmentScope),
     botScope = workspaceKey({ kind: 'bot', id: bot.id });
+  const threadMessages = useMemo(
+      () =>
+        messages
+          .filter((message) => message.role === 'user' || message.role === 'assistant')
+          .map((message) => ({
+            id: message.id,
+            content: message.content,
+            fromUser: message.role === 'user',
+            previewMarks: message.previewMarks,
+          })),
+      [messages],
+    ),
+    pinThread = usePinThread(threadMessages, running, attachmentScope);
   // Only what the avatar draws, so a Bot's other changes do not re-render every message.
   const avatar = useMemo(
     () => ({ id: bot.id, name: bot.name, color: bot.color, avatarStyle: bot.avatarStyle }),
@@ -162,108 +176,110 @@ export function BotConversation({
     <>
       <ConversationTimeProvider messages={messages}>
         <MessageAvatarContext.Provider value={avatar}>
-          <section
-            ref={messagesPane}
-            key={chatKey}
-            className="messages"
-            onScroll={(event) => {
-              onMessagesScroll(event.currentTarget);
-              timelineWindow.onScroll(event.currentTarget);
-            }}
-          >
-            {timeline.slice(timelineWindow.start).map((item, index) => {
-              const key = keys[timelineWindow.start + index];
-              if (item.kind === 'message') {
-                const message = item.message;
+          <PinThreadContext.Provider value={pinThread}>
+            <section
+              ref={messagesPane}
+              key={chatKey}
+              className="messages"
+              onScroll={(event) => {
+                onMessagesScroll(event.currentTarget);
+                timelineWindow.onScroll(event.currentTarget);
+              }}
+            >
+              {timeline.slice(timelineWindow.start).map((item, index) => {
+                const key = keys[timelineWindow.start + index];
+                if (item.kind === 'message') {
+                  const message = item.message;
+                  return (
+                    <TimelineMessage
+                      key={key}
+                      message={message}
+                      shown={shown.get(message)}
+                      groups={message.groupTaskSource || message.groupLink ? state.groups : undefined}
+                      peers={message.taskSource || message.peer ? state.peers : undefined}
+                      allowPins={!runsById.get(message.runId || '')?.groupOrigin}
+                      actions={actions}
+                    />
+                  );
+                }
+                const latest = item.isLast && latestRun?.id === item.id,
+                  allRunMessages = runMessages.get(item.id) || NO_MESSAGES;
                 return (
-                  <TimelineMessage
+                  <TimelineRun
                     key={key}
-                    message={message}
-                    shown={shown.get(message)}
-                    groups={message.groupTaskSource || message.groupLink ? state.groups : undefined}
-                    peers={message.taskSource || message.peer ? state.peers : undefined}
-                    allowPins={!runsById.get(message.runId || '')?.groupOrigin}
+                    runId={item.id}
+                    run={runsById.get(item.id)}
+                    messages={item.messages.map((message) => shown.get(message) || message)}
+                    allRunMessages={allRunMessages}
+                    isLast={item.isLast}
+                    latest={latest}
+                    model={currentModel}
+                    stream={
+                      item.isLast
+                        ? liveReplies.find((reply) => reply.runId === item.id && reply.purpose !== 'progress')
+                        : undefined
+                    }
+                    waiting={item.isLast ? requests.find((request) => request.runId === item.id)?.kind : undefined}
+                    reviewing={
+                      item.isLast &&
+                      requests.some(
+                        (request) =>
+                          request.runId === item.id &&
+                          request.kind === 'host_permission' &&
+                          request.approval?.phase === 'reviewing',
+                      )
+                    }
+                    canContinue={!running && !busy}
+                    outputs={
+                      latest
+                        ? state.artifacts.filter(
+                            (file) =>
+                              file.botId === bot.id &&
+                              file.runId === item.id &&
+                              isRunArtifact(file.path) &&
+                              !allRunMessages.some((message) =>
+                                message.attachments?.some(
+                                  (attachment) => attachment.name === file.name && attachment.size === file.size,
+                                ),
+                              ),
+                          )
+                        : NO_FILES
+                    }
+                    previewEntries={previewEntries}
+                    filesDisabled={busy || !vmReady}
+                    designSession={designSessionOf(state, runsById.get(item.id))}
                     actions={actions}
                   />
                 );
-              }
-              const latest = item.isLast && latestRun?.id === item.id,
-                allRunMessages = runMessages.get(item.id) || NO_MESSAGES;
-              return (
-                <TimelineRun
-                  key={key}
-                  runId={item.id}
-                  run={runsById.get(item.id)}
-                  messages={item.messages.map((message) => shown.get(message) || message)}
-                  allRunMessages={allRunMessages}
-                  isLast={item.isLast}
-                  latest={latest}
-                  model={currentModel}
-                  stream={
-                    item.isLast
-                      ? liveReplies.find((reply) => reply.runId === item.id && reply.purpose !== 'progress')
-                      : undefined
+              })}
+              {liveReplies
+                .filter(
+                  (reply) =>
+                    reply.purpose === 'progress' ||
+                    !reply.runId ||
+                    !timeline.some((item) => item.kind === 'run' && item.id === reply.runId),
+                )
+                .map((reply) => (
+                  <LiveReply key={reply.id} reply={reply} />
+                ))}
+              {(running || greeting) && (
+                <BotWorkingStatus
+                  bot={bot}
+                  onStop={actions.stop}
+                  onReview={waiting ? () => onReview(waiting) : undefined}
+                  step={
+                    liveBotStep(
+                      messages,
+                      latestRun,
+                      waiting?.kind,
+                      waiting?.kind === 'host_permission' && waiting.approval?.phase === 'reviewing',
+                    ) || { phase: 'thinking', label: greeting ? t('正在准备打招呼') : t('正在准备处理') }
                   }
-                  waiting={item.isLast ? requests.find((request) => request.runId === item.id)?.kind : undefined}
-                  reviewing={
-                    item.isLast &&
-                    requests.some(
-                      (request) =>
-                        request.runId === item.id &&
-                        request.kind === 'host_permission' &&
-                        request.approval?.phase === 'reviewing',
-                    )
-                  }
-                  canContinue={!running && !busy}
-                  outputs={
-                    latest
-                      ? state.artifacts.filter(
-                          (file) =>
-                            file.botId === bot.id &&
-                            file.runId === item.id &&
-                            isRunArtifact(file.path) &&
-                            !allRunMessages.some((message) =>
-                              message.attachments?.some(
-                                (attachment) => attachment.name === file.name && attachment.size === file.size,
-                              ),
-                            ),
-                        )
-                      : NO_FILES
-                  }
-                  previewEntries={previewEntries}
-                  filesDisabled={busy || !vmReady}
-                  designSession={designSessionOf(state, runsById.get(item.id))}
-                  actions={actions}
                 />
-              );
-            })}
-            {liveReplies
-              .filter(
-                (reply) =>
-                  reply.purpose === 'progress' ||
-                  !reply.runId ||
-                  !timeline.some((item) => item.kind === 'run' && item.id === reply.runId),
-              )
-              .map((reply) => (
-                <LiveReply key={reply.id} reply={reply} />
-              ))}
-            {(running || greeting) && (
-              <BotWorkingStatus
-                bot={bot}
-                onStop={actions.stop}
-                onReview={waiting ? () => onReview(waiting) : undefined}
-                step={
-                  liveBotStep(
-                    messages,
-                    latestRun,
-                    waiting?.kind,
-                    waiting?.kind === 'host_permission' && waiting.approval?.phase === 'reviewing',
-                  ) || { phase: 'thinking', label: greeting ? t('正在准备打招呼') : t('正在准备处理') }
-                }
-              />
-            )}
-            <div />
-          </section>
+              )}
+              <div />
+            </section>
+          </PinThreadContext.Provider>
         </MessageAvatarContext.Provider>
       </ConversationTimeProvider>
       <div ref={composerWrap} className={`composer-wrap floating-composer ${waiting ? 'with-request' : ''}`}>

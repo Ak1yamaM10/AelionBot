@@ -15,6 +15,8 @@ export interface AgentPreviewRequest {
     | { kind: 'workspace'; path: string }
     | { kind: 'attachment'; file: Attachment }
     | { kind: 'url'; url: string; location: 'host' | 'vm' };
+  /** Pins the Bot placed with preview_mark, shown when the preview opens. */
+  marks?: import('../types/preview-editor-types').PreviewAnnotation[];
 }
 export interface PreviewHistoryEntry {
   id: string;

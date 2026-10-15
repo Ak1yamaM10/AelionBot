@@ -1,6 +1,6 @@
 import { validateDomEdits } from '../../../shared/preview/preview-dom-edits';
-import { validateAnnotations } from '../../../shared/preview/preview-annotations';
-import type { Attachment, AttachmentScope } from '../../../shared/types/attachment-types';
+import { pinNumber, validateAnnotations } from '../../../shared/preview/preview-annotations';
+import { ATTACHMENT_LIMITS, type Attachment, type AttachmentScope } from '../../../shared/types/attachment-types';
 import { previewFeedbackMessage, type PreviewFeedbackInput } from '../../../shared/preview/preview-feedback';
 import { AppError } from '../../../shared/errors';
 /** A canvas can discuss only files from its selected design task. */
@@ -21,10 +21,13 @@ interface Receipt {
   sent: true;
   attachmentId: string;
 }
+/** At most this many pins get a close-up image of their own. */
+const CLOSE_UPS = 6;
 interface Entry {
   key: string;
   attachment?: Attachment;
   changes?: Attachment;
+  closeUps?: Array<{ id: string; file: Attachment }>;
   promise?: Promise<Receipt>;
   receipt?: Receipt;
 }
@@ -34,6 +37,8 @@ export class PreviewFeedbackService {
     private ops: {
       validate: (scope: AttachmentScope) => void;
       capture: (input: PreviewFeedbackInput) => Promise<Buffer>;
+      /** A close-up image per pin; pins it cannot show are left out. */
+      closeUps?: (input: PreviewFeedbackInput, ids: string[]) => Promise<Array<{ id: string; bytes: Buffer }>>;
       attach: (scope: AttachmentScope, name: string, bytes: Buffer) => Attachment;
       discard: (scope: AttachmentScope, id: string) => void;
       send: (
@@ -81,6 +86,26 @@ export class PreviewFeedbackService {
           this.ops.validate(input.scope);
           entry.attachment = this.ops.attach(input.scope, 'preview-' + input.requestId.slice(0, 8) + '.png', bytes);
         }
+        if (!entry.closeUps) {
+          // Within the message's attachment limit, after the screenshot, the person's files and an edit manifest.
+          const room = ATTACHMENT_LIMITS.count - 1 - (input.attachmentIds?.length || 0) - (input.edits?.length ? 1 : 0),
+            ids = (input.annotations || []).slice(0, Math.max(0, Math.min(CLOSE_UPS, room))).map((mark) => mark.id),
+            shots = ids.length && this.ops.closeUps ? await this.ops.closeUps(input, ids).catch(() => []) : [];
+          entry.closeUps = [];
+          for (const shot of shots) {
+            const index = (input.annotations || []).findIndex((mark) => mark.id === shot.id);
+            if (index < 0 || !shot.bytes.length || shot.bytes.length > 8 * 1024 * 1024) continue;
+            const n = pinNumber(input.annotations![index], index);
+            entry.closeUps.push({
+              id: shot.id,
+              file: this.ops.attach(
+                input.scope,
+                'preview-' + input.requestId.slice(0, 8) + '-' + n + '.png',
+                shot.bytes,
+              ),
+            });
+          }
+        }
         if (input.edits?.length && !entry.changes)
           entry.changes = this.ops.attach(
             input.scope,
@@ -88,10 +113,22 @@ export class PreviewFeedbackService {
             Buffer.from(JSON.stringify({ version: 1, source: input.file, edits: input.edits }, null, 2)),
           );
         if (!this.ops.delivered(input.scope, entry.attachment.id))
-          this.ops.send(input.scope, text, entry.attachment.id, input.text.trim(), {
-            ...input,
-            attachmentIds: [...(input.attachmentIds || []), ...(entry.changes ? [entry.changes.id] : [])],
-          });
+          this.ops.send(
+            input.scope,
+            entry.closeUps.length
+              ? previewFeedbackMessage(input, new Map(entry.closeUps.map((shot) => [shot.id, shot.file.name])))
+              : text,
+            entry.attachment.id,
+            input.text.trim(),
+            {
+              ...input,
+              attachmentIds: [
+                ...(input.attachmentIds || []),
+                ...(entry.changes ? [entry.changes.id] : []),
+                ...entry.closeUps.map((shot) => shot.file.id),
+              ],
+            },
+          );
         return (entry.receipt = { sent: true, attachmentId: entry.attachment.id });
       } catch (error) {
         if (entry.attachment && this.ops.delivered(input.scope, entry.attachment.id))
@@ -108,6 +145,11 @@ export class PreviewFeedbackService {
           } catch {}
           entry.changes = undefined;
         }
+        for (const shot of entry.closeUps || [])
+          try {
+            this.ops.discard(input.scope, shot.file.id);
+          } catch {}
+        entry.closeUps = undefined;
         throw error;
       }
     })();

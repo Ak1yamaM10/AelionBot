@@ -1,3 +1,4 @@
+import { validMarkRefs, type PreviewMarkRef } from '../../../shared/preview/preview-annotations';
 import { buildGroupDecisionInput, type GroupDecisions } from './laya-decision';
 import { previewFeedbackDisplay } from '../../../shared/preview/preview-feedback';
 import { groupEventPrompt, groupMustAnswerNote, groupReviewNote, GROUP_STATE_EVENT_PROMPT } from './group-prompt';
@@ -739,6 +740,7 @@ export class GroupChats implements GroupGateway {
         | 'workItemId'
         | 'reply'
         | 'previewPrompt'
+        | 'previewMarks'
         | 'designSessionId'
         | 'answers'
         | 'notice'
@@ -948,6 +950,7 @@ export class GroupChats implements GroupGateway {
     id: string;
     message: string;
     previewPrompt?: string;
+    previewMarks?: PreviewMarkRef[];
     replyToMessageId?: string;
     mentions?: BotMention[];
     attachmentIds?: string[];
@@ -957,6 +960,7 @@ export class GroupChats implements GroupGateway {
       (typeof input.previewPrompt !== 'string' || input.previewPrompt.length > 12000)
     )
       throw Error('无效预览意见');
+    const previewMarks = validMarkRefs(input.previewMarks);
     const command = workCommand(input?.message || '');
     if (command && !command.objective) throw Error(`请在 /${command.kind} 后填写任务内容`);
     const room = this.room(required(input?.id, '群聊 ID', 80)),
@@ -973,6 +977,7 @@ export class GroupChats implements GroupGateway {
       attachments,
       designSessionId,
       ...(input.previewPrompt !== undefined ? { previewPrompt: input.previewPrompt } : {}),
+      ...(previewMarks?.length ? { previewMarks } : {}),
       ...(reply ? { reply } : {}),
     });
     this.touch();

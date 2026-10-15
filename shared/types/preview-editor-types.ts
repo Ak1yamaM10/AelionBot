@@ -30,7 +30,17 @@ export interface PreviewAnnotation {
   page?: number;
   selector?: string;
   designId?: string;
+  /** The number on the pin. It stays when other pins are removed, so a reply's #n still finds its pin. */
+  n?: number;
+  /** After sending: waiting, the Bot at work, changed as asked, or left as it was (with the reason in `reply`). */
+  status?: PinStatus;
+  /** What the Bot's reply said about this pin. */
+  reply?: string;
+  /** A pin the Bot placed with preview_mark; its words are in `botNote`, the person's answer in `text`. */
+  author?: 'bot';
+  botNote?: string;
 }
+export type PinStatus = 'sent' | 'working' | 'done' | 'kept';
 export interface DomTarget {
   tag: string;
   path: string[];
@@ -62,6 +72,10 @@ export interface PreviewTreeNode {
 }
 export interface PreviewEditorState {
   selectedAnnotationId?: string;
+  /** The selected pin's box in viewport CSS pixels while it is on screen, to place its bubble beside it. */
+  selectedRect?: { x: number; y: number; width: number; height: number };
+  /** Rises each time the person clicks or makes a pin in the page. */
+  pinSeq?: number;
   annotationCanUndo?: boolean;
   annotationCanRedo?: boolean;
   viewport?: PreviewViewport;
@@ -78,6 +92,8 @@ export interface PreviewEditorState {
 export type EditorCommand = (
   | { type: 'mode'; mode: PreviewMode; tool?: AnnotationTool }
   | { type: 'select'; id: string }
+  /** Selects the element an element pin points at, to tune its style. */
+  | { type: 'select-pin'; id: string }
   | { type: 'parent' }
   | { type: 'children'; id?: string; offset?: number }
   | { type: 'style'; values: Record<string, string> }
@@ -92,10 +108,15 @@ export type EditorCommand = (
   | { type: 'annotation-undo' | 'annotation-redo' }
   | { type: 'annotations'; annotations: PreviewAnnotation[] }
   | { type: 'capture'; hide: boolean }
+  /** Scrolls a pin into view and returns its box in the viewport, for a close-up; without an id, scrolls back. */
+  | { type: 'reveal'; id?: string; scroll?: { x: number; y: number } }
   | { type: 'lock'; locked: boolean }
 ) & { targetId?: string };
 export interface EditorResult {
   state: PreviewEditorState;
+  /** For `reveal`: the pin's box in viewport CSS pixels, and the scroll position to return to. */
+  rect?: { x: number; y: number; width: number; height: number };
+  scroll?: { x: number; y: number };
   nodes?: PreviewTreeNode[];
   more?: boolean;
   edits?: DomEdit[];

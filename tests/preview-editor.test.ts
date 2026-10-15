@@ -2,7 +2,15 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { applyDomEdits } from '../electron/core/preview/html-preview-edits';
 import { validateDomEdits } from '../shared/preview/preview-dom-edits';
-import { validateAnnotations, annotationContext } from '../shared/preview/preview-annotations';
+import {
+  validateAnnotations,
+  annotationContext,
+  botPins,
+  markRefs,
+  nextPinNumber,
+  pinNumber,
+  unsentPins,
+} from '../shared/preview/preview-annotations';
 const patch = (html: string, after: string, path = ['html:1', 'body:1', 'h1:1']) => ({
   before: { tag: 'h1', path, html },
   after,
@@ -61,7 +69,7 @@ test('annotation and edit inputs have finite bounds and preserve annotation text
   const annotations = validateAnnotations([
     { id: 'a', type: 'rect', x: 0.2, y: 0.3, w: 0.4, h: 0.1, color: '#3975c6', text: 'More space', page: 2 },
   ]);
-  assert.match(annotationContext(annotations), /page 2.*More space/);
+  assert.match(annotationContext(annotations, { en: true }), /^#1 region\n {3}Request: More space\n {3}Locate: page 2/);
   const targeted = validateAnnotations([
     {
       id: 'b',
@@ -130,10 +138,11 @@ test('annotation context retains the selected content and stable CSS-pixel coord
   };
   const [mark] = validateAnnotations([input]);
   assert.deepEqual(mark, input);
-  const context = annotationContext([mark]);
+  const context = annotationContext([mark], { en: true });
   assert.match(context, /source 1440×8000 CSS px/);
-  assert.match(context, /content="Selected section heading"/);
-  assert.match(context, /note="Increase spacing"/);
+  assert.match(context, /^#1 region h2\.section-title "Selected section heading"/);
+  assert.match(context, /Request: Increase spacing/);
+  assert.match(annotationContext([mark]), /要求：Increase spacing/);
   assert.throws(() => validateAnnotations([{ ...input, sourceHeight: Infinity }]), {
     code: 'preview.annotation_canvas_invalid',
   });
@@ -147,8 +156,55 @@ test('annotation context retains the selected content and stable CSS-pixel coord
 });
 
 test('arrow annotation context identifies the actual endpoint', () => {
-  const text = annotationContext([
-    { id: 'arrow', type: 'arrow', x: 0.8, y: 0.9, end: { x: 0.1, y: 0.2 }, color: '#3975c6' },
-  ]);
+  const text = annotationContext(
+    [{ id: 'arrow', type: 'arrow', x: 0.8, y: 0.9, end: { x: 0.1, y: 0.2 }, color: '#3975c6' }],
+    { en: true },
+  );
   assert.match(text, /end \[0\.1000, 0\.2000\]/);
+});
+
+test('pins keep their numbers, carry the reply state, and list close-ups and Bot notes', () => {
+  const marks = validateAnnotations([
+    { id: 'a', type: 'rect', x: 0.1, y: 0.1, w: 0, h: 0, color: '#29282c', n: 4, status: 'sent', text: 'Bigger' },
+    { id: 'b', type: 'element', x: 0, y: 0, color: '#8b6bea', author: 'bot', botNote: 'Which colour?', text: 'Blue' },
+  ]);
+  assert.deepEqual(
+    marks.map((mark, index) => pinNumber(mark, index)),
+    [4, 2],
+  );
+  assert.equal(nextPinNumber(marks), 5);
+  assert.deepEqual(
+    unsentPins(marks).map((mark) => mark.id),
+    ['b'],
+  );
+  const text = annotationContext(marks, { en: true, closeUps: new Map([['a', 'preview-1234abcd-4.png']]) });
+  assert.match(text, /^#4 point\n {3}Request: Bigger\n/);
+  assert.match(text, /Close-up: preview-1234abcd-4\.png/);
+  assert.match(text, /#2 element\n {3}Your note: Which colour\?\n {3}Reply: Blue/);
+  assert.throws(() => validateAnnotations([{ ...marks[0], status: 'lost' }]), { code: 'preview.annotation_invalid' });
+  assert.deepEqual(
+    markRefs(marks).map((ref) => [ref.n, ref.title]),
+    [
+      [4, '位置'],
+      [2, 'Bot 的说明'],
+    ],
+  );
+});
+
+test('a Bot places pins by selector or by a region, each with a note', () => {
+  const [byElement, byRegion] = botPins([
+    { selector: '.hero h1', note: 'Keep this headline?' },
+    { box: [0.5, 0.5, 0.8, 0.2], page: 2, note: 'Too tight' },
+  ]);
+  assert.equal(byElement.type, 'element');
+  assert.equal(byElement.selector, '.hero h1');
+  assert.equal(byElement.author, 'bot');
+  assert.equal(byRegion.type, 'rect');
+  assert.equal(byRegion.w, 0.5);
+  assert.equal(byRegion.page, 2);
+  assert.equal(validateAnnotations([byElement, byRegion]).length, 2);
+  assert.throws(() => botPins([{ selector: 'h1' }]), { code: 'preview.mark_invalid' });
+  assert.throws(() => botPins([{ note: 'Where?' }]), { code: 'preview.mark_invalid' });
+  assert.throws(() => botPins([{ box: [0, 0, 2, 1], note: 'x' }]), { code: 'preview.mark_invalid' });
+  assert.throws(() => botPins([]), { code: 'preview.mark_invalid' });
 });

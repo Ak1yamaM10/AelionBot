@@ -15,7 +15,14 @@ import {
   resizeElementBox,
   translateComponents,
 } from '../../shared/preview/preview-element-geometry';
-import { validateAnnotations } from '../../shared/preview/preview-annotations';
+import {
+  nextPinNumber,
+  PIN,
+  pinColor,
+  pinNumber,
+  straightStroke,
+  validateAnnotations,
+} from '../../shared/preview/preview-annotations';
 const LIMIT = 1_048_576;
 interface Change {
   patch: DomEdit;
@@ -34,7 +41,9 @@ export function createPreviewDomEditor(notify: (state: PreviewEditorState) => vo
   let locked = false;
   let annotations: PreviewAnnotation[] = [],
     capture = false,
-    selectedAnnotationId: string | undefined;
+    selectedAnnotationId: string | undefined,
+    /** Counts pins the person clicked or made, so the app opens a pin's bubble each time. */
+    pinSeq = 0;
   type MarkSnapshot = { annotations: PreviewAnnotation[]; selectedId?: string };
   let annotationHistory: MarkSnapshot[] = [],
     annotationCursor = 0;
@@ -48,6 +57,7 @@ export function createPreviewDomEditor(notify: (state: PreviewEditorState) => vo
         start: { x: number; y: number };
         last: { x: number; y: number };
         points: { x: number; y: number }[];
+        client: { x: number; y: number };
       }
     | undefined;
   let editGesture:
@@ -189,6 +199,8 @@ export function createPreviewDomEditor(notify: (state: PreviewEditorState) => vo
       },
       annotations: currentAnnotations(),
       selectedAnnotationId,
+      ...(selectedAnnotationId ? { selectedRect: pinRect(selectedAnnotationId) } : {}),
+      pinSeq,
       annotationCanUndo: annotationCursor > 0,
       annotationCanRedo: annotationCursor < annotationHistory.length - 1,
       revision,
@@ -281,6 +293,36 @@ export function createPreviewDomEditor(notify: (state: PreviewEditorState) => vo
       };
     });
   }
+  /** A pin's box in the viewport: its element's, or the box around what was drawn. */
+  function pinRect(markId: string) {
+    const a = annotations.find((mark) => mark.id === markId);
+    if (!a) return undefined;
+    const target = annotationNodes.get(a.id);
+    if (target?.isConnected) {
+      const r = target.getBoundingClientRect();
+      return { x: r.x, y: r.y, width: r.width, height: r.height };
+    }
+    const size = annotationDocumentSize(a, docSize()),
+      xs = [a.x, a.x + (a.w || 0), ...(a.end ? [a.end.x] : []), ...(a.points || []).map((p) => p.x)],
+      ys = [a.y, a.y + (a.h || 0), ...(a.end ? [a.end.y] : []), ...(a.points || []).map((p) => p.y)],
+      left = Math.min(...xs) * size.width - scrollX,
+      top = Math.min(...ys) * size.height - scrollY;
+    return {
+      x: left,
+      y: top,
+      width: Math.max(...xs) * size.width - scrollX - left,
+      height: Math.max(...ys) * size.height - scrollY - top,
+    };
+  }
+  /** Adds a pin with the next number and selects it. */
+  function addPin(mark: PreviewAnnotation) {
+    pinSeq++;
+    updateAnnotations([...annotations, { ...mark, n: nextPinNumber(annotations), color: PIN.mine }], mark.id);
+  }
+  /** The element under a point, ignoring the app's own overlay. */
+  function elementAt(x: number, y: number) {
+    return document.elementsFromPoint(x, y).find((el) => !own(el) && el !== document.documentElement);
+  }
   function markSnapshot(): MarkSnapshot {
     return { annotations: currentAnnotations(), selectedId: selectedAnnotationId };
   }
@@ -322,6 +364,14 @@ export function createPreviewDomEditor(notify: (state: PreviewEditorState) => vo
     if (svg?.hasPointerCapture(event.pointerId)) svg.releasePointerCapture(event.pointerId);
     const dx = (g.last.x - g.start.x) * g.sourceWidth,
       dy = (g.last.y - g.start.y) * g.sourceHeight;
+    if (g.tool === 'element' && Math.hypot(dx, dy) < 4) {
+      const el = elementAt(g.client.x, g.client.y);
+      if (el && !locked) pinElement(el);
+      else draw();
+      return;
+    }
+    if (g.tool === 'element') g.tool = 'rect';
+    if (g.tool === 'pen' && straightStroke(g.points, g.sourceWidth, g.sourceHeight)) g.tool = 'arrow';
     const valid =
       g.tool === 'text' ||
       (g.tool === 'pen' &&
@@ -338,7 +388,7 @@ export function createPreviewDomEditor(notify: (state: PreviewEditorState) => vo
           right: (mark.x + (mark.w || 0)) * g.sourceWidth - scrollX,
           bottom: (mark.y + (mark.h || 0)) * g.sourceHeight - scrollY,
         });
-      updateAnnotations([...annotations, mark], mark.id);
+      addPin(mark);
       emit();
     } else draw();
   }
@@ -701,18 +751,18 @@ export function createPreviewDomEditor(notify: (state: PreviewEditorState) => vo
       hover.className = 'box hover';
       shadow.append(style, svg, hover, box);
       svg.addEventListener('pointerdown', (event) => {
-        if (!event.isTrusted || locked || capture || mode !== 'annotate' || event.button !== 0 || !event.isPrimary)
-          return;
+        if (!event.isTrusted || locked || capture || mode === 'edit' || event.button !== 0 || !event.isPrimary) return;
         const badge = event.composedPath().find((n) => n instanceof Element && n.hasAttribute('data-annotation-id')) as
           Element | undefined;
         if (badge) {
           selectedAnnotationId = badge.getAttribute('data-annotation-id') || undefined;
+          pinSeq++;
           emit();
           event.preventDefault();
           event.stopImmediatePropagation();
           return;
         }
-        if (tool === 'element') return;
+        if (mode !== 'annotate') return;
         if (annotations.length >= 100) {
           notify({ ...state(), error: '最多添加 100 条标注，请先删除部分标注' });
           return;
@@ -728,7 +778,9 @@ export function createPreviewDomEditor(notify: (state: PreviewEditorState) => vo
           start: p,
           last: p,
           points: [p],
+          client: { x: event.clientX, y: event.clientY },
         };
+        if (hover) hover.hidden = true;
         svg!.setPointerCapture(event.pointerId);
         event.preventDefault();
         event.stopImmediatePropagation();
@@ -792,8 +844,8 @@ export function createPreviewDomEditor(notify: (state: PreviewEditorState) => vo
     overlay();
     if (!svg || !box || !hover) return;
     host!.style.pointerEvents = 'none';
-    svg.style.pointerEvents = !locked && !capture && mode === 'annotate' && tool !== 'element' ? 'auto' : 'none';
-    svg.style.cursor = tool === 'text' ? 'text' : 'crosshair';
+    svg.style.pointerEvents = !locked && !capture && mode === 'annotate' ? 'auto' : 'none';
+    svg.style.cursor = tool === 'element' ? 'default' : 'crosshair';
     svg.setAttribute('viewBox', `0 0 ${innerWidth} ${innerHeight}`);
     svg.replaceChildren();
     const documentSize = docSize();
@@ -812,16 +864,20 @@ export function createPreviewDomEditor(notify: (state: PreviewEditorState) => vo
         w = b.width;
         h = b.height;
       }
-      if (a.type === 'rect' || a.type === 'element')
+      const color = i < annotations.length ? pinColor(a) : PIN.focus,
+        focus = a.id === selectedAnnotationId || i >= annotations.length;
+      if ((a.type === 'rect' || a.type === 'element') && (w > 0 || h > 0))
         svg.append(
           markElement('rect', {
-            x,
-            y,
-            width: w,
-            height: h,
-            fill: a.color + '0c',
-            stroke: a.color,
-            'stroke-width': a.id === selectedAnnotationId ? 3 : 2,
+            x: x - 3,
+            y: y - 3,
+            width: w + 6,
+            height: h + 6,
+            rx: a.type === 'element' ? 6 : 3,
+            fill: (focus ? PIN.focus : color) + '0d',
+            stroke: focus ? PIN.focus : color,
+            'stroke-opacity': focus ? 1 : 0.55,
+            'stroke-width': 1.5,
           }),
         );
       if (a.type === 'arrow' && a.end) {
@@ -829,12 +885,22 @@ export function createPreviewDomEditor(notify: (state: PreviewEditorState) => vo
           ey = a.end.y * size.height - scrollY,
           angle = Math.atan2(ey - y, ex - x);
         svg.append(
-          markElement('line', { x1: x, y1: y, x2: ex, y2: ey, stroke: a.color, 'stroke-width': 2 }),
+          markElement('line', {
+            x1: x,
+            y1: y,
+            x2: ex,
+            y2: ey,
+            stroke: color,
+            'stroke-width': 2,
+            'stroke-linecap': 'round',
+          }),
           markElement('polyline', {
             points: `${ex - 10 * Math.cos(angle - 0.45)},${ey - 10 * Math.sin(angle - 0.45)} ${ex},${ey} ${ex - 10 * Math.cos(angle + 0.45)},${ey - 10 * Math.sin(angle + 0.45)}`,
             fill: 'none',
-            stroke: a.color,
+            stroke: color,
             'stroke-width': 2,
+            'stroke-linecap': 'round',
+            'stroke-linejoin': 'round',
           }),
         );
       }
@@ -845,8 +911,8 @@ export function createPreviewDomEditor(notify: (state: PreviewEditorState) => vo
               .map((p) => `${p.x * size.width - scrollX},${p.y * size.height - scrollY}`)
               .join(' '),
             fill: 'none',
-            stroke: a.color,
-            'stroke-width': 3,
+            stroke: color,
+            'stroke-width': 2.5,
             'stroke-linecap': 'round',
             'stroke-linejoin': 'round',
           }),
@@ -875,30 +941,50 @@ export function createPreviewDomEditor(notify: (state: PreviewEditorState) => vo
         text.setAttribute('x', String(x + 32));
       }
       if (i < annotations.length) {
+        // The dot sits on the top-left corner of what it marks, or at the start of a stroke.
+        const cx = a.type === 'arrow' || a.type === 'pen' ? x : x - 3,
+          cy = a.type === 'arrow' || a.type === 'pen' ? y : y - 3,
+          label = String(pinNumber(a, i));
         const t = markElement('text', {
-          x: x + 9,
-          y: y + 13,
+          x: cx,
+          y: cy + 4,
           fill: '#fff',
-          'font-size': 11,
-          'font-family': 'sans-serif',
+          'font-size': label.length > 2 ? 9.5 : 11,
+          'font-weight': 600,
+          'font-family': "'Segoe UI Variable Text','Segoe UI',system-ui,sans-serif",
           'text-anchor': 'middle',
         });
-        t.textContent = String(i + 1);
+        t.textContent = label;
         const badge = markElement('g', {
           'data-annotation-id': a.id,
-          style: !capture && mode === 'annotate' ? 'pointer-events:all;cursor:pointer' : 'pointer-events:none',
+          style: !capture && mode !== 'edit' ? 'pointer-events:all;cursor:pointer' : 'pointer-events:none',
         });
-        badge.append(
-          markElement('circle', {
-            cx: x + 9,
-            cy: y + 9,
-            r: a.id === selectedAnnotationId ? 11 : 9,
-            fill: a.color,
-            stroke: '#fff',
-            'stroke-width': 2,
-          }),
-          t,
-        );
+        if (focus)
+          badge.append(markElement('circle', { cx, cy, r: 15, fill: 'none', stroke: PIN.focus, 'stroke-width': 2 }));
+        if (a.status === 'working') {
+          const ring = markElement('circle', {
+            cx,
+            cy,
+            r: 15,
+            fill: 'none',
+            stroke: PIN.focus,
+            'stroke-width': 1.5,
+            'stroke-dasharray': '18 80',
+          });
+          const spin = document.createElementNS(ns, 'animateTransform');
+          for (const [name, value] of Object.entries({
+            attributeName: 'transform',
+            type: 'rotate',
+            from: `0 ${cx} ${cy}`,
+            to: `360 ${cx} ${cy}`,
+            dur: '1s',
+            repeatCount: 'indefinite',
+          }))
+            spin.setAttribute(name, value);
+          ring.append(spin);
+          badge.append(ring);
+        }
+        badge.append(markElement('circle', { cx, cy, r: 11, fill: color, stroke: '#fff', 'stroke-width': 2 }), t);
         svg.append(badge);
       }
     }
@@ -945,41 +1031,48 @@ export function createPreviewDomEditor(notify: (state: PreviewEditorState) => vo
     selected = event.altKey && el.parentElement ? el.parentElement : el;
     id(selected);
     if (mode === 'annotate') {
-      const existing = annotations.find((a) => a.type === 'element' && annotationNodes.get(a.id) === selected);
-      if (existing) {
-        selectedAnnotationId = existing.id;
-        emit();
-        return;
-      }
-      if (annotations.length >= 100) {
-        notify({ ...state(), error: '最多添加 100 条标注，请先删除部分标注' });
-        return;
-      }
-      const r = selected.getBoundingClientRect(),
-        size = docSize(),
-        designId = selected.getAttribute('data-design-id') || undefined,
-        mark: PreviewAnnotation = {
-          id: crypto.randomUUID(),
-          type: 'element',
-          sourceWidth: size.width,
-          sourceHeight: size.height,
-          x: (r.x + scrollX) / size.width,
-          y: (r.y + scrollY) / size.height,
-          w: r.width / size.width,
-          h: r.height / size.height,
-          color: '#3975c6',
-          selector: path(selected)
-            .map((p) => p.replace(/:(\d+)$/, ':nth-of-type($1)'))
-            .join(' > '),
-          elementLabel: label(selected),
-          elementText: visibleText(selected),
-          ...(designId ? { designId } : {}),
-        };
-      annotationNodes.set(mark.id, selected);
-      updateAnnotations([...annotations, mark], mark.id);
+      pinElement(selected);
+      return;
     }
     emit();
   };
+  /** Pins an element, or selects the pin already on it. */
+  function pinElement(el: Element) {
+    const existing = annotations.find((a) => a.type === 'element' && annotationNodes.get(a.id) === el);
+    if (existing) {
+      selectedAnnotationId = existing.id;
+      pinSeq++;
+      emit();
+      return;
+    }
+    if (annotations.length >= 100) {
+      notify({ ...state(), error: '最多添加 100 条标注，请先删除部分标注' });
+      return;
+    }
+    const r = el.getBoundingClientRect(),
+      size = docSize(),
+      designId = el.getAttribute('data-design-id') || undefined,
+      mark: PreviewAnnotation = {
+        id: crypto.randomUUID(),
+        type: 'element',
+        sourceWidth: size.width,
+        sourceHeight: size.height,
+        x: (r.x + scrollX) / size.width,
+        y: (r.y + scrollY) / size.height,
+        w: r.width / size.width,
+        h: r.height / size.height,
+        color: PIN.mine,
+        selector: path(el)
+          .map((p) => p.replace(/:(\d+)$/, ':nth-of-type($1)'))
+          .join(' > '),
+        elementLabel: label(el),
+        elementText: visibleText(el),
+        ...(designId ? { designId } : {}),
+      };
+    annotationNodes.set(mark.id, el);
+    addPin(mark);
+    emit();
+  }
   window.addEventListener(
     'pointerdown',
     (event) => {
@@ -1121,7 +1214,19 @@ export function createPreviewDomEditor(notify: (state: PreviewEditorState) => vo
     },
     true,
   );
-  window.addEventListener('scroll', draw, true);
+  let scrollFrame = 0;
+  window.addEventListener(
+    'scroll',
+    () => {
+      draw();
+      if (!selectedAnnotationId || scrollFrame) return;
+      scrollFrame = requestAnimationFrame(() => {
+        scrollFrame = 0;
+        notify(state());
+      });
+    },
+    true,
+  );
   window.addEventListener('resize', () => {
     draw();
     if (selected) notify(state());
@@ -1134,15 +1239,20 @@ export function createPreviewDomEditor(notify: (state: PreviewEditorState) => vo
         capture ||
         locked ||
         !hover ||
-        editGesture
+        editGesture ||
+        gesture
       )
         return;
       const eventPath = event.composedPath();
-      if (eventPath.some((n) => n instanceof Element && own(n))) {
+      const onBadge = eventPath.some((n) => n instanceof Element && n.hasAttribute('data-annotation-id'));
+      if (onBadge || (mode === 'edit' && eventPath.some((n) => n instanceof Element && own(n)))) {
         hover.hidden = true;
         return;
       }
-      const el = eventPath.find((n) => n instanceof Element) as Element | undefined;
+      const el =
+        mode === 'annotate'
+          ? elementAt(event.clientX, event.clientY)
+          : (eventPath.find((n) => n instanceof Element) as Element | undefined);
       if (!el || (mode === 'edit' && el === selected)) {
         hover.hidden = true;
         return;
@@ -1173,6 +1283,12 @@ export function createPreviewDomEditor(notify: (state: PreviewEditorState) => vo
         selected = undefined;
       } else if (command.type === 'select') {
         selected = get(command.id);
+      } else if (command.type === 'select-pin') {
+        const target = annotationNodes.get(command.id);
+        if (target?.isConnected && !own(target)) {
+          selected = target;
+          id(target);
+        }
       } else if (command.type === 'parent') {
         selected = get().parentElement || selected;
       } else if (command.type === 'children') {
@@ -1271,6 +1387,30 @@ export function createPreviewDomEditor(notify: (state: PreviewEditorState) => vo
       } else if (command.type === 'annotation-undo' || command.type === 'annotation-redo') {
         if (locked) throw Error('正在保存，请稍候');
         annotationHistoryMove(command.type === 'annotation-undo' ? -1 : 1);
+      } else if (command.type === 'reveal') {
+        const before = { x: scrollX, y: scrollY },
+          frames = () => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+        if (!command.id) {
+          if (command.scroll) scrollTo({ left: command.scroll.x, top: command.scroll.y, behavior: 'instant' });
+          await frames();
+          return { state: state() };
+        }
+        const mark = annotations.find((a) => a.id === command.id);
+        if (!mark) return { state: state(), scroll: before };
+        const target = annotationNodes.get(mark.id);
+        if (target?.isConnected) target.scrollIntoView({ block: 'center', inline: 'center', behavior: 'instant' });
+        else {
+          const box = pinRect(mark.id)!;
+          scrollBy({
+            left: box.x + box.width / 2 - innerWidth / 2,
+            top: box.y + box.height / 2 - innerHeight / 2,
+            behavior: 'instant',
+          });
+        }
+        await frames();
+        draw();
+        await frames();
+        return { state: state(), rect: pinRect(mark.id), scroll: before };
       } else if (command.type === 'capture') {
         capture = command.hide;
       } else if (command.type === 'lock') {

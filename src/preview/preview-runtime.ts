@@ -20,6 +20,10 @@ export interface WebPreviewControls {
   inspect: () => void;
   primaryLabel: string;
   saveLabel: string;
+  /** The page's zoom: page CSS pixels times this are app pixels. */
+  zoom: number;
+  /** An image of the visible page, pins included. */
+  capture: () => Promise<string | undefined>;
 }
 export interface PreviewRuntime {
   request: (action: () => void) => void;

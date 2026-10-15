@@ -1,3 +1,4 @@
+import { validMarkRefs, type PreviewMarkRef } from '../../../shared/preview/preview-annotations';
 import { resolveChatReply } from './message-replies';
 import { workCommand } from '../../../shared/types/work-types';
 import { effectiveWorkspace } from '../storage/workspaces';
@@ -122,6 +123,7 @@ export class ChatPinQueue {
       sessionId?: string;
       message: string;
       previewPrompt?: string;
+      previewMarks?: PreviewMarkRef[];
       replyToMessageId?: string;
       mentions?: BotMention[];
       attachmentIds?: string[];
@@ -134,6 +136,7 @@ export class ChatPinQueue {
       (typeof input.previewPrompt !== 'string' || input.previewPrompt.length > 12000)
     )
       throw Error('无效预览意见');
+    const previewMarks = validMarkRefs(input.previewMarks);
     const attachments = this.attachments.forDraft({ kind: 'bot', id: input?.botId }, input?.attachmentIds),
       mentions = validateChatInput(
         this.store,
@@ -158,6 +161,7 @@ export class ChatPinQueue {
       attachments,
       designSessionId: input.designSessionId,
       ...(input.previewPrompt !== undefined ? { previewPrompt: input.previewPrompt } : {}),
+      ...(previewMarks?.length ? { previewMarks } : {}),
       ...(reply ? { reply } : {}),
       ...(sessionId ? { sessionId } : {}),
       ...(connector ? { connector } : {}),

@@ -14,6 +14,7 @@ import { MessageActions } from '../chat/MessagePins';
 import { ScheduledTriggerCard } from '../chat/ScheduledTrigger';
 import { Avatar } from './Avatar';
 import { MentionContent } from './MentionContent';
+import { usePinRefs } from '../preview/pin-thread';
 import { MessageReasoning } from '../chat/MessageReasoning';
 import { shallowEqual } from './equality';
 import { useI18n } from '../i18n';
@@ -56,6 +57,7 @@ function MessageView({
   const onReply = hasReply ? (value: ChatMessage) => reply.current?.(value) : undefined;
   const { t } = useI18n();
   const avatar = useContext(MessageAvatarContext);
+  const pins = usePinRefs(message.id);
   if (!showReasoning && message.reasoning) message = { ...message, reasoning: undefined };
   if (message.scheduled)
     return (
@@ -139,7 +141,7 @@ function MessageView({
           ) : content ? (
             message.role === 'assistant' ? (
               <div className="markdown">
-                <MentionContent content={content} mentions={presentation.mentions} markdown />
+                <MentionContent content={content} mentions={presentation.mentions} markdown pins={pins} />
               </div>
             ) : (
               <>

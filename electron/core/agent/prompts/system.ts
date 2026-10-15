@@ -58,7 +58,8 @@ const openPreview = (vm: boolean) =>
   (vm
     ? 'For a VM dev server, start it in your own project directory, then call open_preview with url http://localhost:PORT and location vm. Keep it running; same-origin requests and WebSockets use the temporary tunnel. '
     : '') +
-  'Choose the actual location explicitly. Queued means presentation was requested, not that the user viewed it. Keep final results and attachments in the conversation as well.';
+  'Choose the actual location explicitly. Queued means presentation was requested, not that the user viewed it. Keep final results and attachments in the conversation as well.' +
+  '\nComments from the preview arrive numbered (#1, #2…), each with its place and often a close-up image. Reply to every number in order: say what you changed, or why you left it as it was. After editing a commented file, open it again with open_preview so the user sees the new version; their pins stay in place. To ask the user about a specific spot, pin a question there with preview_mark instead of describing where it is.';
 const MEMORY_OWNERSHIP =
   '\nLong-term memories belong to the Bot the preference actually concerns. If asked to tell another Bot to remember something, forward the original request and let that Bot save it. Do not save another Bot tone, role, or behavioral preferences as your own.';
 const PRIVATE_MESSAGE =

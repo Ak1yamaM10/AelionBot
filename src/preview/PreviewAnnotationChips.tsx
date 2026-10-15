@@ -1,44 +1,58 @@
 import type { AttachmentScope } from '../../shared/types/attachment-types';
+import type { PreviewAnnotation } from '../../shared/types/preview-editor-types';
+import { pinNumber, pinTitle, unsentPins } from '../../shared/preview/preview-annotations';
 import { useI18n } from '../i18n';
 import { usePreviewWorkbench } from './PreviewWorkbench';
 import './preview-annotation-chips.css';
 
 const sameScope = (a?: AttachmentScope, b?: AttachmentScope) => Boolean(a && b && a.kind === b.kind && a.id === b.id);
 
-/**
- * Marks made on the preview beside this composer. They are sent with the next message (the preview adds the
- * screenshot), so they sit inside the composer like attachments instead of in a second input box.
- */
-export function PreviewAnnotationChips({ scope }: { scope: AttachmentScope }) {
-  const { t } = useI18n(),
-    workbench = usePreviewWorkbench(),
-    info = workbench?.info;
-  if (!info || !info.docked || !sameScope(info.scope, scope) || !info.annotations.length) return null;
-  const kind = { rect: '区域', element: '元素', arrow: '箭头', pen: '画笔', text: '文字' } as const;
+/** The comments waiting to go out with the next message, as chips: number, what it points at, and what it says. */
+export function PinChips({
+  marks,
+  disabled,
+  onSelect,
+  onRemove,
+}: {
+  marks: PreviewAnnotation[];
+  disabled?: boolean;
+  onSelect: (id: string) => void;
+  onRemove: (id: string) => void;
+}) {
+  const { t } = useI18n();
+  const outgoing = unsentPins(marks);
+  if (!outgoing.length) return null;
   return (
-    <div className="composer-annotations" role="group" aria-label={t('已标注的位置')}>
-      {info.annotations.map((mark, index) => {
-        const label = mark.elementLabel || t(kind[mark.type]),
-          note = mark.text && mark.text !== '标注' && mark.text !== 'Annotation' ? mark.text : '';
+    <div className="composer-annotations" role="group" aria-label={t('待发送的评论')}>
+      {outgoing.map((mark) => {
+        const n = pinNumber(mark, marks.indexOf(mark)),
+          label = t(pinTitle(mark)),
+          note = mark.text?.trim() || '';
         return (
-          <span className="composer-annotation" key={mark.id}>
+          <span className={`composer-annotation ${mark.author === 'bot' ? 'is-bot' : ''}`} key={mark.id}>
             <button
               type="button"
               className="composer-annotation-body"
-              title={mark.elementText || note || label}
-              onClick={() => workbench?.annotations?.select(mark.id)}
+              disabled={disabled}
+              title={note || mark.elementText || label}
+              onClick={() => onSelect(mark.id)}
             >
-              <b aria-hidden="true">{index + 1}</b>
+              <b aria-hidden="true">{n}</b>
               <span>
                 {label}
-                {note && <em>「{note.length > 24 ? note.slice(0, 24) + '…' : note}」</em>}
+                {note ? (
+                  <em>{note.length > 24 ? note.slice(0, 24) + '…' : note}</em>
+                ) : (
+                  <em className="is-empty">{t('还没写')}</em>
+                )}
               </span>
             </button>
             <button
               type="button"
               className="composer-annotation-remove"
-              aria-label={t('删除标注 {index}', { index: index + 1 })}
-              onClick={() => workbench?.annotations?.remove(mark.id)}
+              disabled={disabled}
+              aria-label={t('删除评论 {index}', { index: n })}
+              onClick={() => onRemove(mark.id)}
             >
               ×
             </button>
@@ -46,5 +60,22 @@ export function PreviewAnnotationChips({ scope }: { scope: AttachmentScope }) {
         );
       })}
     </div>
+  );
+}
+
+/**
+ * Comments made on the preview beside this composer. They go out with the next message (the preview adds the
+ * screenshot), so they sit inside the composer like attachments instead of in a second input box.
+ */
+export function PreviewAnnotationChips({ scope }: { scope: AttachmentScope }) {
+  const workbench = usePreviewWorkbench(),
+    info = workbench?.info;
+  if (!info || !info.docked || !sameScope(info.scope, scope)) return null;
+  return (
+    <PinChips
+      marks={info.annotations}
+      onSelect={(id) => workbench?.annotations?.select(id)}
+      onRemove={(id) => workbench?.annotations?.remove(id)}
+    />
   );
 }

@@ -9,8 +9,8 @@
   align-items: center;
   max-width: 100%;
   border-radius: 8px;
-  background: light-dark(#efeaf7, #2f2a3a);
-  color: light-dark(#6a5a93, #cbbfe8);
+  background: light-dark(#f1f1f3, #34313a);
+  color: light-dark(#3d3b42, #dedbe2);
   font-size: calc(12px * var(--appearance-text-scale, 1));
 }
 .composer-annotation-body {
@@ -18,6 +18,7 @@
   align-items: center;
   gap: 6px;
   min-width: 0;
+  max-width: 260px;
   padding: 3px 4px 3px 5px;
   color: inherit;
   border-radius: 8px 0 0 8px;
@@ -30,7 +31,11 @@
 }
 .composer-annotation-body em {
   font-style: normal;
-  margin-left: 4px;
+  margin-left: 6px;
+  color: light-dark(#6b6872, #b3afb9);
+}
+.composer-annotation-body em.is-empty {
+  color: light-dark(#a9a6ae, #7c7884);
 }
 .composer-annotation-body b {
   flex: none;
@@ -39,21 +44,26 @@
   display: grid;
   place-items: center;
   border-radius: 50%;
-  background: light-dark(#8f7fb3, #a898d4);
-  color: light-dark(#fff, #1f1c26);
+  background: light-dark(#29282c, #e3e0e6);
+  color: light-dark(#fff, #202024);
   font-size: 10px;
   font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+.composer-annotation.is-bot b {
+  background: #8b6bea;
+  color: #fff;
 }
 .composer-annotation-remove {
   padding: 0 7px 0 3px;
   height: 23px;
-  color: light-dark(#a09aab, #8f889c);
+  color: light-dark(#a19ea8, #8a8691);
   border-radius: 0 8px 8px 0;
 }
-.composer-annotation button:hover {
-  color: light-dark(#4f416f, #fff);
+.composer-annotation button:hover:not(:disabled) {
+  color: light-dark(#29282c, #fff);
 }
 .composer-annotation button:focus-visible {
-  outline: 2px solid light-dark(#8f7fb3, #b3a4e0);
+  outline: 2px solid #8b6bea;
   outline-offset: 1px;
 }

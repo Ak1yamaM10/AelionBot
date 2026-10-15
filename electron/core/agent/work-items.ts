@@ -13,6 +13,7 @@ export const PLANNING_TOOLS = new Set([
   'group_read',
   'group_outbox',
   'open_preview',
+  'preview_mark',
   'code_exec',
   'view_image',
   'video_frames',

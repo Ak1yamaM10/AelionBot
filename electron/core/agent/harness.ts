@@ -161,6 +161,7 @@ const groupNonProgressTools = new Set([
 ]);
 const COMPACT_TOOLS = new Set([
   'open_preview',
+  'preview_mark',
   'code_exec',
   'tool_search',
   'groups_list',
@@ -2103,7 +2104,7 @@ export class Harness {
         !this.disabledTools.has(t.function.name) &&
         (!this.headless || !HEADLESS_HIDDEN_TOOLS.has(t.function.name)) &&
         (t.function.name !== 'video_frames' || Boolean(this.video)) &&
-        (t.function.name !== 'open_preview' || Boolean(this.previews)) &&
+        (!['open_preview', 'preview_mark'].includes(t.function.name) || Boolean(this.previews)) &&
         (t.function.name !== 'view_image' || Boolean(this.host?.options.imagePreview)) &&
         (t.function.name !== 'generate_image' || Boolean(this.imageModel?.(botId))) &&
         (!['request_user_input', 'user_input_wait'].includes(t.function.name) || Boolean(this.interactions)) &&

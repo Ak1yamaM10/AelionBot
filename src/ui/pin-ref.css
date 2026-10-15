@@ -1,0 +1,37 @@
+/* "#3" in a Bot's reply: the comment it answers, with a dot for what happened to it. Opens the pin in the preview. */
+.pin-ref {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin: 0 1px;
+  padding: 0 6px 0 4px;
+  height: 1.45em;
+  border-radius: 6px;
+  background: light-dark(#f1f1f3, #34313a);
+  color: light-dark(#29282c, #e3e0e6);
+  font: inherit;
+  font-size: 0.9em;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  vertical-align: baseline;
+  cursor: pointer;
+}
+.pin-ref:hover {
+  background: light-dark(#e7e6ea, #3d3a43);
+}
+.pin-ref:focus-visible {
+  outline: 2px solid #8b6bea;
+  outline-offset: 1px;
+}
+.pin-ref i {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #9c99a3;
+}
+.pin-ref[data-status='done'] i {
+  background: #3f9a6e;
+}
+.pin-ref[data-status='kept'] i {
+  background: #b9822f;
+}

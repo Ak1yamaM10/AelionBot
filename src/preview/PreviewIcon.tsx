@@ -6,6 +6,7 @@ export function PreviewIcon({ name }: { name: string }) {
     arrow: <path d="M5 19 19 5M8 5h11v11" />,
     text: <path d="M4 5h16M12 5v15M8 20h8" />,
     comment: <path d="M4 4h16v13H9l-5 4V4m4 5h8m-8 4h5" />,
+    compare: <path d="M3 5h7v14H3zm11 0h7v14h-7zM12 3v18" />,
     edit: (
       <>
         <path d="m15 4 5 5M4 20l5-1L20 8a3.5 3.5 0 0 0-5-5L4 14z" />

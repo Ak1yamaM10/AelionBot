@@ -7,6 +7,11 @@ export const MEDIA_HANDLERS: Record<string, ToolHandler> = {
     if (!deps.previews) throw Error('应用预览服务尚未就绪');
     return deps.previews.open(bot.id, runId, args, signal);
   },
+  preview_mark: ({ bot, args, signal, runId, deps }) => {
+    if (!deps.previews) throw Error('应用预览服务尚未就绪');
+    if (args.marks === undefined) throw Error('preview_mark 需要 marks');
+    return deps.previews.open(bot.id, runId, args, signal);
+  },
   view_image: ({ bot, args, signal, runId, workspace, deps }) => {
     if (!deps.host) throw Error('本机图像工具不可用');
     return deps.host.viewImage(bot.id, runId, args, signal, workspace);

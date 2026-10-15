@@ -1,0 +1,169 @@
+/* A pin's comment bubble over a file preview. The web preview draws the same card in its own view
+   (electron/windows/preview-feedback-overlay.ts); keep the two alike. */
+.pin-bubble {
+  --pin-ink: light-dark(#29282c, #e3e0e6);
+  --pin-ink2: light-dark(#4a4850, #c9c5cf);
+  --pin-muted: light-dark(#86838d, #9d99a5);
+  --pin-faint: light-dark(#aeabb5, #75717d);
+  --pin-line: light-dark(#e8e7ec, #3a3641);
+  --pin-surface: light-dark(#fff, #29262f);
+  --pin-fill: light-dark(#f3f2f5, #36323d);
+  position: absolute;
+  /* Above the pin layer, which takes the pointer while commenting. */
+  z-index: 9;
+  width: 300px;
+  max-width: calc(100% - 16px);
+  background: var(--pin-surface);
+  color: var(--pin-ink);
+  border: 1px solid var(--pin-line);
+  border-radius: 12px;
+  box-shadow:
+    0 1px 2px #0000000a,
+    0 16px 36px -14px #1f1a4552;
+  font-size: 13px;
+  line-height: 1.6;
+}
+.pin-bubble header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 12px 0;
+  font-size: 12px;
+  color: var(--pin-muted);
+  min-width: 0;
+}
+.pin-dot {
+  flex: none;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  background: var(--pin-ink);
+  color: var(--pin-surface);
+  font-size: 10px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+.pin-dot.bot {
+  background: #8b6bea;
+  color: #fff;
+}
+.pin-dot.done {
+  background: #3f9a6e;
+  color: #fff;
+}
+.pin-dot.kept {
+  background: #b9822f;
+  color: #fff;
+}
+.pin-dot.sent,
+.pin-dot.working {
+  background: #9c99a3;
+  color: #fff;
+}
+.pin-bubble-title {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.pin-bubble-state {
+  flex: none;
+  font-size: 11px;
+  font-weight: 600;
+}
+.pin-bubble-state.done {
+  color: #3f9a6e;
+}
+.pin-bubble-state.kept {
+  color: #b9822f;
+}
+.pin-bubble-note {
+  margin: 8px 12px 0;
+  padding: 8px 10px;
+  border-radius: 9px;
+  background: var(--pin-fill);
+  color: var(--pin-ink2);
+}
+.pin-bubble textarea {
+  display: block;
+  width: 100%;
+  min-height: 44px;
+  max-height: 132px;
+  margin: 0;
+  padding: 6px 12px 10px;
+  border: 0;
+  resize: none;
+  outline: 0;
+  background: transparent;
+  color: var(--pin-ink);
+  font: inherit;
+  font-size: 13.5px;
+  scrollbar-width: thin;
+}
+.pin-bubble textarea::placeholder {
+  color: var(--pin-faint);
+}
+.pin-bubble-reply {
+  display: flex;
+  gap: 8px;
+  margin: 0 12px 10px;
+  padding-top: 10px;
+  border-top: 1px solid var(--pin-line);
+  color: var(--pin-ink2);
+  line-height: 1.55;
+}
+.pin-bubble-reply b {
+  display: block;
+  color: var(--pin-ink);
+  font-size: 12px;
+  font-weight: 600;
+}
+.pin-bubble-reply i {
+  flex: none;
+  width: 18px;
+  height: 18px;
+  margin-top: 2px;
+  border-radius: 50%;
+  background: #8b6bea;
+}
+.pin-bubble footer {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding: 6px 8px 8px;
+  border-top: 1px solid var(--pin-line);
+}
+.pin-bubble-icon {
+  width: 26px;
+  height: 26px;
+  display: grid;
+  place-items: center;
+  border-radius: 7px;
+  color: var(--pin-muted);
+}
+.pin-bubble-icon:hover {
+  background: var(--pin-fill);
+  color: var(--pin-ink);
+}
+.pin-bubble-hint {
+  margin-left: auto;
+  margin-right: 8px;
+  font-size: 11.5px;
+  color: var(--pin-faint);
+}
+.pin-bubble-done {
+  height: 26px;
+  padding: 0 12px;
+  border-radius: 7px;
+  background: var(--pin-ink);
+  color: var(--pin-surface);
+  font-size: 12px;
+  font-weight: 600;
+}
+.pin-bubble button:focus-visible {
+  outline: 2px solid #8b6bea;
+  outline-offset: 1px;
+}

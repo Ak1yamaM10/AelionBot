@@ -22,6 +22,10 @@ export interface PreviewWorkbenchInfo {
 export interface PreviewAnnotationControls {
   remove: (id: string) => void;
   select: (id: string) => void;
+  /** What the Bot's reply said about sent pins, by pin ID. */
+  status: (
+    updates: Record<string, { status: import('../../shared/types/preview-editor-types').PinStatus; reply?: string }>,
+  ) => void;
 }
 export interface PreviewWorkbench {
   info?: PreviewWorkbenchInfo;

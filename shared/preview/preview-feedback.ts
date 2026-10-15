@@ -17,6 +17,8 @@ export interface PreviewFeedbackInput {
   file: { name: string; url?: string; path?: string; attachmentId?: string; page?: number; unsaved?: boolean };
   rect: { x: number; y: number; width: number; height: number };
   viewport: { width: number; height: number };
+  /** Pins on screen in a file preview, in window CSS pixels, cut from the screenshot as close-ups. */
+  pinRects?: Array<{ id: string; rect: { x: number; y: number; width: number; height: number } }>;
 }
 export function feedbackCaptureRect(
   rect: PreviewFeedbackInput['rect'],
@@ -62,6 +64,8 @@ export function feedbackCaptureRect(
 }
 export function previewFeedbackMessage(
   input: Pick<PreviewFeedbackInput, 'text' | 'file' | 'language' | 'annotations' | 'edits' | 'view'>,
+  /** Close-up image names by pin ID. */
+  closeUps?: Map<string, string>,
 ) {
   if (
     typeof input.text !== 'string' ||
@@ -122,10 +126,14 @@ export function previewFeedbackMessage(
     (input.annotations?.length
       ? '\n\n' +
         (en
-          ? 'Annotations (normalized to their saved document/content dimensions; screenshot shows only the viewport):'
-          : '标注（坐标按记录的整页或内容尺寸归一化；截图只包含可见区域）：') +
+          ? 'Comments (answer each by its number, and for one you leave unchanged say why. Coordinates are normalized to the recorded page or content size' +
+            (closeUps?.size ? '; each listed close-up is attached' : '') +
+            '):'
+          : '评论（回复时按编号逐条说明，没有改的也写上原因。坐标按记录的整页或内容尺寸归一化' +
+            (closeUps?.size ? '；列出的特写图已附上' : '') +
+            '）：') +
         '\n' +
-        annotationContext(input.annotations)
+        annotationContext(input.annotations, { en, closeUps })
       : '') +
     (input.edits?.length
       ? '\n' +

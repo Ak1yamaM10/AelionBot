@@ -526,6 +526,51 @@ export class WebPreviewBrowser {
       );
     return image.toPNG();
   }
+  /**
+   * A close-up of each pin: the page scrolls it into view, the view is captured around it, and the page goes back
+   * to where it was. Undefined when no page is shown.
+   */
+  async closeUps(ids: string[]) {
+    const active = this.active;
+    if (!active || !this.editorPreload || !active.visible || active.state.error) return;
+    const shots: Array<{ id: string; bytes: Buffer }> = [];
+    let scroll: { x: number; y: number } | undefined;
+    await this.editor.command(active.id, { type: 'capture', hide: true });
+    try {
+      for (const id of ids) {
+        if (this.active !== active) break;
+        const result = await this.editor.command(active.id, { type: 'reveal', id });
+        scroll ??= result.scroll;
+        const rect = result.rect;
+        if (!rect) continue;
+        const zoom = active.view.webContents.getZoomFactor(),
+          pad = 40,
+          left = Math.max(0, (rect.x - pad) * zoom),
+          top = Math.max(0, (rect.y - pad) * zoom),
+          box = {
+            x: Math.round(left),
+            y: Math.round(top),
+            width: Math.round(Math.min(active.bounds.width, (rect.x + rect.width + pad) * zoom) - left),
+            height: Math.round(Math.min(active.bounds.height, (rect.y + rect.height + pad) * zoom) - top),
+          };
+        if (box.width < 4 || box.height < 4) continue;
+        let image = await active.view.webContents.capturePage(box, { stayHidden: true });
+        if (image.isEmpty()) continue;
+        const size = image.getSize();
+        if (Math.max(size.width, size.height) > 1600)
+          image = image.resize(
+            size.width >= size.height ? { width: 1600, quality: 'best' } : { height: 1600, quality: 'best' },
+          );
+        shots.push({ id, bytes: image.toPNG() });
+      }
+    } finally {
+      if (this.active === active) {
+        if (scroll) await this.editor.command(active.id, { type: 'reveal', scroll }).catch(() => {});
+        await this.editor.command(active.id, { type: 'capture', hide: false }).catch(() => {});
+      }
+    }
+    return shots;
+  }
   close(id?: string) {
     if (id && this.active?.id !== id && this.pendingId !== id) return;
     this.pendingId = undefined;
