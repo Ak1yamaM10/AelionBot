@@ -741,17 +741,23 @@ async function initialize() {
   );
   greetings = new BotGreetings(store, model, changed, (id) => updatePreparing || harness.isRunning(id));
   greetings.streams.onEmit = streamsChanged;
-  // Group and delegated work run in a Bot's main lane, beside its work sessions.
+  // Group and delegated work run in a Bot's main lane, beside its work sessions; a final reply to a private
+  // message runs in the session that sent it.
   peerChats = new PeerChats(
     store,
     {
-      isRunning: (id) => updatePreparing || harness.isRunning(id, null) || Boolean(chatPins?.hasPending(id, null)),
+      isRunning: (id, sessionId = null) =>
+        updatePreparing || harness.isRunning(id, sessionId) || Boolean(chatPins?.hasPending(id, sessionId)),
       run: (id, input, options) => {
-        groupChats?.preempt(id);
+        // Main-lane work goes first; a work session's lane is its own.
+        if (!options.sessionId) groupChats?.preempt(id);
         greetings?.cancel(id);
-        return harness.run(id, input, options);
+        // A final reply in a connector session goes back to that chat too.
+        return connectors
+          ? connectors.wrapRun(id, options, (wrapped) => harness.run(id, input, wrapped))
+          : harness.run(id, input, options);
       },
-      cancel: (id) => harness.cancel(id, null),
+      cancel: (id, sessionId = null) => harness.cancel(id, sessionId),
     },
     changed,
     attachments,

@@ -539,11 +539,13 @@ export class Store {
     if (!this.data.messages.some((item) => item.id === message.id)) this.data.messages.push(message);
     exchange.userSummaryMessageId = message.id;
     if (!message.peerContextPublished) {
-      const history = (this.data.conversations[run.botId] ||= []);
+      // The reply joins the conversation that sent the message: the main chat or a work session.
+      const key = run.sessionId ? Store.sessionHistoryKey(run.sessionId) : run.botId;
+      const history = (this.data.conversations[key] ||= []);
       let at = history.length;
       if (historical) {
         const humans = this.data.messages
-            .filter((item) => item.botId === run.botId && item.role === 'user')
+            .filter((item) => item.botId === run.botId && item.sessionId === run.sessionId && item.role === 'user')
             .sort((a, b) => a.time.localeCompare(b.time)),
           next = humans.find((item) => item.time > message.time);
         if (next) {

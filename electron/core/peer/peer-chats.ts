@@ -20,10 +20,11 @@ import { attachmentSummary, type Attachment } from '../../../shared/types/attach
 import { Store } from '../storage/store';
 import type { HarnessRunOptions, PeerGateway } from '../agent/peer-runtime-types';
 
+/** Peer work runs in a Bot's main lane (`sessionId` null), except a final reply, which runs where the message was sent. */
 interface Runner {
-  isRunning: (botId: string) => boolean;
+  isRunning: (botId: string, sessionId?: string | null) => boolean;
   run: (botId: string, input: string, options: HarnessRunOptions) => Promise<void>;
-  cancel: (botId: string) => void;
+  cancel: (botId: string, sessionId?: string | null) => void;
 }
 const identity = botIdentity;
 const now = () => new Date().toISOString();
@@ -369,12 +370,14 @@ export class PeerChats implements PeerGateway {
       .sort((a, b) => a.updatedAt.localeCompare(b.updatedAt))) {
       if (exchange.status !== 'queued' && exchange.status !== 'reply_queued') continue;
       const kind = exchange.status === 'queued' ? 'receive' : 'relay',
-        botId = kind === 'receive' ? exchange.toBotId : exchange.fromBotId;
+        botId = kind === 'receive' ? exchange.toBotId : exchange.fromBotId,
+        lane = kind === 'relay' ? this.replySession(exchange) : null;
       if (!this.store.data.bots.some((bot) => bot.id === botId)) {
         this.fail(exchange, '对方 Bot 已删除', 'cancelled');
         continue;
       }
-      if (this.runner.isRunning(botId) || [...this.workers.values()].some((worker) => worker.botId === botId)) continue;
+      if (this.runner.isRunning(botId, lane) || [...this.workers.values()].some((worker) => worker.botId === botId))
+        continue;
       const key = `${kind}:${exchange.id}`,
         worker = { botId } as { botId: string; runId?: string };
       this.workers.set(key, worker);
@@ -394,7 +397,7 @@ export class PeerChats implements PeerGateway {
     const exchange = this.exchange(origin.exchangeId);
     if (
       peerPending(exchange.status) ||
-      this.runner.isRunning(run.botId) ||
+      this.runner.isRunning(run.botId, run.sessionId ?? null) ||
       [...this.workers.values()].some((worker) => worker.botId === run.botId)
     )
       throw Error('私聊任务仍在处理，请稍后重试');
@@ -416,6 +419,18 @@ export class PeerChats implements PeerGateway {
       parent = session.parentId;
     }
     this.touch();
+  }
+  /**
+   * The work session a final reply belongs in: the one whose run sent the first message, while it still exists.
+   * Null for the main chat, and for replies within a chain of messages, which stay private.
+   */
+  private replySession(exchange: PeerExchange) {
+    if (exchange.parentId) return null;
+    const sessionId = this.store.data.runs.find((run) => run.id === exchange.rootRunId)?.sessionId;
+    return sessionId &&
+      this.store.data.workSessions?.some((session) => session.id === sessionId && session.botId === exchange.fromBotId)
+      ? sessionId
+      : null;
   }
   private reference(botId: string) {
     const runs = this.store.data.runs
@@ -455,7 +470,9 @@ export class PeerChats implements PeerGateway {
         ? `来自 ${request.sender.name} 的私聊消息：\n${request.content}`
         : `来自 ${reply?.sender.name || 'Bot'} 的私聊答复：\n${reply?.content.slice(0, 16000) || ''}${(reply?.content.length || 0) > 16000 ? '\n（较长答复已截取，可用 bot_read_messages 查看原私聊。）' : ''}`;
     this.touch();
+    const sessionId = session ? null : this.replySession(exchange);
     await this.runner.run(worker.botId, input, {
+      ...(sessionId ? { sessionId } : {}),
       resumeRunId: retry?.id,
       workItemId: retry?.workItemId,
       workspaceDir: retry?.workspaceDir,
@@ -515,7 +532,7 @@ export class PeerChats implements PeerGateway {
     exchange.error = error.slice(0, 1000);
     exchange.updatedAt = now();
     const active = this.store.data.runs.find((run) => run.id === exchange.activeRunId && run.status === 'running');
-    if (active) this.runner.cancel(active.botId);
+    if (active) this.runner.cancel(active.botId, active.sessionId ?? null);
     for (const child of this.store.data.peerExchanges.filter(
       (item) => item.parentId === exchange.id && peerPending(item.status),
     ))

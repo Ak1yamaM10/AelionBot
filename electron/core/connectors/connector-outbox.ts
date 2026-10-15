@@ -59,14 +59,28 @@ export class ConnectorOutbox {
 
   /** The connector chat a run answers, when its input came from one. */
   private origin(botId: string, options: HarnessRunOptions) {
-    if (!options.sessionId || !options.inputMessageIds?.length) return;
+    if (!options.sessionId) return;
     const session = this.host.store.data.workSessions?.find(
       (item) => item.id === options.sessionId && item.botId === botId,
     );
     if (!session?.connector) return;
-    const inputs = this.host.store.data.messages.filter((message) => options.inputMessageIds!.includes(message.id));
+    const inputs =
+      this.relayedInput(options) ||
+      this.host.store.data.messages.filter((message) => options.inputMessageIds?.includes(message.id));
     if (!inputs.some((message) => message.connector || message.scheduled)) return;
     return { connectorId: session.connector.connectorId, chatId: session.connector.chatId };
+  }
+  /**
+   * For the final reply to a private message to another Bot: the input of the run that sent it. The reply arrives
+   * after that run ended, and goes to the chat that run was answering.
+   */
+  private relayedInput(options: HarnessRunOptions) {
+    if (options.peerOrigin?.kind !== 'peer_summary') return;
+    const store = this.host.store,
+      exchange = store.data.peerExchanges.find((item) => item.id === options.peerOrigin!.exchangeId),
+      root = store.data.runs.find((run) => run.id === exchange?.rootRunId && run.sessionId === options.sessionId),
+      input = root ? store.humanRunMessage(root.id) : undefined;
+    return input ? [input] : [];
   }
   /** Wraps one run started by the chat queue; untracked runs pass through unchanged. */
   wrapRun(botId: string, options: HarnessRunOptions, start: (options: HarnessRunOptions) => Promise<void>) {
@@ -115,13 +129,15 @@ export class ConnectorOutbox {
       return;
     }
     const run = this.host.store.data.runs.find((item) => item.id === runId),
-      answers = this.host.store.data.messages.filter(
-        (message) =>
-          message.runId === runId &&
-          message.role === 'assistant' &&
-          message.presentation === 'answer' &&
-          (message.content.trim() || message.attachments?.length),
-      );
+      // All of the run's messages: a final reply to a private message is published to the chat only after this.
+      answers = this.host.store
+        .runMessages(runId)
+        .filter(
+          (message) =>
+            message.role === 'assistant' &&
+            message.presentation === 'answer' &&
+            (message.content.trim() || message.attachments?.length),
+        );
     // Another run in this chat, one that took over after new input, keeps the cue.
     if (adapter.typing && ![...this.runs.values()].some((item) => item.chatId === tracked.chatId))
       await adapter.typing(tracked.chatId, false).catch(() => {});

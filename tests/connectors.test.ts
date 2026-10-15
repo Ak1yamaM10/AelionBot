@@ -352,6 +352,79 @@ test('approvals of connector runs go to the owner as cards; only the owner decid
   }
 });
 
+test('the final reply to a private message sent while answering a connector chat goes back to that chat', async (t) => {
+  const { store, bot, adapter, connectors, sent } = fixture(t);
+  const id = connectors.add({
+    botId: bot.id,
+    permissionMode: 'ask',
+    credentials: { platform: 'feishu', appId: 'cli_3', appSecret: 's' },
+  });
+  connectors.saved.get(id)!.owner = { id: 'owner', chatId: 'chat-owner' };
+  adapter.receive({ text: '问问数据伙伴进度' });
+  await until(() => sent.length === 1);
+  const session = store.data.workSessions!.find((item) => item.connector?.connectorId === id)!,
+    time = new Date().toISOString();
+  // The run that sent the private message answered the connector message, then ended before the reply came.
+  for (const [rootRunId, connector] of [
+    ['root-im', { connectorId: id, platform: 'feishu' as const, messageId: 'y', sender: { id: 'owner' } }],
+    ['root-desktop', undefined],
+  ] as const) {
+    store.data.runs.push({
+      id: rootRunId,
+      botId: bot.id,
+      sessionId: session.id,
+      status: 'completed',
+      startedAt: time,
+      modelCalls: 0,
+      toolCalls: 0,
+    });
+    store.message(bot.id, 'user', '问问数据伙伴进度', { runId: rootRunId, ...(connector ? { connector } : {}) });
+    store.data.peerExchanges.push({
+      id: 'exchange-' + rootRunId,
+      threadId: 't',
+      fromBotId: bot.id,
+      toBotId: 'other',
+      rootRunId,
+      rootBotId: bot.id,
+      rootRequest: '问问数据伙伴进度',
+      status: 'relaying',
+      createdAt: time,
+      updatedAt: time,
+      requestMessageId: 'r',
+    });
+    const before = adapter.texts.length,
+      runId = 'summary-' + rootRunId;
+    await connectors.wrapRun(
+      bot.id,
+      { sessionId: session.id, peerOrigin: { kind: 'peer_summary', exchangeId: 'exchange-' + rootRunId } },
+      async (options) => {
+        options.onStarted?.(runId);
+        store.data.runs.push({
+          id: runId,
+          botId: bot.id,
+          sessionId: session.id,
+          peerOrigin: options.peerOrigin,
+          status: 'completed',
+          startedAt: time,
+          modelCalls: 0,
+          toolCalls: 0,
+        });
+        // Still private when the run ends; the reply is published to the chat afterwards.
+        store.message(bot.id, 'assistant', '数据伙伴说本周数据已核对完。', {
+          runId,
+          status: 'done',
+          presentation: 'answer',
+        });
+      },
+    );
+    await settle();
+    assert.deepEqual(
+      adapter.texts.slice(before).map((item) => item.text),
+      connector ? ['数据伙伴说本周数据已核对完。'] : [],
+    );
+  }
+});
+
 test('the WeCom adapter subscribes, receives, replies to the message and stops when displaced', async (t) => {
   const server = new WebSocketServer({ port: 0 });
   t.after(() => server.close());

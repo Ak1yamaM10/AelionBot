@@ -668,7 +668,9 @@ export class Harness {
     // A work session: another chat with this Bot, with its own history, context, folder and plans.
     const sessionId = options.sessionId ?? resumed?.sessionId;
     if (sessionId) {
-      if (options.groupOrigin || options.peerOrigin) throw Error('工作会话不接收群聊或协作任务');
+      // The one peer run a session takes: the final reply to a private message the session sent.
+      if (options.groupOrigin || (options.peerOrigin && options.peerOrigin.kind !== 'peer_summary'))
+        throw Error('工作会话不接收群聊或协作任务');
       if (!this.store.data.workSessions?.some((session) => session.id === sessionId && session.botId === botId))
         throw new AppError('session.not_found', '工作会话不存在');
       // Tools and follow-up runs read it from the options, also when it came from the resumed run.

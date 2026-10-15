@@ -160,6 +160,37 @@ test('private dialogue stays isolated and only the sender final summary is publi
   assert.notEqual(fx.store.data.peerThreads[0].messages[0].content, 'mutated');
 });
 
+test('the final reply to a message sent from a work session is published in that session', async (t) => {
+  let sent = false;
+  const fx = fixture(t, (id, messages) => {
+    const context = messages
+      .filter((message) => message.role === 'system')
+      .map((message) => message.content || '')
+      .join('\n');
+    if (id === fx.b.id) return answer('本周数据已核对完。');
+    if (context.includes('这是先前联络的实际回信')) return answer('数据伙伴说本周数据已核对完。');
+    if (sent) return answer('已联系数据伙伴，正在等回复。');
+    sent = true;
+    return tool('bot_send_message', { botId: fx.b.id, message: '本周数据核对完了吗？' });
+  });
+  const session = {
+    id: 's1',
+    botId: fx.a.id,
+    name: 's1',
+    createdAt: '2026-01-01T00:00:00.000Z',
+    updatedAt: '2026-01-01T00:00:00.000Z',
+  };
+  fx.store.data.workSessions!.push(session);
+  await fx.harness.run(fx.a.id, '问问数据伙伴本周数据核对完了吗', { sessionId: session.id });
+  await until(() => fx.store.data.peerExchanges[0]?.status === 'completed');
+  const final = fx.store.data.messages.find((message) => message.audience === 'user');
+  assert.equal(final?.content, '数据伙伴说本周数据已核对完。');
+  assert.equal(final?.sessionId, session.id);
+  assert.equal(fx.store.data.runs.find((run) => run.id === final?.runId)?.sessionId, session.id);
+  assert.equal(fx.store.data.conversations[Store.sessionHistoryKey(session.id)].at(-1)?.content, final?.content);
+  assert.ok(!fx.store.data.conversations[fx.a.id].some((message) => message.content === final?.content));
+});
+
 test('legacy Bot dialogue stays private while the genuine final reply to the user is restored once', async (t) => {
   let count = 0;
   const fx = fixture(t, () =>
