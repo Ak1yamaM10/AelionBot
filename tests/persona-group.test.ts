@@ -19,7 +19,7 @@ function fixture(t: test.TestContext) {
     {
       isRunning: () => false,
       run: async (_id, _input, options) => {
-        contexts.push(options?.groupContext || '');
+        contexts.push((options?.groupPersona || '') + (options?.groupTurn || ''));
       },
       cancel: () => {},
     },
@@ -27,7 +27,7 @@ function fixture(t: test.TestContext) {
     undefined,
     undefined,
     undefined,
-    (botId, people) => persona.groupStyle(botId) + persona.groupFragment(botId, people),
+    (botId, people) => ({ style: persona.groupStyle(botId), people: persona.groupFragment(botId, people) }),
   );
   groups.start();
   t.after(() => {

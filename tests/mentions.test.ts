@@ -41,7 +41,23 @@ test('prefix names are resolved exactly, without treating a longer name as a sho
     botMentions('@猫娘 请回复', [short, cat]).mentions.map((m) => m.id),
     ['cat'],
   );
-  assert.equal(botMentions('@猫娘的名字', [cat]).mentions.length, 0);
+  assert.equal(botMentions('@猫娘的名字', [cat]).mentions[0].id, 'cat');
+});
+test('a name followed directly by Chinese text still addresses the member; Latin names keep word boundaries', () => {
+  const zhou = { id: 'zhou', name: '小周', color: '#aaa' },
+    alice = { id: 'alice', name: 'Alice', color: '#aaa' };
+  for (const text of ['@小周你怎么看', '@小周来看看', '@小周，你看', '@小周 你看', '@小周?'])
+    assert.deepEqual(
+      botMentions(text, [zhou, alice]).mentions.map((m) => m.id),
+      ['zhou'],
+      text,
+    );
+  assert.deepEqual(
+    botMentions('@Alice你看看', [zhou, alice]).mentions.map((m) => m.id),
+    ['alice'],
+  );
+  for (const text of ['@Alicebob 你好', '@Alice2', '@Alice.md'])
+    assert.equal(botMentions(text, [alice]).mentions.length, 0, text);
 });
 test('markdown mentions retain surrounding formatting and cannot reuse user-supplied internal links', () => {
   const result = botMentions('**@猫娘** 请看 [参考](https://example.com)。[假标签](aelion-mention:0)', [cat]);

@@ -7,6 +7,11 @@ export function groupMainContext(
   maxChars = 6500,
   _privateSummary?: string,
   groupId?: string,
+  /**
+   * For a group member's own run. Its history already holds the group's requests, the run in progress and any run
+   * that only talked, so those are left out: the context then changes only after the member did real work.
+   */
+  forGroupRun = false,
 ) {
   const bot = store.bot(botId),
     rooms = store.data.groups.filter(
@@ -14,8 +19,17 @@ export function groupMainContext(
         (!groupId || room.id === groupId) && room.members.some((member) => member.id === botId && !member.leftAt),
     ),
     ids = new Set(rooms.map((room) => room.id));
+  const worked = (runId: string) =>
+    store.runMessages(runId).some((message) => message.role === 'tool') ||
+    store.data.artifacts.some((file) => file.runId === runId);
   const runs = store.data.runs
-      .filter((run) => run.botId === botId && run.groupOrigin && ids.has(run.groupOrigin.groupId))
+      .filter(
+        (run) =>
+          run.botId === botId &&
+          run.groupOrigin &&
+          ids.has(run.groupOrigin.groupId) &&
+          (!forGroupRun || (run.status !== 'running' && worked(run.id))),
+      )
       .slice(-6),
     runIds = new Set(runs.map((run) => run.id));
   const context = {
@@ -24,7 +38,8 @@ export function groupMainContext(
     // Recent requests, leaving out user requests that @-addressed only other members.
     sharedRequests: store.data.groupRounds
       .filter((round) => {
-        if (!ids.has(round.groupId) || (bot.contextResetAt && round.createdAt < bot.contextResetAt)) return false;
+        if (forGroupRun || !ids.has(round.groupId) || (bot.contextResetAt && round.createdAt < bot.contextResetAt))
+          return false;
         const request = rooms
           .find((room) => room.id === round.groupId)
           ?.messages.find(

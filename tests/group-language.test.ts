@@ -3,12 +3,14 @@ import assert from 'node:assert/strict';
 import {
   groupEventPrompt,
   groupMustAnswerNote,
+  groupRequestsContext,
   groupReviewNote,
   GROUP_STATE_EVENT_PROMPT,
 } from '../electron/core/group/group-prompt';
 test('group instructions stay English without imposing a reply language', () => {
   const prompt =
-    groupEventPrompt('Team', 'g', 'Bot', [], ['Build a project.']) +
+    groupEventPrompt('Team', 'g', 'Bot', []) +
+    groupRequestsContext(['Build a project.']) +
     GROUP_STATE_EVENT_PROMPT +
     groupReviewNote('draft', []) +
     groupMustAnswerNote([]);

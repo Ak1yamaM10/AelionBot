@@ -803,10 +803,13 @@ async function initialize() {
     new LayaGroupDecisions(laya, layaLog),
     (botId, people) =>
       persona
-        ? persona.groupStyle(botId, (id) =>
-            id === 'user' ? userDisplayName(store.data.userProfile) : store.data.bots.find((b) => b.id === id)?.name,
-          ) + persona.groupFragment(botId, people)
-        : '',
+        ? {
+            style: persona.groupStyle(botId, (id) =>
+              id === 'user' ? userDisplayName(store.data.userProfile) : store.data.bots.find((b) => b.id === id)?.name,
+            ),
+            people: persona.groupFragment(botId, people),
+          }
+        : { style: '', people: '' },
     persona
       ? groupSocialHooks(
           persona,

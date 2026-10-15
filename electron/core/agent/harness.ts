@@ -927,14 +927,24 @@ export class Harness {
     if (inputs.length || options.supersedesRunId) turnContext.content += BATCHED_INPUT_CONTEXT;
     if (resumed) turnContext.content += RESUME_CONTEXT;
     // Group context can include game relationships and shared experiences. Never inject it into private chats.
+    // A group member is woken many times, and every changed system message is appended to its context again (the
+    // context keeps earlier copies so the prompt cache holds). So the parts that rarely change travel in their own
+    // messages, steadiest first, and only the small per-wake part changes every time.
+    const groupControls: WireMessage[] = [];
     if (options.groupOrigin && options.groupContext) {
       turnContext.content = turnContext.content!.replace(requestAnchor, GROUP_EVENT_CONTEXT);
-      turnContext.content += '\n' + options.groupContext;
+      turnContext.content += options.groupTurn || '';
+      groupControls.push({ role: 'system', content: options.groupContext });
     }
     if (options.groupOrigin)
-      turnContext.content += groupSharedContext(
-        groupMainContext(this.store, botId, 6500, undefined, options.groupOrigin.groupId),
-      );
+      groupControls.push({
+        role: 'system',
+        content: groupSharedContext(
+          groupMainContext(this.store, botId, 6500, undefined, options.groupOrigin.groupId, true),
+        ).trim(),
+      });
+    if (options.groupOrigin && options.groupPersona?.trim())
+      groupControls.push({ role: 'system', content: options.groupPersona.trim() });
     const initialDelegation = this.cognition ? delegatedMemory(this.store, bot.id, run.id) : undefined;
     if (initialDelegation)
       turnContext.content += memoryDelegationContext(
@@ -1166,7 +1176,7 @@ export class Harness {
           runId: run.id,
           system,
           prefixContext: references,
-          dynamicContext: [turnContext],
+          dynamicContext: [...groupControls, turnContext],
           history,
           tools: modelTools,
           signal: inferenceSignal,

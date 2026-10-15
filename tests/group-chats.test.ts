@@ -2153,3 +2153,25 @@ test('a final reply written as group_send_message arguments publishes only its m
     ['早上好，今天有什么想聊的，随时说。'],
   );
 });
+test('a Bot that @-mentions a member by name with Chinese text right after it wakes that member', async (t) => {
+  const woken: string[] = [];
+  let asked = false;
+  const fx = fixture(t, (run) => {
+    woken.push(run.botId);
+    if (run.botId !== fx.a.id || !asked) return silent();
+    asked = false;
+    return answer(`@${fx.b.name}你看一下这个方案`);
+  });
+  const room = fx.groups.create({ name: '接力', botIds: [fx.a.id, fx.b.id] });
+  await until(fx.settled);
+  woken.length = 0;
+  asked = true;
+  fx.ask(room.id, fx.a, '先出个方案');
+  await until(() => woken.includes(fx.b.id));
+  await until(fx.settled);
+  const reply = fx.store.data.groups[0].messages.find((m) => m.sender.id === fx.a.id && m.content.includes('方案'))!;
+  assert.deepEqual(
+    reply.mentions?.map((m) => m.id),
+    [fx.b.id],
+  );
+});

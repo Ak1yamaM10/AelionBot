@@ -14,7 +14,12 @@ export interface HarnessRunOptions {
   mentions?: BotMention[];
   peerOrigin?: PeerRunOrigin;
   groupOrigin?: GroupRunOrigin;
+  /** The group's standing rules; kept in its own system message so an unchanged copy is never sent twice. */
   groupContext?: string;
+  /** This member's personality and its feelings about the people in this wake. */
+  groupPersona?: string;
+  /** What only this wake carries, such as the user requests handed to the member. */
+  groupTurn?: string;
   groupTaskFrom?: string;
   privateSessionId?: string;
   peerContext?: string;

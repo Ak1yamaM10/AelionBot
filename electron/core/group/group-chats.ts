@@ -1,7 +1,13 @@
 import { validMarkRefs, type PreviewMarkRef } from '../../../shared/preview/preview-annotations';
 import { buildGroupDecisionInput, type GroupDecisions } from './laya-decision';
 import { previewFeedbackDisplay } from '../../../shared/preview/preview-feedback';
-import { groupEventPrompt, groupMustAnswerNote, groupReviewNote, GROUP_STATE_EVENT_PROMPT } from './group-prompt';
+import {
+  groupEventPrompt,
+  groupMustAnswerNote,
+  groupRequestsContext,
+  groupReviewNote,
+  GROUP_STATE_EVENT_PROMPT,
+} from './group-prompt';
 import { addressedTo, answerFrom, botMessageCount, noticed, sinceUser, triage } from './group-triage';
 import { isGroupAnswer, replyTarget } from '../../../shared/chat/group-answers';
 import { userDisplayName } from '../../../shared/chat/user-profile';
@@ -139,7 +145,8 @@ export class GroupChats implements GroupGateway {
     private host?: HostComputer,
     private laya?: GroupDecisions,
     /** Persona lines (affinity, shared memories) appended to a Bot's group context; empty string when none. */
-    private persona?: (botId: string, people: { id: string; name: string }[]) => string,
+    /** A member's speaking style, which rarely changes, and its feelings about the people in one message. */
+    private persona?: (botId: string, people: { id: string; name: string }[]) => { style: string; people: string },
     /** Social events the persona module learns from: who joined, and messages aimed at other members. */
     private social?: GroupSocialHooks,
   ) {
@@ -1064,7 +1071,7 @@ export class GroupChats implements GroupGateway {
     this.changed();
   }
   private personaContext(room: GroupRoom, botId: string, message?: GroupMessage) {
-    if (!this.persona || !message) return '';
+    if (!this.persona || !message) return { style: '', people: '' };
     const people: { id: string; name: string }[] = [];
     const add = (id: string, name: string) => {
       if (id !== botId && !people.some((p) => p.id === id)) people.push({ id, name });
@@ -1076,7 +1083,7 @@ export class GroupChats implements GroupGateway {
       // Called even when nobody else is involved: the Bot's own speaking style still applies.
       return this.persona(botId, people);
     } catch {
-      return ''; // persona data is optional context; its failure must not block a reply
+      return { style: '', people: '' }; // persona data is optional context; its failure must not block a reply
     }
   }
   schedule(id: string, prompt: string, scheduled: ScheduledTrigger) {
@@ -1627,7 +1634,6 @@ export class GroupChats implements GroupGateway {
       room.id,
       bot.name,
       this.identities(room).map((m) => ({ id: m.id, name: m.name })),
-      requests,
     );
     const lastMessage = room.messages.find((m) => m.id === deliveries.at(-1)?.messageId),
       workItem = lastMessage?.workItemId
@@ -1636,6 +1642,7 @@ export class GroupChats implements GroupGateway {
           )
         : undefined;
     const names = new Map(this.identities(room).map((member) => [member.id, member.name]));
+    const persona = this.personaContext(room, bot.id, lastMessage);
     await this.runner.run(
       bot.id,
       JSON.stringify({
@@ -1672,7 +1679,9 @@ export class GroupChats implements GroupGateway {
           lastMessage?.workspaceDir ||
           effectiveWorkspace(this.store, this.host, { kind: 'group', id: room.id }),
         groupOrigin: { groupId: room.id, rootId: round.id, deliveryId: deliveries.at(-1)!.id },
-        groupContext: context + GROUP_STATE_EVENT_PROMPT + this.personaContext(room, bot.id, lastMessage),
+        groupContext: context + GROUP_STATE_EVENT_PROMPT,
+        groupPersona: persona.style,
+        groupTurn: groupRequestsContext(requests) + persona.people,
         groupTaskFrom: previousRun?.id,
         onStarted: (id) => {
           worker.runId = id;
