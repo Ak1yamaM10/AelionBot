@@ -125,6 +125,9 @@ export function executionTarget(tool: string, args: Record<string, unknown>, bot
   } else if (tool === 'apply_patch') {
     paths = patchPaths(args, botId, hostWorkspace);
     target = paths.length ? paths.join(' ') : createHash('sha256').update(stable(args)).digest('hex').slice(0, 20);
+  } else if (tool.startsWith('mcp__')) {
+    // A tool of an MCP server offered under its own name: the name says which server and tool.
+    target = tool + ':' + createHash('sha256').update(stable(args)).digest('hex').slice(0, 16);
   } else if (tool === 'mcp_call') {
     target =
       String(args.server) +

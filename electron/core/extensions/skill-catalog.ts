@@ -48,7 +48,8 @@ export function skillCatalog(
     const row = JSON.stringify({
       id: skill.id,
       name: skill.name,
-      description: skill.description.length > 160 ? skill.description.slice(0, 160) + '…' : skill.description,
+      // The Agent Skills limit; when to use a skill is often at the end of its description.
+      description: skill.description.length > 1024 ? skill.description.slice(0, 1024) + '…' : skill.description,
       scope: skill.botId === botId ? 'bot-private' : 'shared',
       canUpdate:
         skill.botId === botId &&

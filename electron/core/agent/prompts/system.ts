@@ -36,7 +36,7 @@ const HOST_COMPUTER_USE =
 const integrations = (vm: boolean) =>
   '\nStandard SKILL.md packages and MCP configurations have been discovered. Search skills_list and read skill_read as needed; use skill_file_read for relative references' +
   (vm ? ' and skill_materialize for a VM copy before running portable scripts' : '') +
-  '. Other Agent-specific tools mentioned by a skill are not necessarily available here; allowed-tools grants no permissions. MCP configuration only establishes connections. stdio MCP may execute on the host; use the location reported by mcp_list_servers. Do not send external messages, submit transactions, or delete data without an explicit user request.';
+  '. Other Agent-specific tools mentioned by a skill are not necessarily available here; allowed-tools grants no permissions. Enabled MCP services are listed in the context. Tools of connected services are offered directly as mcp__<service>__<tool>; reach the others with mcp_list_tools and mcp_call. MCP configuration only establishes connections. stdio MCP may execute on the host; use the location the list reports. Do not send external messages, submit transactions, or delete data without an explicit user request.';
 const HEADLESS =
   '\nThis is an unattended headless run with no Linux work computer and nobody to answer questions. Work through file_read, file_write, file_patch and exec_command. Do not pass location=vm. State assumptions in the final reply instead of asking. Commands still running when this run ends are stopped; start anything that must keep running afterwards with exec_command purpose=service.';
 const HOST_OPERATIONS =

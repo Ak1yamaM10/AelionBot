@@ -608,7 +608,8 @@ test('foreground Agents also see their skill inventory before deciding to save',
   } as unknown as ModelClient;
   const harness = new Harness(f.store, {} as VmController, model, () => {}, undefined, undefined, {
     skills: f.skills,
-  } as Integrations);
+    mcp: { context: () => ({ tools: [], prompt: '' }) },
+  } as unknown as Integrations);
   try {
     await harness.run(f.bot.id, '检查有没有可复用的流程');
     assert.equal(inspected, true);

@@ -6,6 +6,7 @@ export function registerIntegrations(ctx: IpcContext) {
   handle('refreshIntegrations', async () => {
     if (ctx.harness.busy) throw new Error('请等待当前任务结束后重新扫描');
     await ctx.integrations.refresh();
+    void ctx.integrations.mcp.warm();
   });
   handle('manageSkill', (input) => {
     if (ctx.harness.busy) throw Error('请等待当前任务结束');

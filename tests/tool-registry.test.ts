@@ -22,8 +22,8 @@ test('every registered tool has exactly one handler', () => {
 });
 
 test('handlers exist only for registered tools', () => {
-  // MCP server tools are reached through mcp_call rather than as their own tool names,
-  // so the static TOOLS list is the complete set of names the harness dispatches.
+  // Tools of MCP servers are offered under mcp__<server>__<tool> names that dispatchTool sends to the MCP
+  // handler; they change with the connected servers, so they are not part of the static TOOLS list.
   for (const name of Object.keys(TOOL_HANDLERS)) assert.ok(names.includes(name), name);
   for (const [index, entry] of PREFIX_HANDLERS.entries())
     assert.ok(

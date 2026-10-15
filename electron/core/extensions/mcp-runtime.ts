@@ -11,6 +11,7 @@ import { AppError } from '../../../shared/errors';
 import { UnauthorizedError } from '@modelcontextprotocol/sdk/client/auth.js';
 import { appConnectorFor } from '../../../shared/app-connectors';
 import { backgroundProvider, type McpAuthStore, type OwnClient } from './mcp-auth';
+import { mcpContext, type McpContextOptions, type McpServerState, type NativeRoute } from './mcp-native';
 
 type Transport = StdioClientTransport | StreamableHTTPClientTransport | SSEClientTransport;
 interface Connection {
@@ -18,6 +19,8 @@ interface Connection {
   transport: Transport;
   tools: Tool[];
   fingerprint: string;
+  /** What the server says about using it, sent at initialization. */
+  instructions?: string;
 }
 export interface McpPreference {
   enabled: boolean;
@@ -47,6 +50,8 @@ export class McpRuntime {
   private closing = false;
   /** Servers whose sign-in page is open in the browser. */
   readonly signingIn = new Set<string>();
+  /** Function names offered to the model, by name; kept for the session so a call finds its tool. */
+  private routes = new Map<string, NativeRoute>();
   constructor(
     private preferences: Record<string, McpPreference>,
     private changed: () => void,
@@ -97,6 +102,56 @@ export class McpRuntime {
   /** The config of a server, for signing in. */
   config(id: string) {
     return this.find(id);
+  }
+  /** Enabled servers as the model sees them; see mcp-native.ts. */
+  context(options: McpContextOptions) {
+    const views = new Map(this.views().map((view) => [view.id, view]));
+    const servers: McpServerState[] = [...this.configs.values()]
+      .filter((config) => views.get(config.id)?.enabled && !config.issue)
+      .map((config) => {
+        const view = views.get(config.id)!,
+          connection = this.connections.get(config.id);
+        return {
+          id: config.id,
+          name: config.name,
+          url: config.url,
+          status: view.status,
+          login: view.login,
+          issue: view.issue,
+          location: config.transport === 'stdio' ? '本机' : '远程',
+          tools: connection?.tools,
+          instructions: connection?.instructions,
+        };
+      });
+    const result = mcpContext(servers, options);
+    for (const [name, route] of result.routes) this.routes.set(name, route);
+    return result;
+  }
+  /** The server and tool behind a function name offered to the model. */
+  route(name: string) {
+    const route = this.routes.get(name);
+    if (!route || !this.configs.has(route.server))
+      throw new AppError('mcp.tool_unavailable', 'MCP 工具已不可用，请用 mcp_list_tools 重新查看');
+    return route;
+  }
+  /**
+   * Connects enabled servers in the background, so their tools can be offered from the next run on, as other
+   * MCP clients do at startup. Failures only show as the server's status.
+   */
+  async warm(ids?: string[]) {
+    const queue = [...this.configs.values()].filter(
+      (config) =>
+        (!ids || ids.includes(config.id)) &&
+        !config.issue &&
+        this.enabled(config) &&
+        !this.connections.has(config.id) &&
+        !this.pending.has(config.id),
+    );
+    await Promise.all(
+      Array.from({ length: Math.min(3, queue.length) }, async () => {
+        while (queue.length && !this.closing) await this.connect(queue.shift()!.id).catch(() => {});
+      }),
+    );
   }
   private find(id: string) {
     if (this.configs.has(id)) return this.configs.get(id)!;
@@ -233,7 +288,13 @@ export class McpRuntime {
             } while (cursor);
           return tools;
         };
-        const connection = { client, transport, tools: await listAll(), fingerprint: config.fingerprint };
+        const connection: Connection = {
+          client,
+          transport,
+          tools: await listAll(),
+          fingerprint: config.fingerprint,
+          instructions: client.getInstructions(),
+        };
         // Servers that add or remove tools at runtime announce it; keep the cached list current instead of frozen at connect.
         if (client.getServerCapabilities()?.tools?.listChanged)
           client.setNotificationHandler(ToolListChangedNotificationSchema, async () => {

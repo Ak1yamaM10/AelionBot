@@ -115,6 +115,8 @@ import {
   unresolvedFailures,
 } from './prompts/continuations';
 import { dispatchTool } from './tools/handlers';
+import { MCP_NATIVE_PREFIX } from '../extensions/mcp-native';
+import { contextBudget } from '../context/context-budget';
 import type { ToolDeps } from './tools/context';
 import { AppError } from '../../../shared/errors';
 
@@ -947,6 +949,8 @@ export class Harness {
     let contextStart = cognition ? 0 : this.store.data.contextOffsets[contextKey] || 0;
     let lastRuntimeMessages: WireMessage[] | undefined,
       lastTools: ToolDefinition[] = [];
+    // MCP tools and the server list, taken once per run so its tool list, and the prompt cache, stay put.
+    let mcpOffer: { tools: ToolDefinition[]; prompt: string } | undefined;
     const pendingFailures = new Map<string, string>();
     let verificationRetries = 0,
       lastFailure = '',
@@ -1102,6 +1106,15 @@ export class Harness {
           : controller.signal;
         let finalContext: WireMessage[] = [];
         const memoryDelegation = this.cognition ? delegatedMemory(this.store, bot.id, run.id) : undefined;
+        mcpOffer ??= this.mcpOffer(
+          botId,
+          // While planning only a few tools are listed; budget for all of them, which come back afterwards.
+          work.forRun(run)?.status === 'planning'
+            ? TOOLS.length
+            : this.turnTools(botId, run, options, privateSessionId, userMemoryRoute, work).availableTools.length,
+          options.peerOrigin?.kind !== 'peer_summary' && !(privateSessionId && options.peerOrigin),
+          Boolean(privateSessionId),
+        );
         const { availableTools, modelTools } = this.turnTools(
           botId,
           run,
@@ -1109,6 +1122,7 @@ export class Harness {
           privateSessionId,
           userMemoryRoute,
           work,
+          mcpOffer.tools,
         );
         this.callableTools.set(run.id, availableTools);
         const taskFrame = [
@@ -1141,6 +1155,7 @@ export class Harness {
               options.groupOrigin ? 'read-only' : 'foreground',
             ).prompt,
           },
+          ...(mcpOffer.prompt ? [{ role: 'system' as const, content: mcpOffer.prompt }] : []),
           // A run bound to a design task: design rules, craft, the kind's workflow and the pinned reference.
           ...(this.design?.prefix(run) || []),
         ];
@@ -1677,7 +1692,11 @@ export class Harness {
                   };
                   return;
                 }
-                if (!TOOLS.some((tool) => tool.function.name === job.call.function.name)) throw new Error('未注册工具');
+                if (
+                  !TOOLS.some((tool) => tool.function.name === job.call.function.name) &&
+                  !job.call.function.name.startsWith(MCP_NATIVE_PREFIX)
+                )
+                  throw new Error('未注册工具');
                 if (!availableTools.some((tool) => tool.function.name === job.call.function.name))
                   throw new Error('当前任务不可用的工具');
                 validateToolArguments(
@@ -1846,7 +1865,8 @@ export class Harness {
             }
           }
           if (
-            ['mcp_call', 'attachment_read', 'view_image', 'video_frames', 'code_exec'].includes(call.function.name) &&
+            (['mcp_call', 'attachment_read', 'view_image', 'video_frames', 'code_exec'].includes(call.function.name) ||
+              call.function.name.startsWith(MCP_NATIVE_PREFIX)) &&
             Array.isArray((output as any)?.images) &&
             display.status === 'done'
           ) {
@@ -2015,6 +2035,20 @@ export class Harness {
       });
     }
   }
+  /**
+   * Enabled MCP servers for this run: the tools of connected servers as functions, within what the provider takes
+   * (OpenAI allows 128 functions) and a share of the context, and a message listing every server. Runs without
+   * mcp_call, and small-context models that only get the compact tool set, keep to the list.
+   */
+  private mcpOffer(botId: string, builtIn: number, offered: boolean, privateSession: boolean) {
+    if (!this.integrations || !offered || this.disabledTools.has('mcp_call')) return { tools: [], prompt: '' };
+    const capacity = this.store.modelFor(botId).contextTokens,
+      compact = capacity < 32000 && !privateSession;
+    return this.integrations.mcp.context({
+      maxTools: compact ? 0 : Math.max(0, Math.min(60, 120 - builtIn)),
+      maxTokens: compact ? 0 : Math.min(12000, Math.floor(contextBudget(capacity).input * 0.1)),
+    });
+  }
   /** The tools callable in this turn, and the subset listed to the model. */
   private turnTools(
     botId: string,
@@ -2023,6 +2057,7 @@ export class Harness {
     privateSessionId: string | undefined,
     userMemoryRoute: ReturnType<typeof memoryRoute> | undefined,
     work: WorkItems,
+    mcpTools: ToolDefinition[] = [],
   ) {
     const baseTools =
       options.peerOrigin?.kind === 'peer_summary'
@@ -2094,6 +2129,13 @@ export class Harness {
           ].includes(t.function.name)) &&
         (options.groupOrigin || t.function.name !== 'group_read'),
     );
+    // MCP tools go after the built-in ones, in a fixed order, while mcp_call itself is on offer.
+    if (
+      mcpTools.length &&
+      work.forRun(run)?.status !== 'planning' &&
+      availableTools.some((tool) => tool.function.name === 'mcp_call')
+    )
+      availableTools.push(...mcpTools);
     if (work.forRun(run)?.status === 'planning') {
       const index = availableTools.findIndex((tool) => tool.function.name === 'tools_batch');
       if (index >= 0) {

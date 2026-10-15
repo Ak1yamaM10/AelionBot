@@ -455,6 +455,8 @@ async function initialize() {
     secretCodec,
   );
   await integrations.refresh();
+  // Enabled MCP servers connect in the background, as in other MCP clients, so Bots see their tools.
+  void integrations.mcp.warm();
   model = new ModelClient(
     (botId) => providers.config(botId),
     (botId) => providers.key(botId),

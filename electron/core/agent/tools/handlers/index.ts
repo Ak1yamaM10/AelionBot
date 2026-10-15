@@ -15,6 +15,7 @@ import { EXEC_HANDLERS } from './processes';
 import { SCHEDULED_HANDLER } from './scheduling';
 import { WEB_HANDLERS } from './web';
 import { AppError } from '../../../../../shared/errors';
+import { MCP_NATIVE_PREFIX } from '../../../extensions/mcp-native';
 
 /** Handlers for exact tool names. Names never overlap with a prefix handler (see tests/tool-registry.test.ts). */
 export const TOOL_HANDLERS: Record<string, ToolHandler> = {
@@ -38,6 +39,8 @@ export const PREFIX_HANDLERS: PrefixHandler[] = [SCHEDULED_HANDLER, GROUP_HANDLE
 export function dispatchTool(context: ToolContext) {
   const { name } = context;
   if (Object.hasOwn(TOOL_HANDLERS, name)) return TOOL_HANDLERS[name](context);
+  // Tools of connected MCP servers, offered under their own names; the MCP handler finds the server.
+  if (name.startsWith(MCP_NATIVE_PREFIX)) return MCP_HANDLER.handler(context);
   const prefix = PREFIX_HANDLERS.find((entry) => entry.matches(name));
   if (prefix?.unregistered) return prefix.handler(context);
   if (!TOOLS.some((tool) => tool.function.name === name)) throw new AppError('tool.unknown', '未注册工具');

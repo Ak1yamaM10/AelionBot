@@ -169,6 +169,7 @@ export class Integrations {
       });
       await this.mcp.disconnect(config.id);
       if (!view.enabled) await this.setEnabled(config.id, true);
+      else void this.mcp.warm([config.id]);
     } finally {
       this.signIns.delete(config.id);
       this.mcp.signingIn.delete(config.id);
@@ -242,6 +243,8 @@ export class Integrations {
   async setEnabled(id: string, enabled: boolean) {
     await this.mcp.setEnabled(id, enabled);
     this.save();
+    // Connected now, so its tools are offered from the next run on.
+    if (enabled) void this.mcp.warm([this.mcp.config(id).id]);
   }
   async materialize(vm: VmController, botId: string, id: string) {
     const bundle = this.skills.bundle(botId, id);

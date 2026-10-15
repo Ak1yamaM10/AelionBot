@@ -108,7 +108,7 @@ test('enabled MCP discovery does not request repeated permission', async (t) => 
     () => {},
     undefined,
     undefined,
-    { mcp } as unknown as Integrations,
+    { mcp: { context: () => ({ tools: [], prompt: '' }), ...mcp } } as unknown as Integrations,
     undefined,
     interactions,
   ).run(store.data.bots[0].id, '检查本机 MCP');
@@ -160,7 +160,7 @@ test('registered skill reads are available without host permission', async (t) =
     () => {},
     undefined,
     undefined,
-    { skills } as unknown as Integrations,
+    { skills, mcp: { context: () => ({ tools: [], prompt: '' }) } } as unknown as Integrations,
     undefined,
     interactions,
   ).run(store.data.bots[0].id, '读取技能');
@@ -212,7 +212,7 @@ test('MCP mutations still wait for approval and refusal prevents dispatch', asyn
     () => {},
     undefined,
     undefined,
-    { mcp } as unknown as Integrations,
+    { mcp: { context: () => ({ tools: [], prompt: '' }), ...mcp } } as unknown as Integrations,
     undefined,
     interactions,
   ).run(store.data.bots[0].id, '更新资源');
