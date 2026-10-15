@@ -283,6 +283,8 @@ export function AppConnectorDialog({
                             <em>{t('自有客户端')}</em>
                           ) : app.local ? (
                             <em>{t('本机')}</em>
+                          ) : app.auth === 'none' ? (
+                            <em>{t('免登录')}</em>
                           ) : null}
                         </button>
                       ))}

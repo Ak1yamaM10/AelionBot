@@ -9,7 +9,7 @@
  * - `none`: no account needed.
  */
 type AppConnectorAuth = 'oauth' | 'token' | 'google' | 'none';
-export type AppConnectorGroup = 'google' | 'work' | 'dev' | 'design' | 'commerce';
+export type AppConnectorGroup = 'google' | 'work' | 'dev' | 'analytics' | 'design' | 'sales' | 'commerce' | 'reference';
 
 export interface AppConnector {
   id: string;
@@ -31,8 +31,11 @@ export const APP_CONNECTOR_GROUPS: Array<{ id: AppConnectorGroup; name: string }
   { id: 'work', name: '文档与协作' },
   { id: 'google', name: 'Google' },
   { id: 'dev', name: '开发与数据' },
-  { id: 'design', name: '设计' },
+  { id: 'analytics', name: '产品分析' },
+  { id: 'design', name: '设计与内容' },
+  { id: 'sales', name: '销售与营销' },
   { id: 'commerce', name: '支付与商务' },
+  { id: 'reference', name: '资料检索' },
 ];
 
 /** The redirect the app listens on while someone signs in. Google clients must list it exactly. */
@@ -49,6 +52,14 @@ const google = (id: string, name: string, description: string, host: string, sco
   scope: scopes.map((scope) => 'https://www.googleapis.com/auth/' + scope).join(' '),
 });
 const DRIVE = ['drive.readonly', 'drive.file'];
+const app = (
+  id: string,
+  name: string,
+  description: string,
+  group: AppConnectorGroup,
+  url: string,
+  auth: AppConnectorAuth = 'oauth',
+): AppConnector => ({ id, name, description, group, url, auth });
 
 export const APP_CONNECTORS: AppConnector[] = [
   {
@@ -243,6 +254,99 @@ export const APP_CONNECTORS: AppConnector[] = [
     url: 'https://mcp.squareup.com/mcp',
     auth: 'oauth',
   },
+  // Checked 2026-10-15: each OAuth server registers the app and opens its sign-in page; each open one lists tools.
+  app('asana', 'Asana', '查看和更新 Asana 的任务与项目', 'work', 'https://mcp.asana.com/sse'),
+  app('clickup', 'ClickUp', '管理 ClickUp 的任务、文档和空间', 'work', 'https://mcp.clickup.com/mcp'),
+  app('todoist', 'Todoist', '查看和添加 Todoist 待办', 'work', 'https://ai.todoist.net/mcp'),
+  app('dropbox', 'Dropbox', '查找和读取 Dropbox 文件', 'work', 'https://mcp.dropbox.com/mcp'),
+  app('guru', 'Guru', '搜索 Guru 知识库', 'work', 'https://mcp.api.getguru.com/mcp'),
+  app('calcom', 'Cal.com', '查看和预约 Cal.com 日程', 'work', 'https://mcp.cal.com/mcp'),
+  app('granola', 'Granola', '查看 Granola 的会议笔记', 'work', 'https://mcp.granola.ai/mcp'),
+  app('otter', 'Otter.ai', '搜索 Otter 的会议转写和摘要', 'work', 'https://mcp.otter.ai/mcp'),
+  app('fireflies', 'Fireflies', '搜索 Fireflies 的会议记录', 'work', 'https://api.fireflies.ai/mcp'),
+  app('make', 'Make', '运行和管理 Make 自动化场景', 'work', 'https://mcp.make.com/mcp'),
+  app('gitlab', 'GitLab', '查看 GitLab 的项目、issue 和合并请求', 'dev', 'https://gitlab.com/api/v4/mcp'),
+  app('netlify', 'Netlify', '创建和部署 Netlify 网站', 'dev', 'https://netlify-mcp.netlify.app/mcp'),
+  app('prisma', 'Prisma Postgres', '管理 Prisma Postgres 数据库', 'dev', 'https://mcp.prisma.io/mcp'),
+  app('planetscale', 'PlanetScale', '查询和管理 PlanetScale 数据库', 'dev', 'https://mcp.pscale.dev/mcp/planetscale'),
+  app('postman', 'Postman', '管理 Postman 的集合和 API', 'dev', 'https://mcp.postman.com/mcp'),
+  app('jam', 'Jam', '查看 Jam 的错误录屏和日志', 'dev', 'https://mcp.jam.dev/mcp'),
+  app('semgrep', 'Semgrep', '扫描代码里的安全问题', 'dev', 'https://mcp.semgrep.ai/mcp'),
+  app('socket', 'Socket', '检查依赖包的安全风险', 'dev', 'https://mcp.socket.dev/', 'none'),
+  app('apify', 'Apify', '运行 Apify 的网页抓取工具', 'dev', 'https://mcp.apify.com/'),
+  app(
+    'cloudflare-observability',
+    'Cloudflare 可观测性',
+    '查看 Cloudflare Workers 的日志和指标',
+    'dev',
+    'https://observability.mcp.cloudflare.com/mcp',
+  ),
+  app(
+    'cloudflare-browser',
+    'Cloudflare 浏览器渲染',
+    '抓取网页内容和截图',
+    'dev',
+    'https://browser.mcp.cloudflare.com/mcp',
+  ),
+  app(
+    'cloudflare-radar',
+    'Cloudflare Radar',
+    '查询互联网流量和攻击趋势',
+    'dev',
+    'https://radar.mcp.cloudflare.com/mcp',
+  ),
+  app('amplitude', 'Amplitude', '查询 Amplitude 的图表和用户数据', 'analytics', 'https://mcp.amplitude.com/mcp'),
+  app('mixpanel', 'Mixpanel', '查询 Mixpanel 的事件和报表', 'analytics', 'https://mcp.mixpanel.com/mcp'),
+  app('posthog', 'PostHog', '查询 PostHog 的分析、功能开关和错误', 'analytics', 'https://mcp.posthog.com/mcp'),
+  app('honeycomb', 'Honeycomb', '查询 Honeycomb 的追踪和指标', 'analytics', 'https://mcp.honeycomb.io/mcp'),
+  app('hex', 'Hex', '查找和运行 Hex 的数据项目', 'analytics', 'https://app.hex.tech/mcp'),
+  app('lucid', 'Lucid', '查找和创建 Lucid 图表', 'design', 'https://mcp.lucid.app/mcp'),
+  app('mermaid', 'Mermaid Chart', '创建和编辑 Mermaid 图表', 'design', 'https://mcp.mermaidchart.com/mcp'),
+  app(
+    'cloudinary',
+    'Cloudinary',
+    '管理 Cloudinary 的图片和视频',
+    'design',
+    'https://asset-management.mcp.cloudinary.com/mcp',
+  ),
+  app('sanity', 'Sanity', '读写 Sanity 的内容和文档', 'design', 'https://mcp.sanity.io/'),
+  app('wix', 'Wix', '管理 Wix 网站和内容', 'design', 'https://mcp.wix.com/mcp'),
+  app('attio', 'Attio', '查看和更新 Attio 的客户记录', 'sales', 'https://mcp.attio.com/mcp'),
+  app('close', 'Close', '查看和更新 Close 的线索与商机', 'sales', 'https://mcp.close.com/mcp'),
+  app('apollo', 'Apollo.io', '搜索 Apollo 的公司和联系人', 'sales', 'https://mcp.apollo.io/mcp'),
+  app('klaviyo', 'Klaviyo', '查看 Klaviyo 的营销活动和受众', 'sales', 'https://mcp.klaviyo.com/mcp'),
+  app('customerio', 'Customer.io', '查看 Customer.io 的用户和消息', 'sales', 'https://mcp.customer.io/mcp'),
+  app('ahrefs', 'Ahrefs', '查询 Ahrefs 的 SEO 和外链数据', 'sales', 'https://api.ahrefs.com/mcp/mcp'),
+  app('plaid', 'Plaid', '查看 Plaid 集成的状态和数据', 'commerce', 'https://api.dashboard.plaid.com/mcp/sse'),
+  app('ramp', 'Ramp', '查询 Ramp 的消费、卡片和报销', 'commerce', 'https://mcp.ramp.com/mcp'),
+  app('mercury', 'Mercury', '查询 Mercury 的账户和交易', 'commerce', 'https://mcp.mercury.com/mcp'),
+  app('context7', 'Context7', '查最新的库和框架文档', 'reference', 'https://mcp.context7.com/mcp', 'none'),
+  app('deepwiki', 'DeepWiki', '了解 GitHub 开源仓库的结构和用法', 'reference', 'https://mcp.deepwiki.com/mcp', 'none'),
+  app('exa', 'Exa', '用 Exa 搜索网页和抓取内容', 'reference', 'https://mcp.exa.ai/mcp', 'none'),
+  app(
+    'microsoft-learn',
+    'Microsoft Learn',
+    '搜索微软官方文档和代码示例',
+    'reference',
+    'https://learn.microsoft.com/api/mcp',
+    'none',
+  ),
+  app(
+    'aws-knowledge',
+    'AWS 文档',
+    '搜索 AWS 官方文档和区域信息',
+    'reference',
+    'https://knowledge-mcp.global.api.aws',
+    'none',
+  ),
+  app(
+    'cloudflare-docs',
+    'Cloudflare 文档',
+    '搜索 Cloudflare 官方文档',
+    'reference',
+    'https://docs.mcp.cloudflare.com/mcp',
+    'none',
+  ),
 ];
 
 /** The same address however it was written: case of the host and a trailing slash do not matter. */
