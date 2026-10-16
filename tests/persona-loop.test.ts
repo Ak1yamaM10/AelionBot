@@ -176,11 +176,12 @@ test('only key turns are checked, after publication; a failed check leaves one r
   );
   hooks.spoke!({ groupId: 'g', messageId: 'r1', botId: 'A', text: '小周你说得都对', people });
   await until(() => judged.length === 1);
-  await until(() => svc.groupFragment('A', people).includes('提醒'));
-  assert.doesNotMatch(svc.groupFragment('A', people), /提醒/, 'a reminder is shown once');
-  svc.judged('A', 'too_friendly', people);
-  svc.judged('A', 'ok', people);
-  assert.doesNotMatch(svc.groupFragment('A', people), /提醒/, 'a later good turn clears it');
+  assert.doesNotMatch(svc.groupFragment('A', people, 'other'), /提醒/, 'a reminder stays in its own group');
+  await until(() => svc.groupFragment('A', people, 'g').includes('提醒'));
+  assert.doesNotMatch(svc.groupFragment('A', people, 'g'), /提醒/, 'a reminder is shown once');
+  svc.judged('A', 'too_friendly', people, 'g');
+  svc.judged('A', 'ok', people, 'g');
+  assert.doesNotMatch(svc.groupFragment('A', people, 'g'), /提醒/, 'a later good turn clears it');
 });
 
 test("the check uses Laya when it is ready, otherwise the Bot's own model, and reads replies defensively", async () => {
@@ -211,4 +212,19 @@ test('妈咪 and 猫娘 regard their focus their own way and show a grudge in ch
     speechPlan({ ...PRESETS.catgirl, preset: 'catgirl' }, { used: [] }, () => 0),
     /口头禅「喵～」/,
   );
+});
+
+test('the page lists a relationship whose good and bad cancel out, since the grudge is still felt', (t) => {
+  const svc = service(t);
+  svc.store.addAffinity({
+    botId: 'A',
+    targetId: 'B',
+    value: 0.45,
+    durationDays: 30,
+    createdAt: 1_000 * DAY,
+    source: 'x',
+  });
+  svc.appraise(insult({ appraisal: { type: 'insult', intensity: 0.2 } }));
+  const relation = svc.view('A').relations.find((r) => r.id === 'B');
+  assert.ok(relation && relation.grudge >= 0.15, 'listed even with a net affinity near zero');
 });

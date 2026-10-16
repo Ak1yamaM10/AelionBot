@@ -57,6 +57,7 @@ export class PersonaService {
   private speech = new Map<string, SpeechMemory>();
   private eventTurns = new Map<string, number>();
   private spoken = new Map<string, number>();
+  /** By Bot and group: a reminder names people of the group it came from. */
   private reminders = new Map<string, string>();
   constructor(
     dir: string,
@@ -277,8 +278,9 @@ export class PersonaService {
             grudge: Math.round(bond.grudge * 1000) / 1000,
           };
         })
-        .filter((r) => Math.abs(r.affinity) >= 0.01)
-        .sort((a, b) => Math.abs(b.affinity) - Math.abs(a.affinity)),
+        // Good and bad can cancel out in the net value; a grudge still shows.
+        .filter((r) => Math.abs(r.affinity) >= 0.01 || r.closeness >= 0.01 || r.grudge >= 0.01)
+        .sort((a, b) => Math.max(Math.abs(b.affinity), b.grudge) - Math.max(Math.abs(a.affinity), a.grudge)),
       highlights: this.store.recentHighlights(botId),
       growthReview: this.growthRunner.state(botId),
     };
@@ -468,7 +470,7 @@ export class PersonaService {
    * What changes from turn to turn: one shared memory with the people in this message that was not recalled in
    * the last 7 days, this turn's speech plan, and a reminder left by the last character check.
    */
-  groupFragment(botId: string, people: { id: string; name: string }[]) {
+  groupFragment(botId: string, people: { id: string; name: string }[], groupId = '') {
     const others = people.filter((p) => p.id !== botId).slice(0, 2);
     const parts: string[] = [];
     const now = this.now();
@@ -486,9 +488,9 @@ export class PersonaService {
     }
     const p = this.store.profile(botId);
     if (p) parts.push(speechPlan(p, this.speech.get(botId) || { used: [] }, this.random));
-    const reminder = this.reminders.get(botId);
+    const reminder = this.reminders.get(`${botId}:${groupId}`);
     if (reminder) {
-      this.reminders.delete(botId);
+      this.reminders.delete(`${botId}:${groupId}`);
       parts.push(`\n\n${reminder}`);
     }
     return parts.join('');
@@ -524,7 +526,7 @@ export class PersonaService {
     };
   }
   /** Leave a reminder for the next turn when a check found the reply out of character. */
-  judged(botId: string, verdict: Verdict, people: { id: string; name: string }[]) {
+  judged(botId: string, verdict: Verdict, people: { id: string; name: string }[], groupId = '') {
     const resented = people
       .filter((x) => x.id !== botId)
       .filter((x) => {
@@ -533,8 +535,8 @@ export class PersonaService {
       })
       .map((x) => x.name);
     const reminder = reminderFor(verdict, resented);
-    if (reminder) this.reminders.set(botId, reminder);
-    else if (verdict === 'ok') this.reminders.delete(botId);
+    if (reminder) this.reminders.set(`${botId}:${groupId}`, reminder);
+    else if (verdict === 'ok') this.reminders.delete(`${botId}:${groupId}`);
   }
   forget(memberId: string) {
     this.store.transaction(() => this.store.forget(memberId));

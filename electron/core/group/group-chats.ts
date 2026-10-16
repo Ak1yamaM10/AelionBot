@@ -77,7 +77,7 @@ interface Worker {
 type FinalReplyDecision = { kind: 'silent' } | { kind: 'publish'; content: string };
 const now = () => new Date().toISOString();
 const identity = botIdentity;
-/** What the persona module learns from group activity. Both calls are fire-and-forget. */
+/** What the persona module learns from group activity. Every call is fire-and-forget. */
 export interface GroupSocialHooks {
   /** Bots that joined a group, including when it is created. */
   joined?(botIds: string[]): void;
@@ -158,6 +158,7 @@ export class GroupChats implements GroupGateway {
       botId: string,
       people: { id: string; name: string }[],
       members: { id: string; name: string }[],
+      groupId: string,
     ) => { style: string; people: string },
     /** Social events the persona module learns from: who joined, and messages aimed at other members. */
     private social?: GroupSocialHooks,
@@ -1134,7 +1135,7 @@ export class GroupChats implements GroupGateway {
         { id: 'user', name: userDisplayName(this.store.data.userProfile) },
         ...this.identities(room).map((m) => ({ id: m.id, name: m.name })),
       ];
-      return this.persona(botId, people, members);
+      return this.persona(botId, people, members, room.id);
     } catch {
       return { style: '', people: '' }; // persona data is optional context; its failure must not block a reply
     }

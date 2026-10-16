@@ -801,7 +801,7 @@ async function initialize() {
     attachments,
     host,
     new LayaGroupDecisions(laya, layaLog),
-    (botId, people, members) =>
+    (botId, people, members, groupId) =>
       persona
         ? {
             style: persona.groupStyle(
@@ -812,7 +812,7 @@ async function initialize() {
                   : store.data.bots.find((b) => b.id === id)?.name,
               members,
             ),
-            people: persona.groupFragment(botId, people),
+            people: persona.groupFragment(botId, people, groupId),
           }
         : { style: '', people: '' },
     persona
@@ -827,7 +827,7 @@ async function initialize() {
               'persona.social',
               error instanceof Error ? error.stack || error.message : String(error),
             ),
-          judger(laya, askPersonaModel('persona_check', 60)),
+          judger(laya, askPersonaModel('persona_check', 200)),
         )
       : undefined,
   );

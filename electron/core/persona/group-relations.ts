@@ -112,7 +112,7 @@ export function groupSocialHooks(
       if (!input || !judge) return;
       enqueue(async () => {
         const verdict = await judge(event.botId, input);
-        if (verdict) persona.judged(event.botId, verdict, event.people);
+        if (verdict) persona.judged(event.botId, verdict, event.people, event.groupId);
       });
     },
   };
