@@ -1,8 +1,8 @@
 import { BOARDS, PHASE_NAMES, twelveRules } from '../../shared/games/game-boards';
-import { WerewolfTable, seatBot } from './WerewolfTable';
+import { WerewolfTable } from './WerewolfTable';
 import { UndercoverTable } from './UndercoverTable';
 import { PersonaPage } from './PersonaPage';
-import { syncSeats } from './game-view-model';
+import { seatBot, syncSeats } from './game-view-model';
 import type { GameModeId, GameView } from '../../shared/types/game-types';
 import { GAME_MBTI_TYPES, isGameMbti, type GameMbti } from '../../shared/games/game-personality';
 import type { ModelProvider, ModelSelection } from '../../shared/types/core';

@@ -13,6 +13,7 @@ import {
   personalClues,
   reportTimeline,
   seatFate,
+  seatBot,
   seatNumber,
   transcriptItems,
   type TallyRow,
@@ -45,9 +46,6 @@ const campLabel = (role?: GameRole) =>
     : role === 'wolf'
       ? translate('狼人阵营')
       : translate(role === 'villager' ? '好人阵营 · 平民' : '好人阵营 · 神职');
-
-/** A seat's id is random per match; the Bot sitting there is looked up by its own id so its real avatar shows. */
-export const seatBot = (seat: Seat) => ({ ...seat, id: seat.botId || seat.id });
 
 export function SeatAvatar({ seat, size = 30 }: { seat: Seat; size?: number }) {
   return seat.human ? (

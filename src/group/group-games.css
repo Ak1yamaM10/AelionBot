@@ -1093,10 +1093,7 @@
   gap: 9px;
   max-width: 92%;
 }
-.gg-message.is-me {
-  justify-self: end;
-  align-self: flex-end;
-}
+
 .gg-message-who {
   display: flex;
   gap: 6px;
