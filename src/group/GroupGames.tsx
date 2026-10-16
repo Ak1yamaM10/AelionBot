@@ -1,5 +1,5 @@
-import { BOARDS, PHASE_NAMES, TWELVE_RULES } from '../../shared/games/game-boards';
-import { WerewolfTable } from './WerewolfTable';
+import { BOARDS, PHASE_NAMES, twelveRules } from '../../shared/games/game-boards';
+import { WerewolfTable, seatBot } from './WerewolfTable';
 import { UndercoverTable } from './UndercoverTable';
 import { PersonaPage } from './PersonaPage';
 import { syncSeats } from './game-view-model';
@@ -420,7 +420,11 @@ export function GroupGames({
             <span className="gg-chat-card-seats" aria-hidden="true">
               {match.seats.map((seat) => (
                 <span key={seat.id} className={seat.alive ? '' : 'is-dead'}>
-                  {seat.human ? <span className="gg-human-avatar gg-dot-human" /> : <Avatar bot={seat} size={20} />}
+                  {seat.human ? (
+                    <span className="gg-human-avatar gg-dot-human" />
+                  ) : (
+                    <Avatar bot={seatBot(seat)} size={20} />
+                  )}
                 </span>
               ))}
             </span>
@@ -790,7 +794,7 @@ export function GroupGames({
                       ? t(
                           '每轮存活玩家依次描述自己的词，然后同时投票，得票最多的人出局并公布身份。第一次平票时，平票的人各补一句描述后在他们之中重投，再平票本轮无人出局。卧底全部出局平民胜；存活卧底不少于平民，或只剩 3 人时仍有卧底，卧底胜。白板出局时可以猜一次平民的词，猜中则白板单独获胜。',
                         )
-                      : TWELVE_RULES}
+                      : twelveRules(board)}
                   </p>
                 </details>
                 <p className="gg-muted gg-room-note">
