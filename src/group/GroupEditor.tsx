@@ -5,7 +5,6 @@ import type { Bot } from '../../shared/types/core';
 import { soulSummary } from '../../shared/chat/bot-soul';
 import {
   GROUP_HARD_CAP,
-  GROUP_LIMITS,
   GROUP_PACE_RANGES,
   groupPace,
   type GroupPace,
@@ -266,18 +265,13 @@ export function GroupEditor({
                   {t('你')} + {ids.length} Bot
                 </small>
               </div>
-              {ids.length >= GROUP_LIMITS.bots && bots.length > ids.length && (
-                <p className="subtle">
-                  {t('每个群最多 {count} 位 Bot，取消勾选一位后才能添加新成员。', { count: GROUP_LIMITS.bots })}
-                </p>
-              )}
               <div className="group-member-picker">
                 {bots.map((bot) => (
                   <label key={bot.id}>
                     <input
                       type="checkbox"
                       checked={ids.includes(bot.id)}
-                      disabled={pending || (!ids.includes(bot.id) && ids.length >= GROUP_LIMITS.bots)}
+                      disabled={pending}
                       onChange={(event) =>
                         setIds((value) =>
                           event.target.checked ? [...value, bot.id] : value.filter((id) => id !== bot.id),

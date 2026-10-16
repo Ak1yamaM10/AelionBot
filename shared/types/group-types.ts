@@ -5,7 +5,6 @@ import type { MessagePin, PinEvent } from '../chat/reactions';
 import type { BotIdentity, BotMention } from './peer-types';
 import type { ScheduledTrigger } from './scheduled-types';
 export const GROUP_LIMITS = {
-  bots: 8,
   groupsPerTask: 2,
   /** Hard cap on published Bot messages and progress since the user's latest text or explicit continuation. */
   botStreak: 20,

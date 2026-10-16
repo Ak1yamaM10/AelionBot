@@ -617,11 +617,10 @@ export class GroupChats implements GroupGateway {
     if (
       !Array.isArray(value) ||
       value.length < min ||
-      value.length > GROUP_LIMITS.bots ||
       value.some((id) => typeof id !== 'string') ||
       new Set(value).size !== value.length
     )
-      throw new Error(`请选择 ${min}–${GROUP_LIMITS.bots} 位 Bot`);
+      throw new Error(`请至少选择 ${min} 位 Bot`);
     return value.map((id) => this.store.bot(id));
   }
   private summary(room: GroupRoom): GroupSummary {
