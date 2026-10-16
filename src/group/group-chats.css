@@ -734,3 +734,25 @@
   background: light-dark(#fff, #1c1b20);
   color: inherit;
 }
+.group-new-messages {
+  position: absolute;
+  bottom: calc(100% + 8px);
+  left: 50%;
+  z-index: 4;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  border: 1px solid light-dark(#e6e7e9, #3e3945);
+  border-radius: 999px;
+  background: light-dark(#fff, #2a2730);
+  box-shadow: 0 4px 14px #0002;
+  color: light-dark(#1f2328, #f1eef3);
+  font: inherit;
+  font-size: calc(12px * var(--appearance-text-scale, 1));
+  transform: translateX(-50%);
+  cursor: pointer;
+}
+.group-new-messages:hover {
+  background: light-dark(#f6f6f7, #322e38);
+}

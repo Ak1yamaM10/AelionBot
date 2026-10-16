@@ -797,8 +797,6 @@ export const en: Record<string, string> = {
   群名称: 'Group name',
   成员: 'Members',
   '至少需要两位 Bot 才能建群。': 'At least two Bots are required to create a group.',
-  '每个群最多 {count} 位 Bot，取消勾选一位后才能添加新成员。':
-    'A group holds at most {count} Bots. Unselect one to add another.',
   加载更早消息: 'Load older messages',
   私聊记录: 'Private chat history',
   'Bot 私聊': 'Bot private chat',
@@ -1364,8 +1362,8 @@ export const en: Record<string, string> = {
   否: 'No',
   'Aelion MCP 配置 · mcpServers': 'Aelion MCP configuration · mcpServers',
   群名称无效: 'Invalid group name',
-  '请选择 1–8 位 Bot': 'Choose 1–8 Bots',
-  '请选择 2–8 位 Bot': 'Choose 2–8 Bots',
+  '请至少选择 1 位 Bot': 'Choose at least 1 Bot',
+  '请至少选择 2 位 Bot': 'Choose at least 2 Bots',
   '群聊 ID无效': 'Invalid group chat ID',
   群聊不存在或已删除: 'Group chat not found or already deleted',
   纯色: 'Solid',
@@ -2993,4 +2991,5 @@ export const en: Record<string, string> = {
   谁来回应: 'Who responds',
   适用于所有群聊: 'Applies to all group chats',
   当前版本没有本地决策模型: 'This version has no local decision model',
+  '{count} 条新消息': '{count} new messages',
 };
