@@ -10,7 +10,16 @@
 import type { Traits } from '../../../shared/persona/persona-model';
 import type { PersonaContent } from '../../../shared/persona/presets';
 
-export const APPRAISAL_TYPES = ['insult', 'offense', 'argument', 'thanks', 'help', 'apology', 'none'] as const;
+export const APPRAISAL_TYPES = [
+  'insult',
+  'offense',
+  'argument',
+  'thanks',
+  'help',
+  'apology',
+  'mediation',
+  'none',
+] as const;
 export type AppraisalType = (typeof APPRAISAL_TYPES)[number];
 
 interface Kind {
@@ -34,6 +43,10 @@ export const APPRAISAL_KINDS: Record<Exclude<AppraisalType, 'none'>, Kind> = {
   thanks: { criterion: '感谢或夸奖', value: 0.1, days: 14, verb: '感谢了你' },
   help: { criterion: '帮助：帮它解决问题，或完成了它的请求', value: 0.15, days: 30, verb: '帮了你' },
   apology: { criterion: '道歉', value: 0.2, days: 30, verb: '向你道歉' },
+  // Being talked round by a third party softens a grudge a little; only the offender's own apology mends it
+  // (Fehr, Gelfand & Nag, 2010). Its main effect is in PersonaService.appraise; the small value is goodwill
+  // towards the one who mediated.
+  mediation: { criterion: '劝和：劝 target 和别人和好、别再吵、别记仇', value: 0.05, days: 3, verb: '劝你和别人和好' },
 };
 const NONE_CRITERION = '其他：普通交流、玩笑、无恶意的调侃，或游戏规则内的正常博弈（指认、投票、悍跳）';
 

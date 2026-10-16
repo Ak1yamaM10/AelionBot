@@ -108,8 +108,8 @@ test('persona service settles once, recalls a memory once per cooldown, and forg
   assert.match(svc.settle(werewolfFacts(m))!, /狼人杀战报/);
   assert.equal(svc.settle(werewolfFacts(m)), undefined, 'the same match is settled only once');
   assert.ok(svc.affinity('A', 'B') < -0.15);
+  assert.match(svc.groupStyle('A', undefined, [{ id: 'B', name: 'Bot B' }]), /- Bot B：很差/, '−0.4 × (1 + N) = −0.6');
   const first = svc.groupFragment('A', [{ id: 'B', name: 'Bot B' }]);
-  assert.match(first, /你和Bot B的关系很差/, '−0.4 × (1 + N) = −0.6');
   assert.match(first, /被同阵营的 2号 投票放逐|一局狼人杀/);
   const second = svc.groupFragment('A', [{ id: 'B', name: 'Bot B' }]);
   assert.notEqual(first, second, 'the recalled memory is on cooldown the next time');

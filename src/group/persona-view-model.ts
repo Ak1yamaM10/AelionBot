@@ -1,3 +1,4 @@
+import { bondWord } from '../../shared/persona/bond-word';
 import { TRAITS, type Trait, type Traits } from '../../shared/persona/persona-model';
 import type { PersonaEpisode, PersonaView } from '../../shared/types/persona-types';
 import { TRAIT_SEMANTICS, traitBand } from '../../shared/persona/persona-semantics';
@@ -98,9 +99,9 @@ export function growthSummary(view: PersonaView): string {
     ? '当前人格与出生时一致；经历仍在积累。'
     : '人格已有变化，可从曲线和历史记录回看。';
 }
-/** Same wording as the group-chat fragment (persona-service affinityWord), so the page and the Bot agree. */
-export function relationWord(v: number) {
-  return v >= 0.5 ? '很好' : v >= 0.15 ? '不错' : v <= -0.5 ? '很差' : v <= -0.15 ? '有芥蒂' : '一般';
+/** Same wording the reply model is given, so the page and the Bot agree. */
+export function relationWord(r?: { closeness: number; grudge: number }) {
+  return bondWord(r || { closeness: 0, grudge: 0 });
 }
 export function statusText(v: PersonaView) {
   const p = v.profile;

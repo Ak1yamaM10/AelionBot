@@ -7,6 +7,8 @@ import type { MatchFacts } from './match-facts';
 import { APPRAISAL_KINDS, appraisalModifier, contentWeight, type Appraisal, type AppraisalType } from './appraisal';
 import { birthPrompt, facetsFrom } from './birth';
 import { PRESETS, contentText, isPresetId } from '../../../shared/persona/presets';
+import { GRUDGE, bondOf, grudgeConduct, relationsText, sourceIdOf } from './relations';
+import { reminderFor, speechPlan, usedCatchphrase, type JudgeInput, type SpeechMemory, type Verdict } from './speech';
 import {
   NEUTRAL,
   TRAITS,
@@ -25,6 +27,12 @@ const DAY = 86_400_000;
 /** Neutral neuroticism for Bots without a profile (§11.2). */
 const DEFAULT_N = 0.5;
 const HIGHLIGHT_COOLDOWN_DAYS = 7;
+/** Turns after a relationship event during which every reply is checked for staying in character. */
+const EVENT_TURNS = 3;
+/** A Bot with a preset has one in this many replies checked for its voice. */
+const VOICE_EVERY = 5;
+/** The share of all other replies checked, to measure how often Bots drift. */
+const SAMPLE_RATE = 0.02;
 
 /**
  * affinity(t) = clip(Σ b_i · k_i · w_i(t), −1, 1), w_i linear decay over its duration,
@@ -38,9 +46,6 @@ export function affinityScore(mods: AffinityModifier[], now = Date.now(), n = DE
   }
   return Math.max(-1, Math.min(1, sum));
 }
-function affinityWord(v: number) {
-  return v >= 0.5 ? '很好' : v >= 0.15 ? '不错' : v <= -0.5 ? '很差' : v <= -0.15 ? '有芥蒂' : undefined;
-}
 
 const dayStart = (t: number) => t - (t % DAY);
 
@@ -48,9 +53,16 @@ export class PersonaService {
   readonly store: PersonaStore;
   private growthRunner: GrowthRunner;
   private estimating = new Set<string>();
+  // Per-session speech state. Losing it on restart only resets catchphrase pacing and pending reminders.
+  private speech = new Map<string, SpeechMemory>();
+  private eventTurns = new Map<string, number>();
+  private spoken = new Map<string, number>();
+  /** By Bot and group: a reminder names people of the group it came from. */
+  private reminders = new Map<string, string>();
   constructor(
     dir: string,
     private now: () => number = Date.now,
+    private random: () => number = Math.random,
   ) {
     this.store = new PersonaStore(dir);
     this.store.prune(this.now());
@@ -132,6 +144,17 @@ export class PersonaService {
           const left = m.createdAt + m.durationDays * DAY - at;
           this.store.updateAffinity(m.id, (at - m.createdAt + left / 2) / DAY, m.source);
         }
+      // Being talked round shortens grudges towards everyone else a little: a tenth of what is left, up to
+      // four tenths for the most agreeable. It never ends one; only an apology from the offender halves it.
+      if (type === 'mediation') {
+        const ease = 0.1 + 0.3 * (profile?.traits.A ?? NEUTRAL.A);
+        for (const other of this.store.affinityTargets(e.botId).filter((id) => id !== e.actorId))
+          for (const m of this.store.affinity(e.botId, other)) {
+            const left = m.createdAt + m.durationDays * DAY - at;
+            if (m.value < 0 && left > 0)
+              this.store.updateAffinity(m.id, (at - m.createdAt + left * (1 - ease)) / DAY, m.source);
+          }
+      }
       this.store.addAffinity({
         botId: e.botId,
         targetId: e.actorId,
@@ -153,6 +176,7 @@ export class PersonaService {
           createdAt: at,
         });
     });
+    if (type !== 'thanks' && type !== 'help') this.eventTurns.set(e.botId, EVENT_TURNS);
     return change;
   }
   /** Remember factual episodes; only legacy experiences use outcome-based growth. Remember the opening plan too. */
@@ -245,9 +269,18 @@ export class PersonaService {
       episodes: this.store.episodes(botId),
       relations: this.store
         .affinityTargets(botId)
-        .map((id) => ({ id, affinity: this.affinity(botId, id, profile.traits.N) }))
-        .filter((r) => Math.abs(r.affinity) >= 0.01)
-        .sort((a, b) => Math.abs(b.affinity) - Math.abs(a.affinity)),
+        .map((id) => {
+          const bond = this.bond(botId, id);
+          return {
+            id,
+            affinity: this.affinity(botId, id, profile.traits.N),
+            closeness: Math.round(bond.closeness * 1000) / 1000,
+            grudge: Math.round(bond.grudge * 1000) / 1000,
+          };
+        })
+        // Good and bad can cancel out in the net value; a grudge still shows.
+        .filter((r) => Math.abs(r.affinity) >= 0.01 || r.closeness >= 0.01 || r.grudge >= 0.01)
+        .sort((a, b) => Math.max(Math.abs(b.affinity), b.grudge) - Math.max(Math.abs(a.affinity), a.grudge)),
       highlights: this.store.recentHighlights(botId),
       growthReview: this.growthRunner.state(botId),
     };
@@ -390,9 +423,14 @@ export class PersonaService {
    * expression guidance its game seats get, and a stance on agreeing. Only for Bots with a saved profile; a draft
    * is never invented here. Group chats only: private chats keep the original SOUL (§D.14).
    */
-  groupStyle(botId: string, nameOf: (id: string) => string | undefined = () => undefined) {
+  groupStyle(
+    botId: string,
+    nameOf: (id: string) => string | undefined = () => undefined,
+    members: { id: string; name: string }[] = [],
+  ) {
     const p = this.store.profile(botId);
-    if (!p) return '';
+    const relations = this.relationsText(botId, members);
+    if (!p) return relations;
     const conform = tendencies(p.traits).conform;
     const stance =
       conform < -0.3
@@ -400,16 +438,41 @@ export class PersonaService {
         : conform > 0.3
           ? '\n立场：同意别人时要补充新的信息或理由，不要只说「同意」。'
           : '';
-    return '\n\n[你的说话方式，来自你的性格设定]\n' + styleText(p.traits) + '。' + stance + contentText(p, nameOf);
+    return (
+      '\n\n[你的说话方式，来自你的性格设定]\n' +
+      styleText(p.traits) +
+      '。' +
+      stance +
+      contentText(p, nameOf) +
+      relations
+    );
   }
-  groupFragment(botId: string, people: { id: string; name: string }[]) {
+  bond(botId: string, targetId: string) {
+    return bondOf(this.store.affinity(botId, targetId), this.now(), this.store.profile(botId)?.traits.N ?? DEFAULT_N);
+  }
+  /** Every other member's relationship with this Bot, with the remembered reason for a grudge. */
+  private relationsText(botId: string, members: { id: string; name: string }[]) {
+    const others = members.filter((m) => m.id !== botId && !this.store.isForgotten(m.id));
+    const lines = others.map((m) => {
+      const bond = this.bond(botId, m.id);
+      const hurtFrom = bond.hurt && sourceIdOf(bond.hurt);
+      const cause =
+        bond.grudge >= GRUDGE && hurtFrom
+          ? this.store.highlightsWith(botId, [m.id]).find((h) => h.sourceId === hurtFrom)?.summary
+          : undefined;
+      // The human without a display name is 你 in the group, which reads as the Bot itself here.
+      return { name: m.name === '你' ? '用户' : m.name, bond, ...(cause ? { cause } : {}) };
+    });
+    const p = this.store.profile(botId);
+    return relationsText(lines, grudgeConduct(p || {}, p?.traits || NEUTRAL));
+  }
+  /**
+   * What changes from turn to turn: one shared memory with the people in this message that was not recalled in
+   * the last 7 days, this turn's speech plan, and a reminder left by the last character check.
+   */
+  groupFragment(botId: string, people: { id: string; name: string }[], groupId = '') {
     const others = people.filter((p) => p.id !== botId).slice(0, 2);
-    if (!others.length) return '';
-    const lines: string[] = [];
-    for (const p of others) {
-      const word = affinityWord(this.affinity(botId, p.id));
-      if (word) lines.push(`你和${p.name}的关系${word}。`);
-    }
+    const parts: string[] = [];
     const now = this.now();
     const memory = this.store
       .highlightsWith(
@@ -419,9 +482,61 @@ export class PersonaService {
       .find((h) => !h.lastUsedAt || now - h.lastUsedAt >= HIGHLIGHT_COOLDOWN_DAYS * DAY);
     if (memory) {
       this.store.markUsed(memory.id, now);
-      lines.push(`你们之间发生过的事（可以自然地提起，不必每次都提；只说这里写的内容）：${memory.summary}。`);
+      parts.push(
+        `\n\n[想起的事]\n你们之间发生过的事（可以自然地提起，不必每次都提；只说这里写的内容）：${memory.summary}。`,
+      );
     }
-    return lines.length ? '\n\n[你的关系与记忆，仅供参考]\n' + lines.join('\n') : '';
+    const p = this.store.profile(botId);
+    if (p) parts.push(speechPlan(p, this.speech.get(botId) || { used: [] }, this.random));
+    const reminder = this.reminders.get(`${botId}:${groupId}`);
+    if (reminder) {
+      this.reminders.delete(`${botId}:${groupId}`);
+      parts.push(`\n\n${reminder}`);
+    }
+    return parts.join('');
+  }
+  /**
+   * A reply this Bot published. Records its catchphrase for pacing, and returns what to check when this turn is
+   * one worth checking, decided in code: someone it resents is involved, a relationship event happened in the
+   * last few turns, one in five turns of a preset's voice, or a small random sample. Undefined otherwise.
+   */
+  spoke(botId: string, text: string, people: { id: string; name: string }[]): JudgeInput | undefined {
+    const p = this.store.profile(botId);
+    if (!p || !text.trim()) return undefined;
+    const memory = this.speech.get(botId) || { used: [] };
+    memory.used = [...memory.used, usedCatchphrase(p, text)].slice(-12);
+    this.speech.set(botId, memory);
+    const count = (this.spoken.get(botId) || 0) + 1;
+    this.spoken.set(botId, count);
+    const turns = this.eventTurns.get(botId) || 0;
+    if (turns) this.eventTurns.set(botId, turns - 1);
+    const others = people.filter((x) => x.id !== botId);
+    const bonds = others.map((x) => ({ ...x, bond: this.bond(botId, x.id) }));
+    const key =
+      bonds.some((x) => x.bond.grudge >= GRUDGE) ||
+      turns > 0 ||
+      (!!p.preset && count % VOICE_EVERY === 0) ||
+      this.random() < SAMPLE_RATE;
+    if (!key) return undefined;
+    return {
+      speaker: p.preset ? PRESETS[p.preset].name : '这个成员',
+      persona: contentText(p, () => undefined).trim() || styleText(p.traits),
+      relations: this.relationsText(botId, others).trim() || '没有特别的关系',
+      reply: text.slice(0, 600),
+    };
+  }
+  /** Leave a reminder for the next turn when a check found the reply out of character. */
+  judged(botId: string, verdict: Verdict, people: { id: string; name: string }[], groupId = '') {
+    const resented = people
+      .filter((x) => x.id !== botId)
+      .filter((x) => {
+        const b = this.bond(botId, x.id);
+        return b.grudge >= GRUDGE && !b.apologized;
+      })
+      .map((x) => x.name);
+    const reminder = reminderFor(verdict, resented);
+    if (reminder) this.reminders.set(`${botId}:${groupId}`, reminder);
+    else if (verdict === 'ok') this.reminders.delete(`${botId}:${groupId}`);
   }
   forget(memberId: string) {
     this.store.transaction(() => this.store.forget(memberId));
