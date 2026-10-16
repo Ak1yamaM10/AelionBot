@@ -510,7 +510,14 @@ async function initialize() {
   const layaLog = new LayaDecisionLog(store.dir, () => groupChats?.layaChanged());
   layaFeature = new LayaFeature(store.dir, laya, changed);
   persona = new PersonaService(store.dir);
-  /** One short call to a Bot's own model for persona bookkeeping (birth estimate, relationship appraisal). */
+  /**
+   * Output cap for persona bookkeeping calls (birth estimate, relationship appraisal, character check). The answers
+   * are a few dozen tokens, but a model that reasons first spends its output budget on that
+   * reasoning (OpenAI reasoning models, Claude adaptive thinking), so the cap leaves room for it; only what is
+   * generated is billed. The timeout allows for the same reasoning; these calls run in the background.
+   */
+  const PERSONA_CALL_TOKENS = 4096;
+  /** One short call to a Bot's own model for persona bookkeeping. */
   const askPersonaModel =
     (purpose: string, maxOutputTokens: number) => async (botId: string, system: string, user: string) => {
       const config = providers.config(botId);
@@ -523,7 +530,7 @@ async function initialize() {
         [],
         new AbortController().signal,
         undefined,
-        { botId, purpose, maxOutputTokens, timeoutMs: 30000, retries: 1 },
+        { botId, purpose, maxOutputTokens, timeoutMs: 60000, retries: 1 },
       );
       return result.content || '';
     };
@@ -820,14 +827,14 @@ async function initialize() {
           persona,
           (ids) =>
             store.data.bots.filter((b) => ids.includes(b.id)).map((b) => ({ id: b.id, name: b.name, soul: b.soul })),
-          appraiser(laya, askPersonaModel('persona_appraisal', 200)),
-          askPersonaModel('persona_birth', 400),
+          appraiser(laya, askPersonaModel('persona_appraisal', PERSONA_CALL_TOKENS)),
+          askPersonaModel('persona_birth', PERSONA_CALL_TOKENS),
           (error) =>
             diagnostics?.record(
               'persona.social',
               error instanceof Error ? error.stack || error.message : String(error),
             ),
-          judger(laya, askPersonaModel('persona_check', 200)),
+          judger(laya, askPersonaModel('persona_check', PERSONA_CALL_TOKENS)),
         )
       : undefined,
   );
