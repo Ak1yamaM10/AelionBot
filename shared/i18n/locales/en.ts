@@ -2993,5 +2993,4 @@ export const en: Record<string, string> = {
   谁来回应: 'Who responds',
   适用于所有群聊: 'Applies to all group chats',
   当前版本没有本地决策模型: 'This version has no local decision model',
-  '{name} 的人格': 'Personality of {name}',
 };

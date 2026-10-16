@@ -674,21 +674,6 @@
   padding: 4px 10px;
   font-size: calc(12px * var(--appearance-text-scale, 1));
 }
-.gp-member-actions {
-  display: flex;
-  flex-direction: column;
-  align-items: stretch;
-  gap: 6px;
-}
-.gp-member-actions select {
-  padding: 4px 6px;
-  border: 1px solid light-dark(#e6e7e9, #3e3945);
-  border-radius: 8px;
-  background: light-dark(#fff, #201e24);
-  color: inherit;
-  font: inherit;
-  font-size: calc(12px * var(--appearance-text-scale, 1));
-}
 .gp-tag {
   padding: 0 6px;
   border-radius: 6px;
