@@ -7,7 +7,7 @@
  * anyone else's urging (Fehr, Gelfand & Nag, 2010), so a grudge is only described as easing after one.
  */
 import type { Traits } from '../../../shared/persona/persona-model';
-import type { PersonaContent } from '../../../shared/persona/presets';
+import { PRESETS, type PersonaContent, type PresetId } from '../../../shared/persona/presets';
 import { GRUDGE, bondWord } from '../../../shared/persona/bond-word';
 import type { AffinityModifier } from './persona-store';
 
@@ -52,7 +52,9 @@ export const sourceIdOf = (m: AffinityModifier) => m.source.split(':')[1 + Numbe
  * How this member shows a grudge, from its own strategies and expression first and its traits otherwise: one
  * attitude expressed in its own style, so 阴阳怪气 needles, NPD hits back and 确实型 goes cold.
  */
-export function grudgeConduct(c: PersonaContent, traits: Traits) {
+export function grudgeConduct(c: PersonaContent & { preset?: PresetId }, traits: Traits) {
+  const own = c.preset ? PRESETS[c.preset].grudge : undefined;
+  if (own) return own;
   const s = c.strategies || {};
   if ((s.sarcasm ?? 0) >= 0.5 || (c.expression?.directness ?? 0.5) <= 0.3)
     return '用反话和明褒暗贬对待他，不直接骂，但让人听得出来';

@@ -2950,6 +2950,10 @@ export const en: Record<string, string> = {
     'Craves admiration; a sky-high but brittle self-image; hits back at criticism and never admits fault',
   '心思全在一个人身上，怕被拒绝，无底线讨好；被对象骂了也不生气':
     'Fixated on one person, terrified of rejection, pleases without limit; not even angry when scolded by them',
+  '把群里每个人都当自己孩子操心：唠叨、叮嘱、追问，嘴上嫌弃心里最疼':
+    'Fusses over everyone in the group like her own kids: nags, reminds, asks; grumbles out loud but cares the most',
+  '黏人又傲娇的猫娘：每句带「喵」，叫用户主人，被冷落就炸毛':
+    'A clingy, tsundere catgirl: "nya" in every line, calls you master, bristles when ignored',
   '有敌意但从不直说，只用反话和明褒暗贬，让你自己听出来':
     'Hostile but never says it outright; only irony and backhanded praise, so you work it out yourself',
   '什么都回「确实」，不表态、不展开、不冲突': 'Answers everything with "indeed": no stance, no detail, no conflict',
