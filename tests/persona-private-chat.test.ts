@@ -164,9 +164,9 @@ test('editing five traits and settling a game leave private chat identity and me
   assert.deepEqual(settled.profile.traits, traits);
   assert.equal(settled.episodes.length, 1, 'the game really wrote an experience to the persona store');
   assert.ok(settled.relations.some((relation) => relation.id === 'user' && relation.affinity > 0));
-  const fragment = f.persona.groupFragment(f.bot.id, [{ id: 'user', name: 'GAME_RELATION_SENTINEL' }]);
-  assert.match(fragment, /\[你的关系与记忆，仅供参考\]/, 'settlement produced a usable group-only fragment');
-  assert.match(fragment, /GAME_RELATION_SENTINEL/);
+  const style = f.persona.groupStyle(f.bot.id, undefined, [{ id: 'user', name: 'GAME_RELATION_SENTINEL' }]);
+  assert.match(style, /\[你和群里每个人的关系\]/, 'settlement produced a usable group-only relation');
+  assert.match(style, /GAME_RELATION_SENTINEL/);
 
   await f.harness.run(f.bot.id, '游戏后，继续使用我们原来的聊天方式。');
 

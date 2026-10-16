@@ -706,7 +706,7 @@ export function PersonaPage({
                             )}
                             <span className="gp-relation-copy">
                               <b>{nameOf(relation.id)}</b>
-                              <small>{t(relationWord(relation.affinity))}</small>
+                              <small>{t(relationWord(relation))}</small>
                             </span>
                           </li>
                         );

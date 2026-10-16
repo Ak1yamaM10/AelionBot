@@ -78,7 +78,19 @@ test('numbers on the page: signed changes, the strongest moved trait, relation w
   assert.equal(episodeSource({ ...e, scope: 'chat' }), '群聊');
   assert.equal(episodeSource({ ...e, kind: 'growth_review' }), '成长评估');
   assert.equal(episodeSource({ ...e, kind: 'growth_review_undo' }), '撤销成长');
-  assert.deepEqual([0.6, 0.2, 0, -0.2, -0.6].map(relationWord), ['很好', '不错', '一般', '有芥蒂', '很差']);
+  assert.deepEqual(
+    [
+      { closeness: 0.6, grudge: 0 },
+      { closeness: 0.2, grudge: 0 },
+      { closeness: 0, grudge: 0 },
+      { closeness: 0, grudge: 0.2 },
+      { closeness: 0, grudge: 0.6 },
+      // Being owed an apology shows even when the good things outweigh it.
+      { closeness: 0.8, grudge: 0.2 },
+    ].map(relationWord),
+    ['很好', '不错', '一般', '有芥蒂', '很差', '有芥蒂'],
+  );
+  assert.equal(relationWord(undefined), '一般');
 });
 
 function reviewed(): PersonaView {

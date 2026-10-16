@@ -27,7 +27,10 @@ function fixture(t: test.TestContext) {
     undefined,
     undefined,
     undefined,
-    (botId, people) => ({ style: persona.groupStyle(botId), people: persona.groupFragment(botId, people) }),
+    (botId, people, members) => ({
+      style: persona.groupStyle(botId, undefined, members),
+      people: persona.groupFragment(botId, people),
+    }),
   );
   groups.start();
   t.after(() => {
@@ -74,7 +77,7 @@ test('a woken Bot receives its relation and one shared memory about the sender',
   groups.send({ id: room.id, message: '上局怎么样' });
   await until(() => contexts.length > 0, { timeoutMs: 5000 });
   assert.ok(
-    contexts.some((c) => c.includes('[你的关系与记忆，仅供参考]') && c.includes('一局狼人杀')),
+    contexts.some((c) => c.includes('[你和群里每个人的关系]') && c.includes('[想起的事]') && c.includes('一局狼人杀')),
     'the persona lines reach the group run',
   );
 });

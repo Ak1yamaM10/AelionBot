@@ -5,7 +5,7 @@ import { gameProviders } from './core/games/providers';
 import { GameRuntime } from './core/games/runtime';
 import { PersonaService } from './core/persona/persona-service';
 import { userDisplayName } from '../shared/chat/user-profile';
-import { appraiser, groupSocialHooks } from './core/persona/group-relations';
+import { appraiser, groupSocialHooks, judger } from './core/persona/group-relations';
 import { settleFinishedGame } from './core/games/settlement';
 import { contextBudget } from './core/context/context-budget';
 import { parseGameAction } from './core/games/model-player';
@@ -801,11 +801,16 @@ async function initialize() {
     attachments,
     host,
     new LayaGroupDecisions(laya, layaLog),
-    (botId, people) =>
+    (botId, people, members) =>
       persona
         ? {
-            style: persona.groupStyle(botId, (id) =>
-              id === 'user' ? userDisplayName(store.data.userProfile) : store.data.bots.find((b) => b.id === id)?.name,
+            style: persona.groupStyle(
+              botId,
+              (id) =>
+                id === 'user'
+                  ? userDisplayName(store.data.userProfile)
+                  : store.data.bots.find((b) => b.id === id)?.name,
+              members,
             ),
             people: persona.groupFragment(botId, people),
           }
@@ -822,6 +827,7 @@ async function initialize() {
               'persona.social',
               error instanceof Error ? error.stack || error.message : String(error),
             ),
+          judger(laya, askPersonaModel('persona_check', 60)),
         )
       : undefined,
   );

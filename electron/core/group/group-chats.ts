@@ -90,6 +90,14 @@ export interface GroupSocialHooks {
     text: string;
     repliedTo?: string;
   }): void;
+  /** A Bot's own message was published; people are the members it was talking to. */
+  spoke?(event: {
+    groupId: string;
+    messageId: string;
+    botId: string;
+    text: string;
+    people: { id: string; name: string }[];
+  }): void;
 }
 const human: GroupSender = { kind: 'user', id: 'user', name: '你' };
 const system: GroupSender = { kind: 'system', id: 'system', name: '系统' };
@@ -146,7 +154,11 @@ export class GroupChats implements GroupGateway {
     private laya?: GroupDecisions,
     /** Persona lines (affinity, shared memories) appended to a Bot's group context; empty string when none. */
     /** A member's speaking style, which rarely changes, and its feelings about the people in one message. */
-    private persona?: (botId: string, people: { id: string; name: string }[]) => { style: string; people: string },
+    private persona?: (
+      botId: string,
+      people: { id: string; name: string }[],
+      members: { id: string; name: string }[],
+    ) => { style: string; people: string },
     /** Social events the persona module learns from: who joined, and messages aimed at other members. */
     private social?: GroupSocialHooks,
   ) {
@@ -792,6 +804,7 @@ export class GroupChats implements GroupGateway {
     room.messages.push(message);
     rememberPublished(this.store, message);
     if (kind === 'message' && sender.kind !== 'system' && this.social?.aimed) this.reportAimed(room, message);
+    if (kind === 'message' && sender.kind === 'bot' && this.social?.spoke) this.reportSpoke(room, message);
     room.updatedAt = message.time;
     if (round) {
       const current = this.store.data.groupRounds.findIndex((r) => r.id === room.activeRootId);
@@ -845,6 +858,42 @@ export class GroupChats implements GroupGateway {
         this.social?.aimed?.(input);
       } catch {
         // Relationship bookkeeping is optional context.
+      }
+    });
+  }
+  /**
+   * Tell the persona module what a Bot said and to whom: the members it @-mentioned or replied to, and whoever
+   * spoke last before it.
+   */
+  private reportSpoke(room: GroupRoom, message: GroupMessage) {
+    const text = groupReplyContent(message.content, message.sender.id);
+    if (!text.trim()) return;
+    const people = new Map<string, string>();
+    const add = (sender: GroupSender) => {
+      if (sender.id !== message.sender.id && sender.kind !== 'system')
+        people.set(sender.id, sender.kind === 'user' ? userDisplayName(this.store.data.userProfile) : sender.name);
+    };
+    const replied = room.messages.find((item) => item.id === replyTarget(message));
+    if (replied) add(replied.sender);
+    for (const mention of message.mentions || [])
+      if (mention.id !== message.sender.id) people.set(mention.id, mention.name);
+    const before = room.messages
+      .slice(0, room.messages.indexOf(message))
+      .reverse()
+      .find((item) => item.kind === 'message' && item.sender.kind !== 'system' && item.sender.id !== message.sender.id);
+    if (before) add(before.sender);
+    const input = {
+      groupId: room.id,
+      messageId: message.id,
+      botId: message.sender.id,
+      text,
+      people: [...people].map(([id, name]) => ({ id, name })),
+    };
+    queueMicrotask(() => {
+      try {
+        this.social?.spoke?.(input);
+      } catch {
+        // Character checks are optional.
       }
     });
   }
@@ -1081,7 +1130,11 @@ export class GroupChats implements GroupGateway {
     for (const m of message.mentions || []) add(m.id, m.name);
     try {
       // Called even when nobody else is involved: the Bot's own speaking style still applies.
-      return this.persona(botId, people);
+      const members = [
+        { id: 'user', name: userDisplayName(this.store.data.userProfile) },
+        ...this.identities(room).map((m) => ({ id: m.id, name: m.name })),
+      ];
+      return this.persona(botId, people, members);
     } catch {
       return { style: '', people: '' }; // persona data is optional context; its failure must not block a reply
     }

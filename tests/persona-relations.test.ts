@@ -60,7 +60,8 @@ test('an insult hurts and is remembered with the words; the same kind counts onc
     '用户骂了你：「你怎么这么笨」',
     "an unnamed human is not 「你」 in the Bot's own memory",
   );
-  assert.match(svc.groupFragment('A', [{ id: 'user', name: '你' }]), /关系(很差|有芥蒂)/);
+  const relations = svc.groupStyle('A', undefined, [{ id: 'user', name: '你' }]);
+  assert.match(relations, /- 用户：(很差|有芥蒂)。原因：用户骂了你：「你怎么这么笨」。用户还没向你道歉/);
   assert.equal(svc.appraise(event({ botId: 'user', actorId: 'user' })), undefined, 'nobody appraises itself');
 });
 

@@ -59,8 +59,11 @@ export interface PersonaView {
   mbti: string;
   history: PersonaTraitPoint[];
   episodes: PersonaEpisode[];
-  /** Affinity towards other Bots and 'user', strongest first. */
-  relations: { id: string; affinity: number }[];
+  /**
+   * Feelings towards other Bots and 'user', strongest first: the net affinity, and its two parts, what is left of
+   * the good things (closeness) and of the hurt (grudge), each 0–1.
+   */
+  relations: { id: string; affinity: number; closeness: number; grudge: number }[];
   highlights: PersonaHighlight[];
   growthReview?: GrowthReviewState;
 }

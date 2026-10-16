@@ -11,6 +11,15 @@ import {
   type AppraisalType,
 } from './appraisal';
 import type { PersonaService } from './persona-service';
+import {
+  JUDGE_CRITERIA,
+  JUDGE_INSTRUCTIONS,
+  VERDICTS,
+  judgePrompt,
+  parseVerdict,
+  type JudgeInput,
+  type Verdict,
+} from './speech';
 
 /** Asks a Bot's own model; returns the raw reply text. */
 export type AskBot = (botId: string, system: string, user: string) => Promise<string>;
@@ -35,16 +44,33 @@ export function appraiser(laya: Pick<LayaRuntime, 'enabled' | 'isReady' | 'predi
   };
 }
 
+/** The character check, with the same order of models as the appraiser. */
+export function judger(laya: Pick<LayaRuntime, 'enabled' | 'isReady' | 'predict'> | undefined, ask: AskBot) {
+  return async (botId: string, input: JudgeInput): Promise<Verdict | undefined> => {
+    if (laya?.enabled && laya.isReady) {
+      const result = await laya.predict(input, {
+        type: 'choice',
+        instructions: JUDGE_INSTRUCTIONS,
+        criteria: JUDGE_CRITERIA,
+      });
+      if (result && VERDICTS.includes(result.choice as Verdict)) return result.choice as Verdict;
+    }
+    const prompt = judgePrompt(input);
+    return parseVerdict(await ask(botId, prompt.system, prompt.user));
+  };
+}
+
 /** Bounded so a busy group cannot queue unlimited classification calls. */
 const MAX_PENDING = 20;
 
 /** The persona side of group activity: profiles for new members, and relationships from aimed messages. */
 export function groupSocialHooks(
-  persona: Pick<PersonaService, 'appraise' | 'ensureGroupProfiles'>,
+  persona: Pick<PersonaService, 'appraise' | 'ensureGroupProfiles' | 'spoke' | 'judged'>,
   bots: (ids: string[]) => { id: string; name: string; soul: string }[],
   classify: (botId: string, input: AppraisalInput) => Promise<Appraisal | undefined>,
   ask: AskBot,
   report: (error: unknown) => void = () => {},
+  judge?: (botId: string, input: JudgeInput) => Promise<Verdict | undefined>,
 ): GroupSocialHooks {
   let pending = 0;
   let chain = Promise.resolve();
@@ -79,6 +105,15 @@ export function groupSocialHooks(
             sourceId: event.messageId,
           });
         });
+    },
+    // Runs after publication and only leaves a reminder for the next turn, so a reply is never held up.
+    spoke: (event) => {
+      const input = persona.spoke(event.botId, event.text, event.people);
+      if (!input || !judge) return;
+      enqueue(async () => {
+        const verdict = await judge(event.botId, input);
+        if (verdict) persona.judged(event.botId, verdict, event.people);
+      });
     },
   };
 }

@@ -95,7 +95,7 @@ export function GroupPersonaPanel({ members, onClose }: { members: Member[]; onC
       <ul>
         {members.map((m) => {
           const view = views[m.id];
-          const toYou = view?.relations.find((r) => r.id === 'user')?.affinity ?? 0;
+          const toYou = view?.relations.find((r) => r.id === 'user');
           const others = (view?.relations || [])
             .filter((r) => r.id !== 'user' && memberName(members, r.id, t('你')))
             .slice(0, 2);
@@ -116,7 +116,7 @@ export function GroupPersonaPanel({ members, onClose }: { members: Member[]; onC
                       <p className="gp-relations" key={r.id}>
                         {t('对 {name}：{word}', {
                           name: memberName(members, r.id, t('你'))!,
-                          word: t(relationWord(r.affinity)),
+                          word: t(relationWord(r)),
                         })}
                       </p>
                     ))}
@@ -176,7 +176,7 @@ export function PersonaHoverCard({ bot, children }: { bot: Member; children: Rea
   const [open, setOpen] = useState(false);
   const views = usePersonaViews([bot.id], open);
   const view = views[bot.id];
-  const toYou = view?.relations.find((r) => r.id === 'user')?.affinity ?? 0;
+  const toYou = view?.relations.find((r) => r.id === 'user');
   const memory = view?.highlights.find((h) => h.participants?.includes('user'));
   return (
     <span

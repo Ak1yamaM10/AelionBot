@@ -10,7 +10,7 @@ import { Attachments } from '../electron/core/attachments/attachments';
 import { Cognition } from '../electron/core/memory/cognition';
 import { SkillLibrary } from '../electron/core/extensions/skill-library';
 import { Harness } from '../electron/core/agent/harness';
-import { GroupChats } from '../electron/core/group/group-chats';
+import { GroupChats, type GroupSocialHooks } from '../electron/core/group/group-chats';
 import { groupMainContext } from '../electron/core/group/group-context';
 import { Interactions } from '../electron/core/agent/interactions';
 import { HostComputer } from '../electron/core/host/host';
@@ -103,6 +103,7 @@ function fixture(
   ) => Completion | Promise<Completion> = () => silent(),
   vm?: VmController,
   withCognition = false,
+  social?: GroupSocialHooks,
 ) {
   const dir = mkdtempSync(join(tmpdir(), 'aelion-group-test-')),
     store = new Store(dir),
@@ -167,6 +168,11 @@ function fixture(
       refresh: (id) => harness.refreshGroup(id),
     },
     () => {},
+    undefined,
+    undefined,
+    undefined,
+    undefined,
+    social,
   );
   harness.setGroupGateway(groups);
   groups.start();
@@ -2174,4 +2180,26 @@ test('a Bot that @-mentions a member by name with Chinese text right after it wa
     reply.mentions?.map((m) => m.id),
     [fx.b.id],
   );
+});
+test('a published Bot reply reaches the persona module with the members it was talking to', async (t) => {
+  const spoke: { botId: string; text: string; people: string[] }[] = [];
+  let asked = false;
+  const fx = fixture(
+    t,
+    (run) => {
+      if (run.botId !== fx.a.id || !asked) return silent();
+      asked = false;
+      return answer(`@${fx.b.name} 你也看看`);
+    },
+    undefined,
+    false,
+    { spoke: (e) => spoke.push({ botId: e.botId, text: e.text, people: e.people.map((p) => p.id).sort() }) },
+  );
+  const room = fx.groups.create({ name: '闲聊', botIds: [fx.a.id, fx.b.id] });
+  await until(fx.settled);
+  asked = true;
+  fx.ask(room.id, fx.a, '你觉得呢');
+  await until(() => spoke.length > 0);
+  await until(fx.settled);
+  assert.deepEqual(spoke, [{ botId: fx.a.id, text: `@${fx.b.name} 你也看看`, people: [fx.b.id, 'user'].sort() }]);
 });
