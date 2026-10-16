@@ -83,6 +83,22 @@ export function GroupPersonaPanel({ members, onClose }: { members: Member[]; onC
     true,
   );
   const [profile, setProfile] = useState('');
+  // A preset chosen here applies at once; its result shows before the next refresh.
+  const [changed, setChanged] = useState<Record<string, PersonaView>>({});
+  const [busy, setBusy] = useState('');
+  const [error, setError] = useState('');
+  const choose = async (botId: string, preset: string) => {
+    setBusy(botId);
+    setError('');
+    try {
+      const next = await window.aelion.updatePersona({ botId, action: 'preset', preset });
+      setChanged((value) => ({ ...value, [botId]: next }));
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setBusy('');
+    }
+  };
   return (
     <aside className="gp-panel" aria-label={t('成员与性格')}>
       <header>
@@ -94,7 +110,7 @@ export function GroupPersonaPanel({ members, onClose }: { members: Member[]; onC
       </header>
       <ul>
         {members.map((m) => {
-          const view = views[m.id];
+          const view = changed[m.id] || views[m.id];
           const toYou = view?.relations.find((r) => r.id === 'user');
           const others = (view?.relations || [])
             .filter((r) => r.id !== 'user' && memberName(members, r.id, t('你')))
@@ -125,13 +141,33 @@ export function GroupPersonaPanel({ members, onClose }: { members: Member[]; onC
                   <p className="gp-relations">{t('正在读取性格…')}</p>
                 )}
               </div>
-              <button className="secondary-button" onClick={() => setProfile(m.id)}>
-                {t('人格档案')}
-              </button>
+              <div className="gp-member-actions">
+                <select
+                  aria-label={t('{name} 的人格', { name: m.name })}
+                  value={view?.profile.preset || ''}
+                  disabled={!view || busy === m.id}
+                  onChange={(event) => void choose(m.id, event.target.value)}
+                >
+                  <option value="">{t('不使用预设')}</option>
+                  {PRESET_IDS.map((id) => (
+                    <option key={id} value={id}>
+                      {PRESETS[id].name}
+                    </option>
+                  ))}
+                </select>
+                <button className="secondary-button" onClick={() => setProfile(m.id)}>
+                  {t('人格档案')}
+                </button>
+              </div>
             </li>
           );
         })}
       </ul>
+      {error && (
+        <p className="group-error" role="alert">
+          {error}
+        </p>
+      )}
       {profile && <PersonaDialog members={members} botId={profile} onClose={() => setProfile('')} />}
     </aside>
   );
@@ -197,73 +233,5 @@ export function PersonaHoverCard({ bot, children }: { bot: Member; children: Rea
         </span>
       )}
     </span>
-  );
-}
-
-/**
- * Personalities in the group settings: each member's preset picked from the library, with its full profile one
- * click away. A group meant only for work simply leaves every member without a preset.
- */
-export function GroupPersonaSettings({ members }: { members: Member[] }) {
-  const { t } = useI18n();
-  const views = usePersonaViews(
-    members.map((m) => m.id),
-    true,
-  );
-  const [changed, setChanged] = useState<Record<string, PersonaView>>({});
-  const [busy, setBusy] = useState('');
-  const [error, setError] = useState('');
-  const [profile, setProfile] = useState('');
-  const choose = async (botId: string, preset: string) => {
-    setBusy(botId);
-    setError('');
-    try {
-      const next = await window.aelion.updatePersona({ botId, action: 'preset', preset });
-      setChanged((value) => ({ ...value, [botId]: next }));
-    } catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
-    } finally {
-      setBusy('');
-    }
-  };
-  return (
-    <>
-      <ul className="gp-settings-list">
-        {members.map((m) => {
-          const view = changed[m.id] || views[m.id];
-          return (
-            <li key={m.id}>
-              <Avatar bot={{ ...m, color: m.color || '#8e7ca2' }} size={32} />
-              <div className="gp-settings-name">
-                <b>{m.name}</b>
-                <small>{view ? labelOf(view, t) : t('正在读取性格…')}</small>
-              </div>
-              <select
-                aria-label={t('{name} 的人格', { name: m.name })}
-                value={view?.profile.preset || ''}
-                disabled={!view || busy === m.id}
-                onChange={(event) => void choose(m.id, event.target.value)}
-              >
-                <option value="">{t('不使用预设')}</option>
-                {PRESET_IDS.map((id) => (
-                  <option key={id} value={id}>
-                    {PRESETS[id].name}
-                  </option>
-                ))}
-              </select>
-              <button type="button" className="secondary-button" onClick={() => setProfile(m.id)}>
-                {t('人格档案')}
-              </button>
-            </li>
-          );
-        })}
-      </ul>
-      {error && (
-        <p className="group-error" role="alert">
-          {error}
-        </p>
-      )}
-      {profile && <PersonaDialog members={members} botId={profile} onClose={() => setProfile('')} />}
-    </>
   );
 }

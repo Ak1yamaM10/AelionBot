@@ -1,6 +1,5 @@
 import type { LayaFeatureState } from '../../shared/types/laya-types';
 import { GroupDecisionSetting } from './GroupDecisionSetting';
-import { GroupPersonaSettings } from './GroupPersonaPanel';
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import type { Bot } from '../../shared/types/core';
 import { soulSummary } from '../../shared/chat/bot-soul';
@@ -17,7 +16,7 @@ import { Icon } from '../ui/Icon';
 import { ipcErrorText } from '../ui/ipc-error';
 import { useI18n } from '../i18n';
 
-type Tab = 'basic' | 'pace' | 'persona' | 'decide';
+type Tab = 'basic' | 'pace' | 'decide';
 
 /** A whole number within a range, with a 不限制 box when the limit can be turned off (value null). */
 function LimitInput({
@@ -234,7 +233,6 @@ export function GroupEditor({
                 [
                   ['basic', t('基本'), 'settings'],
                   ['pace', t('对话节奏'), 'message'],
-                  ['persona', t('人格'), 'user'],
                   ['decide', t('智能判断'), 'sparkle'],
                 ] as const
               ).map(([id, label, icon]) => (
@@ -403,17 +401,6 @@ export function GroupEditor({
                     })}
                   </p>
                 )}
-              </div>
-            )}
-            {group && tab === 'persona' && (
-              <div>
-                <section className="group-settings-section">
-                  <h3>
-                    {t('人格')}
-                    <small>{t('选好后立即生效；想专心干活的群不设预设就行')}</small>
-                  </h3>
-                  <GroupPersonaSettings members={bots.filter((bot) => ids.includes(bot.id))} />
-                </section>
               </div>
             )}
             {group && (
