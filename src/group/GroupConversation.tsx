@@ -559,6 +559,8 @@ const GroupMessageRow = memo(function GroupMessageRow({
       </>
     );
   if (message.kind === 'reaction') return null;
+  if (message.kind === 'system' && message.id.startsWith('game-result:'))
+    return <GameResultCard content={message.content} />;
   if (message.kind === 'system' || message.kind === 'continue')
     return <div className="event-message group-system">{message.content}</div>;
   const bot =
@@ -631,3 +633,28 @@ const GroupMessageRow = memo(function GroupMessageRow({
     </>
   );
 }, sameProps);
+
+/**
+ * A finished match's report as a card of its own, so several matches in a row read as several results instead of
+ * one live card and a wall of text. The first line is the outcome; the rest folds away.
+ */
+function GameResultCard({ content }: { content: string }) {
+  const { t } = useI18n();
+  const [first = '', ...rest] = content.split('\n');
+  const match = /^(.+?)战报：(.+?)。?$/.exec(first);
+  return (
+    <details className="gg-result-card">
+      <summary>
+        <span className="gg-moon is-day" aria-hidden="true">
+          ☀
+        </span>
+        <span className="gg-result-title">
+          <strong>{match ? t('{game} · 战报', { game: t(match[1]) }) : t('对局战报')}</strong>
+          <small>{match ? match[2] : first}</small>
+        </span>
+        <span className="gg-result-more">{t('详情')}</span>
+      </summary>
+      {rest.length > 0 && <p>{rest.join('\n')}</p>}
+    </details>
+  );
+}

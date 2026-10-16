@@ -2992,4 +2992,6 @@ export const en: Record<string, string> = {
   适用于所有群聊: 'Applies to all group chats',
   当前版本没有本地决策模型: 'This version has no local decision model',
   '{count} 条新消息': '{count} new messages',
+  '{game} · 战报': '{game} · Result',
+  对局战报: 'Match result',
 };
