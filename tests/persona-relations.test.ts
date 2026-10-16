@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { tempDir, until } from './helpers';
+import { inTempDir, until } from './helpers';
 import { PersonaService } from '../electron/core/persona/persona-service';
 import { appraisalModifier, grudgeFactor, parseAppraisal } from '../electron/core/persona/appraisal';
 import { appraiser, groupSocialHooks } from '../electron/core/persona/group-relations';
@@ -8,8 +8,7 @@ import { NEUTRAL } from '../shared/persona/persona-model';
 
 const DAY = 86_400_000;
 function service(t: test.TestContext, now = () => 1_000 * DAY) {
-  const svc = new PersonaService(tempDir(t), now);
-  t.after(() => svc.close());
+  const svc = inTempDir(t, (dir) => new PersonaService(dir, now));
   return svc;
 }
 const event = (over: Record<string, unknown> = {}) => ({

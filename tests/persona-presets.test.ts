@@ -1,14 +1,13 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { tempDir } from './helpers';
+import { inTempDir } from './helpers';
 import { PersonaService } from '../electron/core/persona/persona-service';
 import { PRESETS, PRESET_IDS, contentText } from '../shared/persona/presets';
 import { contentWeight } from '../electron/core/persona/appraisal';
 
 const DAY = 86_400_000;
 function service(t: test.TestContext) {
-  const svc = new PersonaService(tempDir(t), () => 1_000 * DAY);
-  t.after(() => svc.close());
+  const svc = inTempDir(t, (dir) => new PersonaService(dir, () => 1_000 * DAY));
   return svc;
 }
 const names = (id: string) => ({ user: '何梓鸿', b: '小周' })[id];

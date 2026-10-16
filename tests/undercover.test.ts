@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { tempDir, until } from './helpers';
+import { inTempDir, tempDir, until } from './helpers';
 import {
   acceptUndercover,
   createUndercover,
@@ -237,8 +237,7 @@ test('the finished match reaches the persona module as plain facts', () => {
 
 test("the runtime plays Who's the Spy with model seats, settles it and keeps observations", async (t) => {
   const dir = tempDir(t);
-  const persona = new PersonaService(tempDir(t));
-  t.after(() => persona.close());
+  const persona = inTempDir(t, (dir) => new PersonaService(dir));
   const decide: Decide = async (_player, context, request, _signal, options) => {
     // As the real providers do: report the exact input this seat was sent.
     options?.onRequest?.({ input: undercoverPrompt(context, request), instruction: '', config: { model: 'test' } });

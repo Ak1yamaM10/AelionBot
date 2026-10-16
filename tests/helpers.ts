@@ -46,5 +46,21 @@ export function tempDir(t: test.TestContext, prefix = 'aelion-test-'): string {
   return dir;
 }
 
+/**
+ * A resource that keeps files open in its own temp folder, such as a SQLite store. It is closed before the folder
+ * is removed: Windows refuses to delete a file that is still open.
+ */
+export function inTempDir<T extends { close(): unknown }>(t: test.TestContext, open: (dir: string) => T): T {
+  const parent = realpathSync.native(tmpdir()),
+    dir = mkdtempSync(join(parent, 'aelion-test-')),
+    resource = open(dir);
+  t.after(() => {
+    resource.close();
+    if (dirname(dir) !== parent) throw new Error(`Refusing to remove ${dir}`);
+    rmSync(dir, { recursive: true, force: true });
+  });
+  return resource;
+}
+
 /** A final model answer with no tool calls. */
 export const answer = (content: string): Completion => ({ content, calls: [], finishReason: 'stop' });
