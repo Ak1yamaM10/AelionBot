@@ -256,7 +256,8 @@ export class PersonaService {
       const p = this.ensureProfile(b.botId, b.mbti);
       const affinity: Record<string, number> = {};
       for (const m of members) if (m !== b.botId) affinity[m] = this.affinity(b.botId, m, p.traits.N);
-      out[b.botId] = { traits: p.traits, lastPlans: p.lastPlans, affinity };
+      const voice = contentText(p, () => undefined, 'rate').trim();
+      out[b.botId] = { traits: p.traits, lastPlans: p.lastPlans, affinity, ...(voice ? { voice } : {}) };
     }
     return out;
   }

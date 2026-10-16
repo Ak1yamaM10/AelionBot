@@ -238,9 +238,13 @@ test('the finished match reaches the persona module as plain facts', () => {
 test("the runtime plays Who's the Spy with model seats, settles it and keeps observations", async (t) => {
   const dir = tempDir(t);
   const persona = inTempDir(t, (dir) => new PersonaService(dir));
+  persona.applyPreset('bot0', 'queshi');
+  const inputs: string[] = [];
   const decide: Decide = async (_player, context, request, _signal, options) => {
     // As the real providers do: report the exact input this seat was sent.
-    options?.onRequest?.({ input: undercoverPrompt(context, request), instruction: '', config: { model: 'test' } });
+    const input = undercoverPrompt(context, request);
+    inputs.push(JSON.stringify(input));
+    options?.onRequest?.({ input, instruction: '', config: { model: 'test' } });
     if (request.kind === 'describe') return { text: '一个常见的东西', note: '先说得含糊一点。' };
     if (request.kind === 'blank_guess') return { text: '不知道' };
     return { target: request.targets[0], note: '投给第一个可选的人。' };
@@ -262,6 +266,14 @@ test("the runtime plays Who's the Spy with model seats, settles it and keeps obs
   assert.ok(match.winner);
   assert.equal(Object.keys(match.persona || {}).length, 3, 'every member Bot plays with its persona');
   assert.ok(Object.values(match.persona!).every((p) => ['直白描述', '含糊描述'].includes(p.plan!.name)));
+  const queshi = Object.values(match.persona!).find((p) => p.botId === 'bot0')!;
+  assert.match(queshi.voice!, /口头禅：「确实」/, "a preset's voice travels with its seat");
+  assert.match(queshi.voice!, /大约每 1 次发言用一次/);
+  assert.ok(
+    inputs.some((i) => i.includes('voice') && i.includes('口头禅：「确实」')),
+    "and reaches that seat's prompt",
+  );
+  assert.equal(Object.values(match.persona!).filter((p) => p.voice).length, 1, 'Bots without contents have no voice');
   const report = runtime.read('g')!;
   assert.equal(report.status, 'finished');
   assert.ok(report.words?.civilian && report.words.undercover, 'the words are revealed at the end');

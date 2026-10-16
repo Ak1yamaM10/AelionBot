@@ -305,7 +305,12 @@ const level = (v: number, low: string, mid: string, high: string) => (v >= 0.7 ?
  * The contents as instructions for the reply model. Only fields that differ from an ordinary middle value are
  * mentioned, so a Bot without a preset gets nothing here. A preset also asks for exaggerated play.
  */
-export function contentText(c: PersonaContent & { preset?: PresetId }, nameOf: (id: string) => string | undefined) {
+export function contentText(
+  c: PersonaContent & { preset?: PresetId },
+  nameOf: (id: string) => string | undefined,
+  /** Group chat decides each turn's catchphrase; a game seat is told its usual rate instead. */
+  pacing: 'turn' | 'rate' = 'turn',
+) {
   const lines: string[] = [];
   if (c.motives) {
     const wants = [
@@ -344,7 +349,10 @@ export function contentText(c: PersonaContent & { preset?: PresetId }, nameOf: (
     if (e.verbosity <= 0.1) lines.push('回复极短，通常只有几个字。');
     if (e.catchphrases.length)
       lines.push(
-        `口头禅：${e.catchphrases.map((p) => `「${p}」`).join('')}。每一轮要不要用、用哪个，会在本轮信息里告诉你。`,
+        `口头禅：${e.catchphrases.map((p) => `「${p}」`).join('')}。` +
+          (pacing === 'turn'
+            ? '每一轮要不要用、用哪个，会在本轮信息里告诉你。'
+            : `大约每 ${Math.max(1, Math.round(1 / catchphraseRate(c)))} 次发言用一次，轮换着用，不要每句都一样。`),
       );
     if (e.exaggeration >= 0.8) lines.push('这是夸张化的网络人格，演得越像梗越好，但仍然要回应具体内容。');
   }

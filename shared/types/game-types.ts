@@ -130,6 +130,8 @@ interface GameSeatPersona {
   traits: import('../persona/persona-model').Traits;
   mbti: string;
   plan?: { id: string; name: string; detail: string };
+  /** How it talks: a preset's habits and catchphrases. */
+  voice?: string;
   /** Key decisions where personality chose a reasonable alternative to the model's first pick. */
   overrides?: number;
 }
