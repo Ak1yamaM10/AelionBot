@@ -312,6 +312,42 @@
   gap: 4px;
   cursor: pointer;
 }
+.gp-settings-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.gp-settings-list > li {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 0;
+}
+.gp-settings-name {
+  display: flex;
+  flex: 1;
+  min-width: 0;
+  flex-direction: column;
+  gap: 3px;
+  font-size: calc(13px * var(--appearance-text-scale, 1));
+}
+.gp-settings-name small {
+  color: light-dark(#8c939c, #bdbac0);
+  font-size: calc(12px * var(--appearance-text-scale, 1));
+}
+.gp-settings-list select {
+  flex: none;
+  padding: 6px 8px;
+  border: 1px solid light-dark(#e6e7e9, #3e3945);
+  border-radius: 8px;
+  background: light-dark(#fff, #201e24);
+  color: inherit;
+  font: inherit;
+  font-size: calc(12px * var(--appearance-text-scale, 1));
+}
 .group-settings-note {
   display: flex;
   align-items: flex-start;

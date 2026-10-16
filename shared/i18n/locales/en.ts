@@ -2993,4 +2993,7 @@ export const en: Record<string, string> = {
   谁来回应: 'Who responds',
   适用于所有群聊: 'Applies to all group chats',
   当前版本没有本地决策模型: 'This version has no local decision model',
+  '{name} 的人格': 'Personality of {name}',
+  '选好后立即生效；想专心干活的群不设预设就行':
+    'Takes effect right away; for a group that is only for work, leave every member without a preset',
 };
