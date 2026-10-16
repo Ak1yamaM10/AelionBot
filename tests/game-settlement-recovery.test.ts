@@ -4,6 +4,7 @@ import { mkdirSync, mkdtempSync, readFileSync, writeFileSync, rmSync } from 'nod
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { GameRuntime, type GameHooks } from '../electron/core/games/runtime';
+import type { AnyMatch } from '../electron/core/games/modes';
 import { createWerewolf, acceptAction, view, type WerewolfState } from '../electron/core/games/werewolf';
 import { gamePrompt } from '../electron/core/games/model-player';
 import { assignPersonas } from '../electron/core/games/persona-play';
@@ -12,6 +13,7 @@ import { PersonaService } from '../electron/core/persona/persona-service';
 import { GroupChats } from '../electron/core/group/group-chats';
 import { Store } from '../electron/core/storage/store';
 import type { GameAction, GameRequest } from '../shared/types/game-types';
+import { werewolfFacts } from '../electron/core/games/werewolf-facts';
 
 const players = Array.from({ length: 7 }, (_, i) => ({
   id: String(i),
@@ -111,7 +113,7 @@ test('startup completes a match saved before the finished callback and acknowled
     f = fixture(t, [match]);
   const completed: string[] = [];
   const hooks = {
-    finished: (s: WerewolfState) => {
+    finished: (s: AnyMatch) => {
       completed.push(s.id);
     },
   };
@@ -292,7 +294,7 @@ for (const boundary of ['settled', 'growth', 'report'] as const)
     const f = services(t);
     const deliveriesBefore = f.store.data.groupDeliveries.length;
     let interrupted = false;
-    const finished = (s: WerewolfState) => {
+    const finished = (s: AnyMatch) => {
       if (!interrupted) {
         interrupted = true;
         if (boundary === 'settled') {
@@ -373,7 +375,7 @@ test('a finished match waits for downstream startup and cancelled matches produc
 
 test('legacy completion adopts an already published unkeyed report but explicit pending matches still publish', async (t) => {
   const f = services(t);
-  const report = f.persona.settle({ ...f.match, events: f.match.events || [] })!;
+  const report = f.persona.settle(werewolfFacts({ ...f.match, events: f.match.events || [] }))!;
   f.groups.postGameResult(f.room.id, report);
   const oldMessageId = f.room.messages.at(-1)!.id;
   const first = f.open({ finished: (s) => settleFinishedGame(s, f.persona, f.groups) });

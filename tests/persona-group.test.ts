@@ -7,6 +7,7 @@ import { Store } from '../electron/core/storage/store';
 import { GroupChats } from '../electron/core/group/group-chats';
 import { PersonaService } from '../electron/core/persona/persona-service';
 import { until } from './helpers';
+import { werewolfFacts } from '../electron/core/games/werewolf-facts';
 
 function fixture(t: test.TestContext) {
   const dir = mkdtempSync(join(tmpdir(), 'aelion-persona-group-'));
@@ -18,7 +19,7 @@ function fixture(t: test.TestContext) {
     {
       isRunning: () => false,
       run: async (_id, _input, options) => {
-        contexts.push(options?.groupContext || '');
+        contexts.push((options?.groupPersona || '') + (options?.groupTurn || ''));
       },
       cancel: () => {},
     },
@@ -26,7 +27,7 @@ function fixture(t: test.TestContext) {
     undefined,
     undefined,
     undefined,
-    (botId, people) => persona.groupStyle(botId) + persona.groupFragment(botId, people),
+    (botId, people) => ({ style: persona.groupStyle(botId), people: persona.groupFragment(botId, people) }),
   );
   groups.start();
   t.after(() => {
@@ -57,17 +58,19 @@ test('a woken Bot receives its relation and one shared memory about the sender',
   const a = store.createBot('阿岩', 'bold', '#aa5500'),
     b = store.createBot('小周', 'calm', '#0055aa');
   const room = groups.create({ name: '狼人杀群', botIds: [a.id, b.id] });
-  persona.settle({
-    id: 'm1',
-    groupId: room.id,
-    winner: 'village',
-    seats: [
-      { id: 's1', name: '1号', human: false, botId: a.id, role: 'wolf' },
-      { id: 's2', name: '2号', human: false, botId: b.id, role: 'wolf' },
-      { id: 's3', name: '3号', human: true, role: 'villager' },
-    ],
-    events: [{ type: 'save', day: 1, witchId: 's3', seatId: 's1' }],
-  });
+  persona.settle(
+    werewolfFacts({
+      id: 'm1',
+      groupId: room.id,
+      winner: 'village',
+      seats: [
+        { id: 's1', name: '1号', human: false, botId: a.id, role: 'wolf' },
+        { id: 's2', name: '2号', human: false, botId: b.id, role: 'wolf' },
+        { id: 's3', name: '3号', human: true, role: 'villager' },
+      ],
+      events: [{ type: 'save', day: 1, witchId: 's3', seatId: 's1' }],
+    }),
+  );
   groups.send({ id: room.id, message: '上局怎么样' });
   await until(() => contexts.length > 0, { timeoutMs: 5000 });
   assert.ok(
@@ -98,4 +101,46 @@ test('a Bot with a personality profile speaks in its own style in the group; one
     contexts.some((c) => c.includes('发言不超过 198 字')),
     'the style reaches the group run',
   );
+});
+
+test('messages aimed at Bots by @, by reply or by name reach the persona module; others do not', async (t) => {
+  const dir = mkdtempSync(join(tmpdir(), 'aelion-persona-social-'));
+  const store = new Store(dir);
+  const aimed: { sender: string; targets: string[]; text: string }[] = [],
+    joined: string[][] = [];
+  const groups = new GroupChats(
+    store,
+    { isRunning: () => false, run: async () => {}, cancel: () => {} },
+    () => {},
+    undefined,
+    undefined,
+    undefined,
+    undefined,
+    {
+      joined: (ids) => joined.push(ids),
+      aimed: (e) => aimed.push({ sender: e.sender.id, targets: e.targets.map((x) => x.name), text: e.text }),
+    },
+  );
+  groups.start();
+  t.after(() => {
+    groups.dispose();
+    store.close();
+    rmSync(dir, { recursive: true, force: true });
+  });
+  const a = store.createBot('阿岩', 'bold', '#aa5500'),
+    b = store.createBot('小周', 'calm', '#0055aa');
+  const room = groups.create({ name: '闲聊群', botIds: [a.id, b.id] });
+  assert.deepEqual(joined, [[a.id, b.id]], 'members of a new group are reported');
+  groups.send({ id: room.id, message: '大家早' });
+  groups.send({ id: room.id, message: '阿岩你今天好笨' });
+  groups.send({
+    id: room.id,
+    message: '@小周 帮我看看',
+    mentions: [{ id: b.id, name: b.name, color: b.color, start: 0, end: 3 }],
+  });
+  await until(() => aimed.length >= 2, { timeoutMs: 5000 });
+  assert.deepEqual(aimed, [
+    { sender: 'user', targets: ['阿岩'], text: '阿岩你今天好笨' },
+    { sender: 'user', targets: ['小周'], text: '@小周 帮我看看' },
+  ]);
 });

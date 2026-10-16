@@ -1,7 +1,13 @@
 import { validMarkRefs, type PreviewMarkRef } from '../../../shared/preview/preview-annotations';
 import { buildGroupDecisionInput, type GroupDecisions } from './laya-decision';
 import { previewFeedbackDisplay } from '../../../shared/preview/preview-feedback';
-import { groupEventPrompt, groupMustAnswerNote, groupReviewNote, GROUP_STATE_EVENT_PROMPT } from './group-prompt';
+import {
+  groupEventPrompt,
+  groupMustAnswerNote,
+  groupRequestsContext,
+  groupReviewNote,
+  GROUP_STATE_EVENT_PROMPT,
+} from './group-prompt';
 import { addressedTo, answerFrom, botMessageCount, noticed, sinceUser, triage } from './group-triage';
 import { isGroupAnswer, replyTarget } from '../../../shared/chat/group-answers';
 import { userDisplayName } from '../../../shared/chat/user-profile';
@@ -71,6 +77,20 @@ interface Worker {
 type FinalReplyDecision = { kind: 'silent' } | { kind: 'publish'; content: string };
 const now = () => new Date().toISOString();
 const identity = botIdentity;
+/** What the persona module learns from group activity. Both calls are fire-and-forget. */
+export interface GroupSocialHooks {
+  /** Bots that joined a group, including when it is created. */
+  joined?(botIds: string[]): void;
+  /** A member's message aimed at other Bots was published. */
+  aimed?(event: {
+    groupId: string;
+    messageId: string;
+    sender: { id: string; name: string };
+    targets: { id: string; name: string }[];
+    text: string;
+    repliedTo?: string;
+  }): void;
+}
 const human: GroupSender = { kind: 'user', id: 'user', name: '你' };
 const system: GroupSender = { kind: 'system', id: 'system', name: '系统' };
 function required(value: unknown, label: string, max: number) {
@@ -125,7 +145,10 @@ export class GroupChats implements GroupGateway {
     private host?: HostComputer,
     private laya?: GroupDecisions,
     /** Persona lines (affinity, shared memories) appended to a Bot's group context; empty string when none. */
-    private persona?: (botId: string, people: { id: string; name: string }[]) => string,
+    /** A member's speaking style, which rarely changes, and its feelings about the people in one message. */
+    private persona?: (botId: string, people: { id: string; name: string }[]) => { style: string; people: string },
+    /** Social events the persona module learns from: who joined, and messages aimed at other members. */
+    private social?: GroupSocialHooks,
   ) {
     // Publication may commit just before the process exits, before the inbox receipt is saved.
     const recovering = store.data.groupDeliveries.filter(pendingOrResumable);
@@ -768,6 +791,7 @@ export class GroupChats implements GroupGateway {
     };
     room.messages.push(message);
     rememberPublished(this.store, message);
+    if (kind === 'message' && sender.kind !== 'system' && this.social?.aimed) this.reportAimed(room, message);
     room.updatedAt = message.time;
     if (round) {
       const current = this.store.data.groupRounds.findIndex((r) => r.id === room.activeRootId);
@@ -790,6 +814,40 @@ export class GroupChats implements GroupGateway {
     }
     return message;
   }
+  /**
+   * Tell the persona module about a message aimed at other Bots: by @, by replying to their message, or by
+   * naming them (names of two or more characters, so a short name inside a word does not count).
+   */
+  private reportAimed(room: GroupRoom, message: GroupMessage) {
+    const text =
+      message.sender.kind === 'bot' ? groupReplyContent(message.content, message.sender.id) : message.content;
+    if (!text.trim()) return;
+    const members = this.members(room).filter((member) => member.id !== message.sender.id);
+    const replied = room.messages.find((item) => item.id === replyTarget(message));
+    const targets = members.filter(
+      (member) =>
+        message.mentions?.some((mention) => mention.id === member.id) ||
+        replied?.sender.id === member.id ||
+        (member.name.length > 1 && text.includes(member.name)),
+    );
+    if (!targets.length) return;
+    const input = {
+      groupId: room.id,
+      messageId: message.id,
+      sender: { id: message.sender.id, name: message.sender.name },
+      targets: targets.map((member) => ({ id: member.id, name: member.name })),
+      text,
+      ...(replied ? { repliedTo: replied.content.slice(0, 300) } : {}),
+    };
+    // After the message is saved; appraisal must never hold up or fail publication.
+    queueMicrotask(() => {
+      try {
+        this.social?.aimed?.(input);
+      } catch {
+        // Relationship bookkeeping is optional context.
+      }
+    });
+  }
   private lifecycle(room: GroupRoom, content: string, event: Omit<GroupLifecycleEvent, 'members'>, round?: GroupRound) {
     round ||= this.store.data.groupRounds.find((item) => item.id === room.activeRootId && item.status === 'active');
     round ||= this.newRound(room, `群状态变化：${content}。这是成员关系通知，不是新的工作任务或操作授权。`);
@@ -809,6 +867,7 @@ export class GroupChats implements GroupGateway {
       lastReadSeq: 0,
     };
     this.store.data.groups.push(room);
+    this.social?.joined?.(bots.map((bot) => bot.id));
     this.lifecycle(
       room,
       `${sender.name} 创建了群聊`,
@@ -852,6 +911,7 @@ export class GroupChats implements GroupGateway {
       room.name = name;
       this.append(room, system, `群名称改为「${name}」`);
     }
+    if (joined.length) this.social?.joined?.(joined.map((bot) => bot.id));
     if (joined.length || left.length) {
       const content = [
         joined.length ? `${joined.map((bot) => bot.name).join('、')} 加入了群聊` : '',
@@ -1011,7 +1071,7 @@ export class GroupChats implements GroupGateway {
     this.changed();
   }
   private personaContext(room: GroupRoom, botId: string, message?: GroupMessage) {
-    if (!this.persona || !message) return '';
+    if (!this.persona || !message) return { style: '', people: '' };
     const people: { id: string; name: string }[] = [];
     const add = (id: string, name: string) => {
       if (id !== botId && !people.some((p) => p.id === id)) people.push({ id, name });
@@ -1023,7 +1083,7 @@ export class GroupChats implements GroupGateway {
       // Called even when nobody else is involved: the Bot's own speaking style still applies.
       return this.persona(botId, people);
     } catch {
-      return ''; // persona data is optional context; its failure must not block a reply
+      return { style: '', people: '' }; // persona data is optional context; its failure must not block a reply
     }
   }
   schedule(id: string, prompt: string, scheduled: ScheduledTrigger) {
@@ -1574,7 +1634,6 @@ export class GroupChats implements GroupGateway {
       room.id,
       bot.name,
       this.identities(room).map((m) => ({ id: m.id, name: m.name })),
-      requests,
     );
     const lastMessage = room.messages.find((m) => m.id === deliveries.at(-1)?.messageId),
       workItem = lastMessage?.workItemId
@@ -1583,6 +1642,7 @@ export class GroupChats implements GroupGateway {
           )
         : undefined;
     const names = new Map(this.identities(room).map((member) => [member.id, member.name]));
+    const persona = this.personaContext(room, bot.id, lastMessage);
     await this.runner.run(
       bot.id,
       JSON.stringify({
@@ -1619,7 +1679,9 @@ export class GroupChats implements GroupGateway {
           lastMessage?.workspaceDir ||
           effectiveWorkspace(this.store, this.host, { kind: 'group', id: room.id }),
         groupOrigin: { groupId: room.id, rootId: round.id, deliveryId: deliveries.at(-1)!.id },
-        groupContext: context + GROUP_STATE_EVENT_PROMPT + this.personaContext(room, bot.id, lastMessage),
+        groupContext: context + GROUP_STATE_EVENT_PROMPT,
+        groupPersona: persona.style,
+        groupTurn: groupRequestsContext(requests) + persona.people,
         groupTaskFrom: previousRun?.id,
         onStarted: (id) => {
           worker.runId = id;

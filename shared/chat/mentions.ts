@@ -53,6 +53,17 @@ export function validMentions(content: string, mentions: BotMention[] = []) {
   });
 }
 
+// Chinese and Japanese put no space after a name, so「@小周你看」addresses 小周. A name only runs on into the next
+// word when both sides are letters of a spaced script, as in「@Alice」inside「@Alicebob」, or before a file suffix.
+const SPACED_WORD = /[\p{L}\p{N}_]/u,
+  UNSPACED = /[\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}]/u;
+const continues = (name: string, rest: string) => {
+  if (/^\.[a-zA-Z]/.test(rest)) return true;
+  const last = name.at(-1) || '',
+    next = rest[0] || '';
+  return SPACED_WORD.test(next) && !UNSPACED.test(next) && SPACED_WORD.test(last) && !UNSPACED.test(last);
+};
+
 /** Bot replies can address a unique @name, or use @{id} for an exact identity. */
 export function botMentions(
   input: string,
@@ -88,7 +99,7 @@ export function botMentions(
       const name = names.find(
         (name) =>
           input.startsWith(name, at + 1) &&
-          !/^[\p{L}\p{N}_]|^\.[a-zA-Z]/u.test(input.slice(at + 1 + name.length)) &&
+          !continues(name, input.slice(at + 1 + name.length)) &&
           !inside(at, at + 1 + name.length),
       );
       if (name) {

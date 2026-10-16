@@ -6,6 +6,7 @@ import type { GameMbti } from '../../shared/games/game-personality';
 import { Avatar } from '../ui/Avatar';
 import { Icon } from '../ui/Icon';
 import { useI18n } from '../i18n';
+import { PRESETS, PRESET_IDS } from '../../shared/persona/presets';
 import {
   TRAIT_POLES,
   dateText,
@@ -275,6 +276,7 @@ export function PersonaPage({
               <p className={`gp-status ${view.profile.confirmed ? '' : 'is-draft'}`}>
                 {!view.profile.confirmed && <span>{t('初稿')}</span>}
                 {view.profile.locked && <span>{t('成长已锁定')}</span>}
+                {view.profile.preset && <span>{PRESETS[view.profile.preset].name}</span>}
               </p>
             </div>
             <div className="gp-actions">
@@ -343,6 +345,54 @@ export function PersonaPage({
           )}
           <div className="gp-layout">
             <div className="gp-main" hidden={section !== 'personality' && section !== 'growth'}>
+              <section className="gp-section gp-presets" hidden={section !== 'personality'} aria-label={t('人格预设')}>
+                <header className="gp-section-head">
+                  <h2>{t('人格预设')}</h2>
+                  <small className="gg-muted">{t('网络经典人格的夸张演绎，娱乐用，不是诊断')}</small>
+                </header>
+                <div className="gp-preset-list" role="radiogroup" aria-label={t('人格预设')}>
+                  {[...PRESET_IDS, '' as const].map((id) => (
+                    <button
+                      key={id || 'none'}
+                      type="button"
+                      role="radio"
+                      aria-checked={(view.profile.preset || '') === id}
+                      className={`gp-preset ${(view.profile.preset || '') === id ? 'is-on' : ''}`}
+                      disabled={!!busy || !!draft}
+                      title={id ? t(PRESETS[id].summary) : t('不使用预设，保留现在的性格数值')}
+                      onClick={() => void update({ action: 'preset', preset: id }, 'preset')}
+                    >
+                      {id ? PRESETS[id].name : t('无预设')}
+                    </button>
+                  ))}
+                </div>
+                {view.profile.preset && <p className="gp-preset-summary">{t(PRESETS[view.profile.preset].summary)}</p>}
+                {view.profile.focus && (
+                  <label className="gp-preset-focus">
+                    {t('心思全在')}
+                    <select
+                      value={view.profile.focus}
+                      disabled={!!busy}
+                      onChange={(e) =>
+                        void update(
+                          { action: 'preset', preset: view.profile.preset || 'simp', focus: e.target.value },
+                          'preset',
+                        )
+                      }
+                    >
+                      <option value="user">{t('你')}</option>
+                      {members
+                        .filter((m) => m.id !== member.id)
+                        .map((m) => (
+                          <option key={m.id} value={m.id}>
+                            {m.name}
+                          </option>
+                        ))}
+                    </select>
+                    {t('身上')}
+                  </label>
+                )}
+              </section>
               <section
                 className="gp-section gp-personality"
                 hidden={section !== 'personality'}

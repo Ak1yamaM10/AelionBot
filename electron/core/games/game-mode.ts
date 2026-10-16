@@ -15,12 +15,15 @@ import type {
   GameTrace,
   GameView,
 } from '../../../shared/types/game-types';
+import type { MatchFacts } from '../persona/match-facts';
 import type { PersonaDecision, PersonaSeed, SeatPersona } from './persona-play';
 
 /** Fields every match has, whatever the game. Game-specific state lives in the mode's own fields. */
 export interface MatchState {
   /** Missing on matches saved before game modes existed; those are all Werewolf. */
   mode?: GameModeId;
+  /** Winning team. Missing while running and when the match was stopped without a result. */
+  winner?: string;
   id: string;
   groupId: string;
   day: number;
@@ -62,7 +65,7 @@ export interface GameMode<S extends MatchState = MatchState> {
   /** Throws when this game cannot be played with this many seats. Checked before anything else. */
   checkSeats(count: number): void;
   /** Start a match. Throws when the players or options do not fit this game. */
-  create(input: { groupId: string; players: GamePlayer[]; board?: GameView['board'] }): S;
+  create(input: { groupId: string; players: GamePlayer[]; board?: GameView['board']; blank?: boolean }): S;
   /** Rule description recorded in the run record when the match is created. */
   describe(s: S, aiTimeoutMs: number): string;
   validate(s: S, request: GameRequest, action: GameAction): void;
@@ -74,6 +77,8 @@ export interface GameMode<S extends MatchState = MatchState> {
   instructions(context: GameView, request: GameRequest): string;
   prompt(context: GameView, request: GameRequest): string;
   skills(context: GameView, request: GameRequest): GameSkill[];
+  /** The finished match in the persona module's terms (docs/ai-party-games-design.md §2.2). */
+  facts(s: S): MatchFacts;
   /** Personality hooks: an opening plan per Bot seat, and a choice among reasonable candidates. */
   persona?: {
     assign(s: S, seeds: Record<string, PersonaSeed>): void;
@@ -89,4 +94,36 @@ export interface GameMode<S extends MatchState = MatchState> {
 
 export function log(s: MatchState, text: string, seatId?: string, audience?: string[]) {
   s.logs.push({ id: s.logs.length + 1, day: s.day, phase: s.phase, text, seatId, audience, time: Date.now() });
+}
+/** Persona of Bot seats in a view: the viewer's own while running, every seat's after the reveal. */
+export function personaView(s: MatchState, viewerId: string | undefined, reveal: boolean) {
+  if (!s.persona) return {};
+  const persona: NonNullable<GameView['persona']> = {};
+  for (const [seatId, p] of Object.entries(s.persona))
+    if (reveal || seatId === viewerId)
+      persona[seatId] = {
+        botId: p.botId,
+        traits: p.traits,
+        mbti: p.mbti,
+        ...(p.plan ? { plan: { id: p.plan.id, name: p.plan.name, detail: p.plan.detail } } : {}),
+        ...(reveal ? { overrides: (s.decisions || []).filter((d) => d.seatId === seatId && d.overridden).length } : {}),
+      };
+  return Object.keys(persona).length ? { persona } : {};
+}
+/**
+ * The log as one seat may read it: shared lines, and private lines addressed to it. After the reveal everyone reads
+ * everything, and other seats' private system lines are labelled with whose they were.
+ */
+export function viewLogs(s: MatchState, viewerId: string | undefined, reveal: boolean): GameView['logs'] {
+  return s.logs
+    .filter((e) => !e.audience || reveal || (!!viewerId && e.audience.includes(viewerId)))
+    .map(({ audience, ...e }) => {
+      const otherPrivate = reveal && audience && !e.seatId && !(viewerId && audience.includes(viewerId));
+      const owners = audience?.map((id) => s.seats.find((p) => p.id === id)?.name || '玩家').join('、');
+      return {
+        ...e,
+        text: otherPrivate ? `【${owners} · 私有记录】${e.text.replace(/^你/, owners || '该玩家')}` : e.text,
+        scope: audience ? ('personal' as const) : ('shared' as const),
+      };
+    });
 }

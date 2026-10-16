@@ -2,23 +2,24 @@ import { PersonaStore, type AffinityModifier, type PersonaProfile } from './pers
 import type { PersonaView } from '../../../shared/types/persona-types';
 import type { GrowthObservation } from '../../../shared/types/persona-growth-types';
 import { GrowthRunner, type GrowthReviewerHooks } from './growth-runner';
-import { settleMatch, type SettleMatch } from './settle';
-import { matchExperiences } from './growth';
-import { birthPrompt, traitsFromFacets } from './birth';
+import { settleMatch } from './settle';
+import type { MatchFacts } from './match-facts';
+import { APPRAISAL_KINDS, appraisalModifier, contentWeight, type Appraisal, type AppraisalType } from './appraisal';
+import { birthPrompt, facetsFrom } from './birth';
+import { PRESETS, contentText, isPresetId } from '../../../shared/persona/presets';
 import {
   NEUTRAL,
   TRAITS,
   clip,
   growthStep,
   mbtiOf,
-  planRole,
   roundTraits,
   styleText,
   tendencies,
   traitsFromMbti,
   type Traits,
 } from '../../../shared/persona/persona-model';
-import type { PersonaDecision, PersonaSeed, SeatPersona } from '../games/persona-play';
+import type { PersonaSeed } from '../games/persona-play';
 
 const DAY = 86_400_000;
 /** Neutral neuroticism for Bots without a profile (§11.2). */
@@ -41,15 +42,12 @@ function affinityWord(v: number) {
   return v >= 0.5 ? '很好' : v >= 0.15 ? '不错' : v <= -0.5 ? '很差' : v <= -0.15 ? '有芥蒂' : undefined;
 }
 
-export interface PersonaMatch extends SettleMatch {
-  decisions?: PersonaDecision[];
-  persona?: Record<string, SeatPersona>;
-}
 const dayStart = (t: number) => t - (t % DAY);
 
 export class PersonaService {
   readonly store: PersonaStore;
   private growthRunner: GrowthRunner;
+  private estimating = new Set<string>();
   constructor(
     dir: string,
     private now: () => number = Date.now,
@@ -76,14 +74,12 @@ export class PersonaService {
     return this.view(botId);
   }
   /** Settle a finished match once. Returns the recap to post, or undefined when nothing is posted. */
-  settle(match: PersonaMatch, options?: { replayReport?: boolean }): string | undefined {
-    const seatOrder = match.seats.map((seat) => seat.id);
+  settle(match: MatchFacts, options?: { replayReport?: boolean }): string | undefined {
     // Matches retain their original seats after a Bot is deleted. Do not let a
     // delayed settlement restore that member in anyone's persistent memories.
-    match = {
-      ...match,
-      seats: match.seats.filter((seat) => !this.store.isForgotten(seat.human ? 'user' : seat.botId || '')),
-    };
+    const seats = match.seats.filter((seat) => !this.store.isForgotten(seat.human ? 'user' : seat.botId || ''));
+    const present = new Set(seats.map((seat) => seat.id));
+    match = { ...match, seats, experiences: match.experiences.filter((e) => e.seats.every((id) => present.has(id))) };
     if (!match.seats.some((s) => s.botId)) return undefined;
     const result = settleMatch(match);
     if (!result) return undefined;
@@ -93,20 +89,81 @@ export class PersonaService {
       for (const a of result.affinity) this.store.addAffinity({ ...a, createdAt: at });
       for (const h of result.highlights)
         this.store.addHighlight({ ...h, scope: 'match', sourceId: match.id, groupId: match.groupId, createdAt: at });
-      this.grow(match, at, seatOrder);
+      this.grow(match, at);
       return result.recap;
     });
   }
 
+  /**
+   * A message aimed at this Bot changed how it feels about the sender (群聊人格方案 §3.6). Adds one decaying modifier;
+   * the same kind of event between the same two members counts once a day. A new offence while a grudge is still
+   * running extends that grudge once by half (rumination slows forgiveness); an apology halves what is left of
+   * every running grudge towards the sender. Insults, offences, help and apologies are also remembered with the
+   * sender's words, so the Bot can bring them up later.
+   */
+  appraise(e: {
+    botId: string;
+    actorId: string;
+    actorName: string;
+    appraisal: Appraisal;
+    quote: string;
+    groupId: string;
+    sourceId: string;
+  }) {
+    if (e.botId === e.actorId || this.store.isForgotten(e.botId) || this.store.isForgotten(e.actorId)) return;
+    const profile = this.store.profile(e.botId);
+    const base = appraisalModifier(e.appraisal, profile?.traits || NEUTRAL);
+    if (!base) return;
+    const type = e.appraisal.type as Exclude<AppraisalType, 'none'>;
+    const weighted = base.value * contentWeight(type, base.value, profile || {}, e.actorId);
+    const change = { ...base, value: Math.round(Math.max(-1, Math.min(1, weighted)) * 1000) / 1000 };
+    if (!change.value) return;
+    const at = this.now();
+    const held = this.store.affinity(e.botId, e.actorId);
+    if (held.some((m) => m.source.startsWith(`chat:${type}:`) && m.createdAt >= dayStart(at))) return;
+    const running = held.filter((m) => m.value < 0 && m.createdAt + m.durationDays * DAY > at);
+    this.store.transaction(() => {
+      if (change.value < 0) {
+        const last = running.filter((m) => !m.source.endsWith(':ruminated')).at(-1);
+        if (last) this.store.updateAffinity(last.id, last.durationDays * 1.5, last.source + ':ruminated');
+      }
+      if (type === 'apology')
+        for (const m of running) {
+          const left = m.createdAt + m.durationDays * DAY - at;
+          this.store.updateAffinity(m.id, (at - m.createdAt + left / 2) / DAY, m.source);
+        }
+      this.store.addAffinity({
+        botId: e.botId,
+        targetId: e.actorId,
+        value: change.value,
+        durationDays: change.durationDays,
+        createdAt: at,
+        source: `chat:${type}:${e.sourceId}`,
+      });
+      if (type !== 'thanks' && type !== 'argument')
+        this.store.addHighlight({
+          botId: e.botId,
+          participants: [e.actorId],
+          // The human without a display name is shown as 你 in the group; in the Bot's own memory that would read 「你骂了你」.
+          summary: `${e.actorName === '你' ? '用户' : e.actorName}${APPRAISAL_KINDS[type].verb}：「${e.quote.slice(0, 40)}${e.quote.length > 40 ? '…' : ''}」`,
+          type: `chat_${type}`,
+          scope: 'group',
+          sourceId: e.sourceId,
+          groupId: e.groupId,
+          createdAt: at,
+        });
+    });
+    return change;
+  }
   /** Remember factual episodes; only legacy experiences use outcome-based growth. Remember the opening plan too. */
-  private grow(match: PersonaMatch, at: number, seatOrder: string[]) {
+  private grow(match: MatchFacts, at: number) {
     if (!match.persona) return;
-    const experiences = matchExperiences(match.seats, match.decisions || [], match.events, seatOrder);
+    const experiences = match.experiences;
     for (const [seatId, sp] of Object.entries(match.persona)) {
       const p = this.store.profile(sp.botId);
       if (!p) continue;
       const seat = match.seats.find((s) => s.id === seatId);
-      if (seat && sp.plan) p.lastPlans = { ...p.lastPlans, [planRole(seat.role)]: sp.plan.id };
+      if (seat?.planKey && sp.plan) p.lastPlans = { ...p.lastPlans, [seat.planKey]: sp.plan.id };
       const mine = experiences.filter((e) => e.botId === sp.botId);
       let growthCount = 0;
       for (const e of mine) {
@@ -196,7 +253,7 @@ export class PersonaService {
     };
   }
   /** The user sets the birth personality: both the current value and the anchor move, and growth restarts from it. */
-  setTraits(botId: string, traits: Traits, source: PersonaProfile['source'] = 'user') {
+  setTraits(botId: string, traits: Traits, source: PersonaProfile['source'] = 'user', facets?: Record<string, number>) {
     if (
       !traits ||
       TRAITS.some((k) => typeof traits[k] !== 'number' || !Number.isFinite(traits[k]) || traits[k] < 0 || traits[k] > 1)
@@ -209,8 +266,18 @@ export class PersonaService {
       this.store.discardGrowthObservations(botId);
       const at = this.now();
       Object.assign(p, { traits: t, anchor: { ...t }, n: 0, source, confirmed: source === 'user', updatedAt: at });
+      // Facets describe the estimate they came from; a hand-set profile no longer matches them.
+      if (facets) p.facets = facets;
+      else delete p.facets;
+      // Hand-set or re-estimated traits no longer match the preset's name; its learned contents stay.
+      if (source !== 'preset') delete p.preset;
       this.store.saveProfile(p);
-      this.store.addHistory(botId, t, source === 'user' ? '手动设定' : '角色设定估计', at);
+      this.store.addHistory(
+        botId,
+        t,
+        source === 'user' ? '手动设定' : source === 'preset' ? '应用预设' : '角色设定估计',
+        at,
+      );
     });
     return this.view(botId);
   }
@@ -224,10 +291,60 @@ export class PersonaService {
     this.cancelGrowthReview(botId);
     const epoch = this.store.growthEpoch(botId);
     const prompt = birthPrompt(name, soul);
-    const traits = traitsFromFacets(await ask(prompt.system, prompt.user));
+    const { traits, facets } = facetsFrom(await ask(prompt.system, prompt.user));
     const current = this.store.profile(botId);
     if (!current || current.n > 0 || this.store.growthEpoch(botId) !== epoch) throw Error('人格已改变，请重新发起估计');
-    return this.setTraits(botId, traits, 'bfi2');
+    return this.setTraits(botId, traits, 'bfi2', facets);
+  }
+  /**
+   * Every group member gets a personality (群聊人格方案 §3.1): a Bot without a profile gets a SOUL estimate, left
+   * unconfirmed for the user to adjust. Without a working model it keeps the neutral draft. Runs once per Bot.
+   */
+  async ensureGroupProfiles(
+    bots: { id: string; name: string; soul: string }[],
+    ask: (botId: string, system: string, user: string) => Promise<string>,
+  ) {
+    for (const b of bots) {
+      if (this.store.profile(b.id) || this.store.isForgotten(b.id) || this.estimating.has(b.id)) continue;
+      this.estimating.add(b.id);
+      try {
+        await this.draft(b.id, b.name, b.soul, (system, user) => ask(b.id, system, user));
+      } catch {
+        // The neutral draft draft() saved first stays; the user can estimate again from the profile page.
+      } finally {
+        this.estimating.delete(b.id);
+      }
+    }
+  }
+  /**
+   * Give this Bot a named preset (群聊人格方案 §4.6): its traits become the birth personality and its learned
+   * contents are set to the preset's. An empty id clears the preset's contents and keeps the traits.
+   * Experience keeps changing both afterwards unless growth is locked.
+   */
+  applyPreset(botId: string, id: string, focus?: string) {
+    if (!id) {
+      const p = this.ensureProfile(botId);
+      for (const k of ['preset', 'motives', 'selfView', 'strategies', 'expression', 'focus'] as const) delete p[k];
+      p.updatedAt = this.now();
+      this.store.saveProfile(p);
+      return this.view(botId);
+    }
+    if (!isPresetId(id)) throw Error('未知的人格预设');
+    const preset = PRESETS[id];
+    this.setTraits(botId, preset.traits, 'preset');
+    const p = this.store.profile(botId)!;
+    Object.assign(p, {
+      preset: id,
+      confirmed: true,
+      motives: preset.motives,
+      selfView: preset.selfView,
+      strategies: preset.strategies,
+      expression: preset.expression,
+      ...(preset.focus ? { focus: focus || preset.focus } : {}),
+    });
+    if (!preset.focus) delete p.focus;
+    this.store.saveProfile(p);
+    return this.view(botId);
   }
   /** Accept the draft as this Bot's birth personality. */
   confirm(botId: string, mbti?: string) {
@@ -273,7 +390,7 @@ export class PersonaService {
    * expression guidance its game seats get, and a stance on agreeing. Only for Bots with a saved profile; a draft
    * is never invented here. Group chats only: private chats keep the original SOUL (§D.14).
    */
-  groupStyle(botId: string) {
+  groupStyle(botId: string, nameOf: (id: string) => string | undefined = () => undefined) {
     const p = this.store.profile(botId);
     if (!p) return '';
     const conform = tendencies(p.traits).conform;
@@ -283,7 +400,7 @@ export class PersonaService {
         : conform > 0.3
           ? '\n立场：同意别人时要补充新的信息或理由，不要只说「同意」。'
           : '';
-    return '\n\n[你的说话方式，来自你的性格设定]\n' + styleText(p.traits) + '。' + stance;
+    return '\n\n[你的说话方式，来自你的性格设定]\n' + styleText(p.traits) + '。' + stance + contentText(p, nameOf);
   }
   groupFragment(botId: string, people: { id: string; name: string }[]) {
     const others = people.filter((p) => p.id !== botId).slice(0, 2);
