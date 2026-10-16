@@ -196,8 +196,9 @@ test("the check uses Laya when it is ready, otherwise the Bot's own model, and r
     await judger(undefined, async () => '```json\n{"verdict":"too_friendly"}\n```')('A', input),
     'too_friendly',
   );
-  assert.equal(parseVerdict('not json'), 'ok');
-  assert.equal(parseVerdict('{"verdict":"weird"}'), 'ok');
+  assert.equal(parseVerdict(''), undefined, 'a reply cut off before its answer changes nothing');
+  assert.equal(parseVerdict('not json'), undefined);
+  assert.equal(parseVerdict('{"verdict":"weird"}'), undefined);
 });
 
 test('妈咪 and 猫娘 regard their focus their own way and show a grudge in character', () => {

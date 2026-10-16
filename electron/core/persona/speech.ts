@@ -75,13 +75,14 @@ export function judgePrompt(input: JudgeInput) {
     user: JSON.stringify(input),
   };
 }
-export function parseVerdict(raw: string): Verdict {
+/** The verdict in a model reply, or undefined when it gave none: an unreadable answer changes nothing. */
+export function parseVerdict(raw: string): Verdict | undefined {
   const text = raw.trim().replace(/^```(?:json)?\s*|\s*```$/g, '');
   try {
     const parsed = JSON.parse(text.slice(text.indexOf('{'), text.lastIndexOf('}') + 1)) as { verdict?: unknown };
-    return VERDICTS.includes(parsed.verdict as Verdict) ? (parsed.verdict as Verdict) : 'ok';
+    return VERDICTS.includes(parsed.verdict as Verdict) ? (parsed.verdict as Verdict) : undefined;
   } catch {
-    return 'ok';
+    return undefined;
   }
 }
 /** The reminder a failed check leaves for the next turn. */
