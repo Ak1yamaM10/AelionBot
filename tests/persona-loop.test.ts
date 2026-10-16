@@ -199,13 +199,13 @@ test("the check uses Laya when it is ready, otherwise the Bot's own model, and r
   assert.equal(parseVerdict('{"verdict":"weird"}'), 'ok');
 });
 
-test('妈妈 and 猫娘 regard their focus their own way and show a grudge in character', () => {
+test('妈咪 and 猫娘 regard their focus their own way and show a grudge in character', () => {
   const name = () => '何梓鸿';
-  assert.match(contentText({ ...PRESETS.mom, preset: 'mom' }, name), /何梓鸿是你的孩子：你最操心何梓鸿/);
+  assert.match(contentText({ ...PRESETS.mom, preset: 'mom' }, name), /何梓鸿是你最宠的孩子：你总是温柔地哄何梓鸿/);
   assert.match(contentText({ ...PRESETS.catgirl, preset: 'catgirl' }, name), /何梓鸿是你的主人/);
   assert.doesNotMatch(contentText({ ...PRESETS.catgirl, preset: 'catgirl' }, name), /\{name\}/);
   assert.match(contentText({ ...PRESETS.simp, preset: 'simp' }, name), /心思几乎全在何梓鸿身上/, '舔狗 keeps its line');
-  assert.match(grudgeConduct({ ...PRESETS.mom, preset: 'mom' }, PRESETS.mom.traits), /念叨/);
+  assert.match(grudgeConduct({ ...PRESETS.mom, preset: 'mom' }, PRESETS.mom.traits), /妈咪有点失望哦/);
   assert.match(grudgeConduct({ ...PRESETS.catgirl, preset: 'catgirl' }, PRESETS.catgirl.traits), /炸毛/);
   assert.match(
     speechPlan({ ...PRESETS.catgirl, preset: 'catgirl' }, { used: [] }, () => 0),
