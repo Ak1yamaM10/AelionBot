@@ -184,6 +184,8 @@ export class PersonaService {
     if (!match.persona) return;
     const experiences = match.experiences;
     for (const [seatId, sp] of Object.entries(match.persona)) {
+      // A preset chosen for one match was not this Bot being itself, so it neither grows nor sets its plans.
+      if (sp.preset) continue;
       const p = this.store.profile(sp.botId);
       if (!p) continue;
       const seat = match.seats.find((s) => s.id === seatId);

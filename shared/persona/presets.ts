@@ -374,3 +374,13 @@ export function contentText(
 /** The share of messages that should use a catchphrase; presets set it, others default to one in three. */
 export const catchphraseRate = (c: PersonaContent & { preset?: PresetId }) =>
   c.expression?.catchphraseRate ?? (c.preset ? PRESETS[c.preset].expression?.catchphraseRate : undefined) ?? 1 / 3;
+
+/** A preset played for one match: its traits and the voice a game seat is given. */
+export function presetSeed(id: PresetId) {
+  const preset = PRESETS[id];
+  return {
+    traits: preset.traits,
+    voice: contentText({ ...preset, preset: id }, () => undefined, 'rate').trim(),
+    preset: id,
+  };
+}

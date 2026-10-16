@@ -27,6 +27,8 @@ export interface GamePlayer {
   model?: ModelSelection;
   /** The group member Bot seated here; seat ids are random per match. Guests and the human have none. */
   botId?: string;
+  /** A personality preset for this match only; a member Bot's own profile is left as it is. */
+  preset?: string;
 }
 /** Structured facts the rules engine records for post-match settlement; logs stay human-readable text. */
 export type GameEvent =

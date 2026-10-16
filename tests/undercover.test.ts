@@ -20,6 +20,7 @@ import { PersonaService } from '../electron/core/persona/persona-service';
 import { settleFinishedGame } from '../electron/core/games/settlement';
 import { seededRandom } from '../shared/games/seeded-random';
 import type { GameAction, GameRequest } from '../shared/types/game-types';
+import { PRESETS } from '../shared/persona/presets';
 
 const players = (n: number, human = -1) =>
   Array.from({ length: n }, (_, i) => ({ id: 'p' + i, name: '玩家' + i, color: '#887799', human: i === human }));
@@ -300,4 +301,46 @@ test('the model input keeps the shape the run record reads: round as day, own wo
   assert.equal(input.context.personal.self.word, ownWord(s, r.seatId));
   assert.equal(input.context.personal.self.role, undefined);
   assert.equal(input.request.kind, 'describe');
+});
+
+test('a preset chosen for one match plays for that match only, for member Bots and guests alike', async (t) => {
+  const dir = tempDir(t);
+  const persona = inTempDir(t, (dir) => new PersonaService(dir));
+  persona.setTraits('bot0', { E: 0.5, A: 0.5, C: 0.5, N: 0.5, O: 0.5 });
+  const before = persona.view('bot0').profile;
+  const inputs: string[] = [];
+  const decide: Decide = async (_player, context, request) => {
+    inputs.push(JSON.stringify(undercoverPrompt(context, request)));
+    if (request.kind === 'describe') return { text: '一个常见的东西' };
+    if (request.kind === 'blank_guess') return { text: '不知道' };
+    return { target: request.targets[0] };
+  };
+  let finished: AnyMatch | undefined;
+  const runtime = new GameRuntime(dir, decide, () => {}, undefined, {
+    personas: (bots, members) => persona.seeds(bots, members),
+    finished: (match) => {
+      finished = match;
+    },
+  });
+  t.after(() => runtime.dispose());
+  const seats = players(6).map((p, i) => ({
+    ...p,
+    ...(i === 0 ? { botId: 'bot0', preset: 'npd' } : {}),
+    ...(i === 1 ? { preset: 'catgirl' } : {}),
+    ...(i === 2 ? { preset: 'not-a-preset' } : {}),
+  }));
+  runtime.create({ groupId: 'g', mode: 'undercover', players: seats });
+  await until(() => !!finished, { timeoutMs: 30000 });
+  const match = finished as UndercoverState;
+  const member = Object.values(match.persona!).find((p) => p.botId === 'bot0')!;
+  assert.equal(member.preset, 'npd');
+  assert.deepEqual(member.traits, PRESETS.npd.traits, 'the member plays the preset, not its profile');
+  assert.match(member.voice!, /这对我来说太简单了/);
+  const guest = match.seats.find((p) => p.name === seats[1].name)!;
+  assert.match(guest.personality!, /喵～/, 'a guest plays the preset through its game personality');
+  assert.equal(match.seats.find((p) => p.name === seats[2].name)!.preset, undefined, 'unknown presets are dropped');
+  assert.ok(inputs.some((i) => i.includes('喵～')));
+  persona.settle(undercoverFacts(match));
+  assert.deepEqual(persona.view('bot0').profile.traits, before.traits, "the member's own profile is untouched");
+  assert.equal(collectGrowthObservations(match).length, 0, 'nothing from a borrowed personality is learned');
 });

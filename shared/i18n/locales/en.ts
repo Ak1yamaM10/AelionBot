@@ -2994,4 +2994,7 @@ export const en: Record<string, string> = {
   '{count} 条新消息': '{count} new messages',
   '{game} · 战报': '{game} · Result',
   对局战报: 'Match result',
+  本局人格: 'Personality this match',
+  '{name} 的本局人格': "{name}'s personality this match",
+  不用预设: 'No preset',
 };

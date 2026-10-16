@@ -1972,3 +1972,8 @@
   line-height: 1.7;
   white-space: pre-wrap;
 }
+.gg-pop-note {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.5;
+}

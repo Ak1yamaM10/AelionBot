@@ -2939,4 +2939,7 @@ export const zhTW: Record<string, string> = {
   '{count} 条新消息': '{count} 則新訊息',
   '{game} · 战报': '{game} · 戰報',
   对局战报: '對局戰報',
+  本局人格: '本局人格',
+  '{name} 的本局人格': '{name} 的本局人格',
+  不用预设: '不用預設',
 };

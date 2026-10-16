@@ -5,6 +5,7 @@ import { PersonaPage } from './PersonaPage';
 import { seatBot, syncSeats } from './game-view-model';
 import type { GameModeId, GameView } from '../../shared/types/game-types';
 import { GAME_MBTI_TYPES, isGameMbti, type GameMbti } from '../../shared/games/game-personality';
+import { PRESETS, PRESET_IDS, isPresetId, type PresetId } from '../../shared/persona/presets';
 import type { ModelProvider, ModelSelection } from '../../shared/types/core';
 import { Avatar } from '../ui/Avatar';
 import { Icon } from '../ui/Icon';
@@ -101,6 +102,8 @@ export function GroupGames({
     [mbtiPresets, setMbtiPresets] = useState<Record<string, GameMbti>>({}),
     [configNotice, setConfigNotice] = useState('');
   const [sessionMbti, setSessionMbti] = useState<Record<string, GameMbti | 'random'>>({});
+  // A personality preset per seat for this match only; a member Bot's own profile is not changed.
+  const [sessionPreset, setSessionPreset] = useState<Record<string, PresetId>>({});
   const [personaBotId, setPersonaBotId] = useState('');
   const [personaReturn, setPersonaReturn] = useState<'select' | 'room'>('select');
   const [hasUnsaved, setHasUnsaved] = useState(false);
@@ -170,6 +173,10 @@ export function GroupGames({
       for (const [id, type] of Object.entries(saved.sessionMbti || {}))
         if (type === 'random' || isGameMbti(type)) session[id] = type;
       setSessionMbti(session);
+      const presets: Record<string, PresetId> = {};
+      for (const [id, preset] of Object.entries(saved.sessionPreset || {}))
+        if (isPresetId(preset)) presets[id] = preset;
+      setSessionPreset(presets);
       setConfigNotice(t('已恢复上次玩家配置'));
     } catch {
       setConfigNotice(t('无法读取上次配置'));
@@ -310,6 +317,7 @@ export function GroupGames({
           human: p.id === 'human',
           model: p.id === 'human' ? undefined : resolved(p),
           mbti: p.id === 'human' ? undefined : resolvedMbti(p.id),
+          ...(p.id !== 'human' && sessionPreset[p.id] ? { preset: sessionPreset[p.id] } : {}),
         })),
       });
       updateMatch(next);
@@ -321,6 +329,7 @@ export function GroupGames({
           filled,
           overrides,
           sessionMbti,
+          sessionPreset,
           ...(game === 'werewolf' ? { board } : { seatCount, blank }),
         };
         localStorage.setItem(
@@ -891,6 +900,8 @@ export function GroupGames({
                         <span className="gg-chip-row">
                           {s.id === 'human' ? (
                             <span className="gg-tag is-accent">{t('参与')}</span>
+                          ) : sessionPreset[s.id] ? (
+                            <span className="gg-tag is-accent">{PRESETS[sessionPreset[s.id]].name}</span>
                           ) : !s.temporary ? (
                             <span className="gg-tag">{t('沿用人格档案')}</span>
                           ) : type ? (
@@ -899,7 +910,7 @@ export function GroupGames({
                             <span className="gg-tag">{t('随机性格')}</span>
                           )}
                           {s.temporary && <span className="gg-tag">{t('临时')}</span>}
-                          {(overrides[s.id] || (s.temporary && sessionMbti[s.id])) && (
+                          {(overrides[s.id] || sessionPreset[s.id] || (s.temporary && sessionMbti[s.id])) && (
                             <span className="gg-tag">{t('本局修改')}</span>
                           )}
                         </span>
@@ -953,12 +964,40 @@ export function GroupGames({
                         </select>
                       </label>
                       <label>
-                        {t(editSeat.temporary ? '本局性格' : '人格档案')}
-                        {personalityPicker(editSeat)}
+                        {t('本局人格')}
+                        <select
+                          aria-label={t('{name} 的本局人格', { name: editSeat.name })}
+                          value={sessionPreset[editSeat.id] || ''}
+                          onChange={(e) => {
+                            const preset = e.target.value;
+                            setSessionPreset(({ [editSeat.id]: _old, ...rest }) =>
+                              isPresetId(preset) ? { ...rest, [editSeat.id]: preset } : rest,
+                            );
+                          }}
+                        >
+                          <option value="">{t(editSeat.temporary ? '不用预设' : '沿用人格档案')}</option>
+                          {PRESET_IDS.map((id) => (
+                            <option key={id} value={id}>
+                              {PRESETS[id].name}
+                            </option>
+                          ))}
+                        </select>
                       </label>
+                      {sessionPreset[editSeat.id] ? (
+                        <p className="gg-muted gg-pop-note">{t(PRESETS[sessionPreset[editSeat.id]].summary)}</p>
+                      ) : (
+                        <label>
+                          {t(editSeat.temporary ? '本局性格' : '人格档案')}
+                          {personalityPicker(editSeat)}
+                        </label>
+                      )}
                       <div className="gg-pop-actions">
                         <span className="gg-muted">
-                          {t(editSeat.temporary ? '只影响这一局' : '模型只影响这一局；人格沿用 Bot 档案。')}
+                          {t(
+                            editSeat.temporary || sessionPreset[editSeat.id]
+                              ? '只影响这一局'
+                              : '模型只影响这一局；人格沿用 Bot 档案。',
+                          )}
                         </span>
                         <span className="gg-spacer" />
                         <button
@@ -966,6 +1005,7 @@ export function GroupGames({
                           onClick={() => {
                             setOverrides(({ [editSeat.id]: _model, ...rest }) => rest);
                             setSessionMbti(({ [editSeat.id]: _type, ...rest }) => rest);
+                            setSessionPreset(({ [editSeat.id]: _preset, ...rest }) => rest);
                           }}
                         >
                           {t('恢复预设')}
