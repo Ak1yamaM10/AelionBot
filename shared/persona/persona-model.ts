@@ -289,7 +289,23 @@ export function growthStep(
 /** Speech length cap: base × (0.6 + 0.8·E). Extraverts talk more (Mehl et al., 2006). */
 export const speechLimit = (t: Traits, base = 150) => Math.round(base * (0.6 + 0.8 * t.E));
 export function styleText(t: Traits) {
-  const parts = [`发言不超过 ${speechLimit(t)} 字`];
+  return [`发言不超过 ${speechLimit(t)} 字`, ...traitExpression(t)].join('；');
+}
+/**
+ * The same tendencies for group chat, where a character cap made replies telegraphic: models squeeze a count by
+ * dropping words. Extraversion sets how much a member usually says, as people talk, never as a number.
+ */
+export function chatStyleText(t: Traits) {
+  const length =
+    t.E >= 0.65
+      ? '话比较多，聊得起劲时会多说几句'
+      : t.E <= 0.35
+        ? '话不多，通常一两句就说完'
+        : '说多说少看话题，平时两三句';
+  return [length, ...traitExpression(t)].join('；');
+}
+function traitExpression(t: Traits) {
+  const parts: string[] = [];
   for (const k of TRAITS) {
     const domain = TRAIT_SEMANTICS[k];
     if (t[k] >= 0.65) parts.push(`${domain.name}：${domain.expression[1]}`);
@@ -298,5 +314,5 @@ export function styleText(t: Traits) {
   parts.push(
     '这些是表达倾向，需结合当前情境；不由性格推断能力、立场或具体对象的可信度。友善不要求附和，坚持计划允许依据新证据调整，开放不要求冒险，情绪敏感不要求报复',
   );
-  return parts.join('；');
+  return parts;
 }

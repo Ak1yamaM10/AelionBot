@@ -16,7 +16,7 @@ import {
   growthStep,
   mbtiOf,
   roundTraits,
-  styleText,
+  chatStyleText,
   tendencies,
   traitsFromMbti,
   type Traits,
@@ -440,7 +440,7 @@ export class PersonaService {
           : '';
     return (
       '\n\n[你的说话方式，来自你的性格设定]\n' +
-      styleText(p.traits) +
+      chatStyleText(p.traits) +
       '。' +
       stance +
       contentText(p, nameOf) +
@@ -520,7 +520,7 @@ export class PersonaService {
     if (!key) return undefined;
     return {
       speaker: p.preset ? PRESETS[p.preset].name : '这个成员',
-      persona: contentText(p, () => undefined).trim() || styleText(p.traits),
+      persona: contentText(p, () => undefined).trim() || chatStyleText(p.traits),
       relations: this.relationsText(botId, others).trim() || '没有特别的关系',
       reply: text.slice(0, 600),
     };

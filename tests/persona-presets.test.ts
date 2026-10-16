@@ -47,7 +47,7 @@ test('applying a preset sets traits and contents; the group style carries them; 
   assert.deepEqual(view.profile.anchor, PRESETS.npd.traits, 'the preset becomes the birth personality');
   const style = svc.groupStyle('A', names);
   assert.match(style, /你的人设：NPD/);
-  assert.match(style, /发言不超过 \d+ 字/);
+  assert.match(style, /话(比较多|不多)|说多说少看话题/);
   const cleared = svc.applyPreset('A', '');
   assert.equal(cleared.profile.preset, undefined);
   assert.equal(cleared.profile.expression, undefined);

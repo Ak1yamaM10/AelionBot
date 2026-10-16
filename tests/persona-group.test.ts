@@ -91,17 +91,17 @@ test('a Bot with a personality profile speaks in its own style in the group; one
   assert.equal(persona.groupStyle(plain.id), '', 'no profile, no invented personality');
   const style = persona.groupStyle(talker.id);
   assert.match(style, /\[你的说话方式，来自你的性格设定\]/);
-  assert.match(style, /发言不超过 198 字/);
+  assert.match(style, /话比较多，聊得起劲时会多说几句/);
   assert.match(style, /不同意就直接说出来/);
   persona.setTraits(plain.id, { E: 0.1, A: 0.9, C: 0.9, N: 0.2, O: 0.5 });
-  assert.match(persona.groupStyle(plain.id), /发言不超过 102 字/);
+  assert.match(persona.groupStyle(plain.id), /话不多，通常一两句就说完/);
   assert.match(persona.groupStyle(plain.id), /同意别人时要补充新的信息/);
 
   const room = groups.create({ name: '闲聊群', botIds: [talker.id, plain.id] });
   groups.send({ id: room.id, message: '周末去哪玩' });
   await until(() => contexts.length > 0, { timeoutMs: 5000 });
   assert.ok(
-    contexts.some((c) => c.includes('发言不超过 198 字')),
+    contexts.some((c) => c.includes('话比较多，聊得起劲时会多说几句')),
     'the style reaches the group run',
   );
 });
