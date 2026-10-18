@@ -2769,6 +2769,8 @@ export const en: Record<string, string> = {
   '管理 Webflow 网站和 CMS 内容': 'Manage Webflow sites and CMS content',
   '读取 Figma 桌面版里打开的设计': 'Read designs open in the Figma desktop app',
   '查询 Stripe 的客户、付款和订阅': 'Look up Stripe customers, payments and subscriptions',
+  '查看币安行情与账户，按授权交易和划转 Agentic 子账户资金':
+    'View Binance markets and accounts; trade and transfer funds within your Agentic sub-account as authorized',
   '查询 PayPal 的交易、发票和订单': 'Look up PayPal transactions, invoices and orders',
   '查询 Square 的商品、订单和付款': 'Look up Square items, orders and payments',
   需要登录: 'Sign-in needed',

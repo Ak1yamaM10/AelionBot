@@ -7,6 +7,8 @@ import { join } from 'node:path';
 import { tempDir } from './helpers';
 import { Store } from '../electron/core/storage/store';
 import { Integrations } from '../electron/core/extensions/integrations';
+import { backgroundProvider, McpAuthStore, signIn } from '../electron/core/extensions/mcp-auth';
+import { appConnectorFor, OAUTH_REDIRECT_URL } from '../shared/app-connectors';
 
 // Stands in for the system key store; the marker shows nothing was written in the clear.
 const codec = {
@@ -24,7 +26,7 @@ const json = (response: ServerResponse, status: number, value: unknown, headers:
   response.writeHead(status, { 'content-type': 'application/json', ...headers }).end(JSON.stringify(value));
 
 /** A remote MCP server behind OAuth with dynamic client registration, PKCE and refresh tokens. */
-async function oauthServer(t: test.TestContext) {
+async function oauthServer(t: test.TestContext, clientMetadataUrl?: string) {
   const state = { valid: 'access-1', registered: [] as string[], refreshed: 0, challenge: '' };
   const server = createServer(async (request, response) => {
     const url = new URL(request.url!, base);
@@ -39,19 +41,23 @@ async function oauthServer(t: test.TestContext) {
         issuer: base,
         authorization_endpoint: base + '/authorize',
         token_endpoint: base + '/token',
-        registration_endpoint: base + '/register',
+        ...(clientMetadataUrl
+          ? { client_id_metadata_document_supported: true }
+          : { registration_endpoint: base + '/register' }),
         response_types_supported: ['code'],
         grant_types_supported: ['authorization_code', 'refresh_token'],
         code_challenge_methods_supported: ['S256'],
         token_endpoint_auth_methods_supported: ['none'],
       });
     if (url.pathname === '/register') {
+      assert.equal(clientMetadataUrl, undefined, 'CIMD must not attempt dynamic registration');
       const client = JSON.parse(await body(request));
       state.registered.push(...client.redirect_uris);
       return json(response, 201, { ...client, client_id: 'client-1' });
     }
     if (url.pathname === '/authorize') {
-      assert.equal(url.searchParams.get('client_id'), 'client-1');
+      assert.equal(url.searchParams.get('client_id'), clientMetadataUrl || 'client-1');
+      assert.equal(url.searchParams.get('resource'), base + '/mcp');
       assert.equal(url.searchParams.get('code_challenge_method'), 'S256');
       state.challenge = url.searchParams.get('code_challenge')!;
       const back = new URL(url.searchParams.get('redirect_uri')!);
@@ -61,6 +67,7 @@ async function oauthServer(t: test.TestContext) {
     }
     if (url.pathname === '/token') {
       const form = new URLSearchParams(await body(request));
+      assert.equal(form.get('client_id'), clientMetadataUrl || 'client-1');
       if (form.get('grant_type') === 'authorization_code') {
         const hash = createHash('sha256').update(form.get('code_verifier')!).digest('base64url');
         if (form.get('code') !== 'code-1' || hash !== state.challenge)
@@ -175,9 +182,68 @@ test('a cancelled sign-in stops waiting and leaves the server signed out', async
   assert.equal(integrations.snapshot().servers[0].login, 'signed-out');
 });
 
+test('CIMD signs in with PKCE without registration and reuses persisted credentials', async (t) => {
+  const app = appConnectorFor('https://agent.binance.com/mcp/agentic')!;
+  const metadata = JSON.parse(
+    readFileSync(new URL('../website/public/oauth/client-metadata.json', import.meta.url), 'utf8'),
+  );
+  assert.equal(metadata.client_id, app.clientMetadataUrl);
+  assert.deepEqual(metadata.redirect_uris, [OAUTH_REDIRECT_URL]);
+  assert.equal(metadata.token_endpoint_auth_method, 'none');
+  const remote = await oauthServer(t, app.clientMetadataUrl);
+  const file = join(tempDir(t, 'aelion-cimd-'), 'auth.json');
+  const store = new McpAuthStore(file, codec);
+  const serverUrl = remote.base + '/mcp';
+  await signIn(store, {
+    serverUrl,
+    clientMetadataUrl: app.clientMetadataUrl,
+    port: 0,
+    signal: new AbortController().signal,
+    open: async (url) => {
+      await fetch(url);
+    },
+  });
+  assert.equal(remote.state.registered.length, 0);
+  const restored = new McpAuthStore(file, codec);
+  assert.equal(restored.signedIn(serverUrl), true);
+  const provider = backgroundProvider(restored, serverUrl);
+  assert.equal(provider.clientInformation()?.client_id, metadata.client_id);
+  assert.equal(provider.tokens()?.access_token, 'access-1');
+  assert.equal(backgroundProvider(restored, app.url).clientMetadataUrl, metadata.client_id);
+  assert.ok(!readFileSync(file, 'utf8').includes('access-1'));
+});
+
+test('CIMD refuses a busy redirect port instead of using an unpublished redirect', async (t) => {
+  const occupied = createServer();
+  await new Promise<void>((resolve) => occupied.listen(0, '127.0.0.1', resolve));
+  t.after(() => occupied.close());
+  const address = occupied.address();
+  assert.ok(address && typeof address === 'object');
+  const app = appConnectorFor('https://agent.binance.com/mcp/agentic')!;
+  const store = new McpAuthStore(join(tempDir(t, 'aelion-cimd-busy-'), 'auth.json'), codec);
+  await assert.rejects(
+    signIn(store, {
+      serverUrl: app.url,
+      clientMetadataUrl: app.clientMetadataUrl,
+      port: address.port,
+      signal: new AbortController().signal,
+      open: () => assert.fail('must not open the browser with a different redirect'),
+    }),
+    { code: 'mcp.signin_port_busy' },
+  );
+});
+
 test('catalog apps are added to the app config with their token or Google client, and removed with them', async (t) => {
   const { paths, integrations } = setup(t, {});
   await integrations.refresh();
+  const binance = await integrations.addApp({ app: 'binance' });
+  const binanceView = integrations.snapshot().servers.find((server) => server.id === binance)!;
+  assert.equal(binanceView.app, 'binance');
+  assert.equal(binanceView.login, 'signed-out');
+  assert.equal(integrations.mcp.config(binance).url, 'https://agent.binance.com/mcp/agentic');
+  assert.equal(await integrations.addApp({ app: 'binance' }), binance);
+  await integrations.remove(binance);
+  assert.ok(!integrations.snapshot().servers.some((server) => server.app === 'binance'));
   await assert.rejects(integrations.addApp({ app: 'github' }), { code: 'mcp.token_invalid' });
   const github = await integrations.addApp({ app: 'github', token: 'github_pat_example' });
   let view = integrations.snapshot().servers.find((server) => server.id === github)!;

@@ -63,6 +63,8 @@ draft: true
 
 ## 线上部署
 
+`public/oauth/client-metadata.json` 是 AelionBot 的公开 OAuth 客户端元数据（CIMD），供币安等服务识别桌面客户端，不含密钥。必须先将此文件部署到 `https://aelion.chat/oauth/client-metadata.json`，再发布依赖它的桌面版本；确认响应为 HTTP 200、`Content-Type: application/json`，且内容与文件一致。`client_id` 必须等于该公开地址，`redirect_uris` 必须与 `shared/app-connectors.ts` 的 `OAUTH_REDIRECT_URL` 同步。使用此元数据的登录在端口被占用时会报错，不会换端口。
+
 官网地址为 <https://aelion.chat/>，`www.aelion.chat` 和 HTTP 访问统一跳转到此地址。
 
 - Nginx 配置模板：`deploy/nginx.conf`。线上配置单独启用，保留服务器既有站点。

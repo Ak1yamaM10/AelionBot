@@ -161,6 +161,7 @@ export class Integrations {
       await signIn(auth, {
         serverUrl: config.url,
         scope: app?.scope,
+        clientMetadataUrl: app?.clientMetadataUrl,
         ownClient,
         // Google issues a refresh token only when asked for offline access.
         authorizationParams: app?.auth === 'google' ? { access_type: 'offline', prompt: 'consent' } : undefined,

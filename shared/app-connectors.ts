@@ -1,9 +1,9 @@
 // Apps a Bot can work in through their official remote MCP servers. Each entry was checked against the live
-// server: OAuth entries accept dynamic client registration, so signing in needs nothing but the browser.
+// server: OAuth entries use dynamic registration or a public client metadata document to sign in in the browser.
 // Token entries take a token the person creates; Google needs an OAuth client in the person's own Cloud project.
 
 /**
- * - `oauth`: sign in in the browser; the app registers itself with the service.
+ * - `oauth`: sign in in the browser; the app identifies itself to the service.
  * - `token`: the person pastes an access token.
  * - `google`: sign in with an OAuth client the person creates in Google Cloud.
  * - `none`: no account needed.
@@ -21,6 +21,8 @@ export interface AppConnector {
   auth: AppConnectorAuth;
   /** Requested instead of everything the server lists, where that would ask for more than the tools need. */
   scope?: string;
+  /** Public OAuth client metadata document; its redirect must match OAUTH_REDIRECT_URL. */
+  clientMetadataUrl?: string;
   /** Where the person creates a token, for `token` entries. */
   tokenUrl?: string;
   /** Runs on this computer, inside another app. */
@@ -229,6 +231,16 @@ export const APP_CONNECTORS: AppConnector[] = [
     url: 'http://127.0.0.1:3845/mcp',
     auth: 'none',
     local: true,
+  },
+  {
+    id: 'binance',
+    name: 'Binance',
+    description: '查看币安行情与账户，按授权交易和划转 Agentic 子账户资金',
+    group: 'commerce',
+    url: 'https://agent.binance.com/mcp/agentic',
+    auth: 'oauth',
+    // Binance advertises CIMD + PKCE, without dynamic client registration (checked 2026-10-18).
+    clientMetadataUrl: 'https://aelion.chat/oauth/client-metadata.json',
   },
   {
     id: 'stripe',

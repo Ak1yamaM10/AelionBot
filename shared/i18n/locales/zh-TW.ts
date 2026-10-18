@@ -2723,6 +2723,7 @@ export const zhTW: Record<string, string> = {
   '管理 Webflow 网站和 CMS 内容': '管理 Webflow 網站和 CMS 內容',
   '读取 Figma 桌面版里打开的设计': '讀取 Figma 桌面版裡開啟的設計',
   '查询 Stripe 的客户、付款和订阅': '查詢 Stripe 的客戶、付款和訂閱',
+  '查看币安行情与账户，按授权交易和划转 Agentic 子账户资金': '查看幣安行情與帳戶，依授權交易和劃轉 Agentic 子帳戶資金',
   '查询 PayPal 的交易、发票和订单': '查詢 PayPal 的交易、發票和訂單',
   '查询 Square 的商品、订单和付款': '查詢 Square 的商品、訂單和付款',
   需要登录: '需要登入',

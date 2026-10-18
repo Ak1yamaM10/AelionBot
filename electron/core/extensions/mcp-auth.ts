@@ -10,7 +10,12 @@ import type {
   OAuthClientMetadata,
   OAuthTokens,
 } from '@modelcontextprotocol/sdk/shared/auth.js';
-import { OAUTH_REDIRECT_PORT, OAUTH_REDIRECT_URL, sameServerUrl } from '../../../shared/app-connectors';
+import {
+  appConnectorFor,
+  OAUTH_REDIRECT_PORT,
+  OAUTH_REDIRECT_URL,
+  sameServerUrl,
+} from '../../../shared/app-connectors';
 import { AppError } from '../../../shared/errors';
 import { atomicJson } from '../storage/store';
 
@@ -117,6 +122,7 @@ class McpOAuthProvider implements OAuthClientProvider {
     private options: {
       redirectUrl: string;
       ownClient?: OwnClient;
+      clientMetadataUrl?: string;
       /** Opens the sign-in page; absent while Bots work. */
       open?: (url: URL) => void | Promise<void>;
       /** Extra parameters on the sign-in page, such as Google's offline access. */
@@ -125,6 +131,9 @@ class McpOAuthProvider implements OAuthClientProvider {
   ) {}
   get redirectUrl() {
     return this.options.redirectUrl;
+  }
+  get clientMetadataUrl() {
+    return this.options.clientMetadataUrl;
   }
   get clientMetadata(): OAuthClientMetadata {
     return {
@@ -203,6 +212,7 @@ export function backgroundProvider(store: McpAuthStore, serverUrl: string, ownCl
   return new McpOAuthProvider(store, serverUrl, {
     redirectUrl: client?.redirect_uris?.[0] || OAUTH_REDIRECT_URL,
     ownClient,
+    clientMetadataUrl: appConnectorFor(serverUrl)?.clientMetadataUrl,
   });
 }
 
@@ -211,7 +221,7 @@ const page = (title: string, body: string) =>
 
 /**
  * Waits for the browser to come back to the loopback address with an authorization code. A client the app
- * registers itself can use any free port; a person's own client lists one exact address, so it gets no fallback.
+ * registers itself can use any free port; an own client or published metadata lists a fixed redirect.
  */
 async function listen(port: number, fallback: boolean) {
   let server: Server;
@@ -257,6 +267,8 @@ export interface SignInOptions {
   /** Instead of everything the server lists. */
   scope?: string;
   ownClient?: OwnClient;
+  /** A public client metadata document with a fixed loopback redirect. */
+  clientMetadataUrl?: string;
   authorizationParams?: Record<string, string>;
   open: (url: URL) => void | Promise<void>;
   signal: AbortSignal;
@@ -268,7 +280,7 @@ export interface SignInOptions {
 export async function signIn(store: McpAuthStore, options: SignInOptions) {
   let loopback: Awaited<ReturnType<typeof listen>>;
   try {
-    loopback = await listen(options.port ?? OAUTH_REDIRECT_PORT, !options.ownClient);
+    loopback = await listen(options.port ?? OAUTH_REDIRECT_PORT, !options.ownClient && !options.clientMetadataUrl);
   } catch {
     throw new AppError(
       'mcp.signin_port_busy',
@@ -279,6 +291,7 @@ export async function signIn(store: McpAuthStore, options: SignInOptions) {
     const provider = new McpOAuthProvider(store, options.serverUrl, {
       redirectUrl: loopback.redirectUrl,
       ownClient: options.ownClient,
+      clientMetadataUrl: options.clientMetadataUrl,
       open: options.open,
       authorizationParams: options.authorizationParams,
     });
