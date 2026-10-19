@@ -69,11 +69,12 @@ export function undercoverPrompt(context: GameView, request: GameRequest) {
     // Spelled out: a model left to look its id up in the seat table sometimes counted itself one seat off.
     yourSeat: { seat, name: aliases[seat - 1].name },
     context: {
+      // Ordered for prompt caching: the append-only log first, the state that changes every phase after.
       shared: {
         game: '谁是卧底',
-        day: context.day,
-        phase: context.phase,
-        status: context.status,
+        logs: events
+          .filter((l) => l.scope === 'shared')
+          .map(({ scope: _, ...l }, i) => ({ ...l, id: i + 1, source: 'public_event' })),
         seats: context.seats.map((p, i) => ({
           id: p.id,
           seat: i + 1,
@@ -81,9 +82,9 @@ export function undercoverPrompt(context: GameView, request: GameRequest) {
           alive: p.alive,
           ...(p.role && p.id !== self.id ? { role: p.role } : {}),
         })),
-        logs: events
-          .filter((l) => l.scope === 'shared')
-          .map(({ scope: _, ...l }, i) => ({ ...l, id: i + 1, source: 'public_event' })),
+        day: context.day,
+        phase: context.phase,
+        status: context.status,
       },
       personal: {
         self: {

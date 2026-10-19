@@ -50,15 +50,17 @@ export function gameInstructions(context: GameView, request: GameRequest) {
   const personaRule = persona
     ? personaPromptRule(WEREWOLF_TERMS) + (KEY_DECISIONS.includes(request.kind) ? candidatesRule(WEREWOLF_TERMS) : '')
     : '';
+  // Steady text first and what varies by seat or request last: providers cache the longest unchanged prefix, and
+  // the guides are most of this text.
   return (
     prompt +
-    personaRule +
-    '\n' +
-    discussion +
     '\n\n' +
     gameSkills(context, request)
       .map((s) => `## 已加载技能：${s.title}\n${s.content}`)
       .join('\n\n') +
+    personaRule +
+    '\n' +
+    discussion +
     '\n\n本轮只执行 ' +
     request.kind +
     '。仅返回符合以下结构的 JSON，不要使用其他动作的字段：\n' +
@@ -106,14 +108,10 @@ export function gamePrompt(context: GameView, request: GameRequest) {
           ? 'authorized_private_event'
           : 'legacy_unclassified',
   }));
+  // Ordered for prompt caching: the board and the append-only log first, the state that changes every phase after.
   const shared = {
     board: context.board,
-    sheriffId: context.sheriffId,
-    candidates: context.candidates,
-    stage: context.stage,
-    day: context.day,
-    phase: context.phase,
-    status: context.status,
+    logs: events.filter((l) => l.source === 'public_event').map((l, i) => ({ ...l, id: i + 1 })),
     seats: context.seats.map((p, i) => ({
       id: p.id,
       seat: i + 1,
@@ -122,7 +120,12 @@ export function gamePrompt(context: GameView, request: GameRequest) {
       canVote: p.canVote,
       ...(p.revealed ? { role: p.role } : {}),
     })),
-    logs: events.filter((l) => l.source === 'public_event').map((l, i) => ({ ...l, id: i + 1 })),
+    sheriffId: context.sheriffId,
+    candidates: context.candidates,
+    stage: context.stage,
+    day: context.day,
+    phase: context.phase,
+    status: context.status,
   };
   const persona = context.persona?.[request.seatId];
   const personal = {
