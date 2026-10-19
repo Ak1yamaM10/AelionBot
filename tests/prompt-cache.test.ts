@@ -99,7 +99,7 @@ test('diagnostics identify added, removed and changed tool definitions', () => {
   assert.ok(!JSON.stringify(changed).includes('description'));
 });
 
-test('creating a plan keeps tool schemas stable and rejects reactions before execution', async (t) => {
+test('creating a plan keeps tool schemas stable while a reaction is allowed', async (t) => {
   const store = fixture(t),
     serialized: string[] = [],
     bot = store.data.bots[0];
@@ -135,7 +135,7 @@ test('creating a plan keeps tool schemas stable and rejects reactions before exe
             call('chat_pin', { messageId: store.data.messages.find((m) => m.role === 'user')!.id, emoji: '👍' }),
           ],
         };
-      assert.ok(messages.some((m) => m.role === 'system' && m.content?.includes('当前工具执行限制')));
+      assert.ok(messages.some((m) => m.role === 'tool' && m.content?.includes('"pinned":true')));
       if (turn === 2)
         return {
           content: '',
@@ -155,11 +155,9 @@ test('creating a plan keeps tool schemas stable and rejects reactions before exe
   assert.equal(store.data.runs[0].status, 'completed');
   assert.equal(turn, 4);
   assert.equal(new Set(serialized).size, 1);
-  assert.ok(store.data.messages.every((message) => !message.pins?.length));
-  const rejected = store.data.messages.find((message) => message.tool === 'chat_pin')!;
-  assert.equal(rejected.status, 'cancelled');
-  assert.match(rejected.content, /TOOL_TEMPORARILY_UNAVAILABLE/);
-  assert.match(rejected.content, /"executed":false/);
+  assert.ok(
+    store.data.messages.some((message) => message.tool === 'chat_pin' && message.content?.includes('"pinned":true')),
+  );
 });
 
 test('large output does not add a new tool schema and read_result is available from the first request', async (t) => {
