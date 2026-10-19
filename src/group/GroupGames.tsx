@@ -70,6 +70,7 @@ export function GroupGames({
   initialOpen = false,
   cardContainer,
   onCardTime,
+  onLatestMatch,
   providers = [],
   defaultModel,
 }: {
@@ -80,6 +81,8 @@ export function GroupGames({
   cardContainer?: HTMLElement | null;
   /** When the shown match ended, or undefined while it is live; the host places the card by it. */
   onCardTime?: (endedAt: number | undefined) => void;
+  /** The id of the match this group can still open, if any. */
+  onLatestMatch?: (id: string | undefined) => void;
   providers?: ModelProvider[];
   defaultModel?: ModelSelection;
 }) {
@@ -368,6 +371,16 @@ export function GroupGames({
     setScreen(match ? 'table' : 'select');
     setOpen(true);
   }
+  // A result card asks to open its match; only the latest match can still be opened.
+  useEffect(() => {
+    const open = (event: Event) => {
+      const { groupId: target, matchId } = (event as CustomEvent<{ groupId: string; matchId: string }>).detail;
+      if (target === groupId && match?.id === matchId) enter();
+    };
+    window.addEventListener('aelion:open-game', open);
+    return () => window.removeEventListener('aelion:open-game', open);
+  });
+  useEffect(() => onLatestMatch?.(match?.id), [match?.id, onLatestMatch]);
   const [editing, setEditing] = useState(''),
     [adding, setAdding] = useState(false);
   const aiSeats = roster.filter((s) => s.id !== 'human'),
@@ -413,16 +426,15 @@ export function GroupGames({
           <span aria-hidden="true">☾</span> {t('AI 游戏')}
         </button>
       </div>
+      {/* Only an unfinished match has a live card; a finished one is told by its result card in the timeline. */}
       {match &&
+        match.status !== 'finished' &&
         cardContainer &&
         createPortal(
           <button className={`gg-chat-card ${myTurn ? 'is-turn' : ''}`} onClick={enter}>
             <span className="gg-chat-card-top">
-              <span
-                className={`gg-moon ${match.phase === 'night' && match.status !== 'finished' ? '' : 'is-day'}`}
-                aria-hidden="true"
-              >
-                {match.phase === 'night' && match.status !== 'finished' ? '☾' : '☀'}
+              <span className={`gg-moon ${match.phase === 'night' ? '' : 'is-day'}`} aria-hidden="true">
+                {match.phase === 'night' ? '☾' : '☀'}
               </span>
               <span className="gg-chat-card-title">
                 <strong>
@@ -434,13 +446,7 @@ export function GroupGames({
                 </small>
               </span>
               <span className={`gg-live ${match.status === 'running' ? '' : 'is-idle'}`}>
-                {match.status === 'finished'
-                  ? match.winner
-                    ? t(WINNER_NAMES[match.winner])
-                    : t('已结束')
-                  : match.status === 'paused'
-                    ? t('已暂停')
-                    : t('进行中')}
+                {match.status === 'paused' ? t('已暂停') : t('进行中')}
               </span>
             </span>
             <span className="gg-chat-card-seats" aria-hidden="true">
@@ -458,7 +464,7 @@ export function GroupGames({
               <span>{t('{count} 人存活', { count: match.seats.filter((p) => p.alive).length })}</span>
               {myTurn && <span className="gg-turn">{t('· 轮到你了')}</span>}
               <span className="gg-spacer" />
-              <b>{t(match.status === 'finished' ? '查看战报' : '进入对局')} ↗</b>
+              <b>{t('进入对局')} ↗</b>
             </span>
           </button>,
           cardContainer,

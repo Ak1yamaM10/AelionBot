@@ -418,3 +418,36 @@ test("each board's players read only its own special role in the rules and the g
     }
   }
 });
+test('every seat is told its own seat number outright', () => {
+  const s = make();
+  for (const [i, p] of s.seats.entries()) {
+    const input = JSON.parse(gamePrompt(view(s, p.id), { id: 'r', seatId: p.id, kind: 'speak', targets: [] }));
+    assert.deepEqual(input.yourSeat, { seat: i + 1, name: `${i + 1}号玩家` });
+  }
+});
+test('consecutive requests share a long prompt prefix, so providers can cache it', () => {
+  const s = make();
+  const p = s.seats[0];
+  const speak = { id: 'a', seatId: p.id, kind: 'speak' as const, targets: [] };
+  const vote = { id: 'b', seatId: p.id, kind: 'vote' as const, targets: s.seats.map((x) => x.id) };
+  const common = (a: string, b: string) => {
+    let i = 0;
+    while (i < a.length && a[i] === b[i]) i++;
+    return i;
+  };
+  const a = gameInstructions(view(s, p.id), speak),
+    b = gameInstructions(view(s, p.id), vote);
+  assert.ok(common(a, b) > a.indexOf('## 已加载技能') + 1000, 'the guides are shared by every request kind');
+  const before = gamePrompt(view(s, p.id), speak);
+  s.logs.push({
+    id: s.logs.length + 1,
+    day: 1,
+    phase: 'day',
+    text: '新的一条公开记录',
+    time: 0,
+    scope: 'shared',
+  } as never);
+  s.day = 2;
+  const after = gamePrompt(view(s, p.id), speak);
+  assert.ok(common(before, after) > before.indexOf('"logs"') + 50, 'the log comes before the state that changes');
+});
