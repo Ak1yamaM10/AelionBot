@@ -1,10 +1,11 @@
-import { BOARDS, PHASE_NAMES, TWELVE_RULES } from '../../shared/games/game-boards';
+import { BOARDS, PHASE_NAMES, twelveRules } from '../../shared/games/game-boards';
 import { WerewolfTable } from './WerewolfTable';
 import { UndercoverTable } from './UndercoverTable';
 import { PersonaPage } from './PersonaPage';
-import { syncSeats } from './game-view-model';
+import { seatBot, syncSeats } from './game-view-model';
 import type { GameModeId, GameView } from '../../shared/types/game-types';
 import { GAME_MBTI_TYPES, isGameMbti, type GameMbti } from '../../shared/games/game-personality';
+import { PRESETS, PRESET_IDS, isPresetId, type PresetId } from '../../shared/persona/presets';
 import type { ModelProvider, ModelSelection } from '../../shared/types/core';
 import { Avatar } from '../ui/Avatar';
 import { Icon } from '../ui/Icon';
@@ -91,6 +92,8 @@ export function GroupGames({
   const [match, setMatch] = useState<GameView | null>(null);
   const [open, setOpen] = useState(initialOpen),
     [screen, setScreen] = useState<'select' | 'presets' | 'persona' | 'room' | 'table'>(match ? 'table' : 'select');
+  // The seat you take, by index; the other players fill the remaining seats in order.
+  const [humanSeat, setHumanSeat] = useState(0);
   const [mode, setMode] = useState<'play' | 'watch'>('play'),
     [selected, setSelected] = useState<string[]>(members.slice(0, 11).map((m) => m.id));
   const [omniscient, setOmniscient] = useState(false),
@@ -101,6 +104,8 @@ export function GroupGames({
     [mbtiPresets, setMbtiPresets] = useState<Record<string, GameMbti>>({}),
     [configNotice, setConfigNotice] = useState('');
   const [sessionMbti, setSessionMbti] = useState<Record<string, GameMbti | 'random'>>({});
+  // A personality preset per seat for this match only; a member Bot's own profile is not changed.
+  const [sessionPreset, setSessionPreset] = useState<Record<string, PresetId>>({});
   const [personaBotId, setPersonaBotId] = useState('');
   const [personaReturn, setPersonaReturn] = useState<'select' | 'room'>('select');
   const [hasUnsaved, setHasUnsaved] = useState(false);
@@ -150,6 +155,7 @@ export function GroupGames({
         setSeatCount(saved.seatCount);
         setBlank(saved.blank === true);
       }
+      if (Number.isInteger(saved.humanSeat) && saved.humanSeat >= 0) setHumanSeat(saved.humanSeat);
       if (['play', 'watch'].includes(saved.mode) && Array.isArray(saved.selected)) {
         setMode(saved.mode);
         setSelected(
@@ -170,6 +176,10 @@ export function GroupGames({
       for (const [id, type] of Object.entries(saved.sessionMbti || {}))
         if (type === 'random' || isGameMbti(type)) session[id] = type;
       setSessionMbti(session);
+      const presets: Record<string, PresetId> = {};
+      for (const [id, preset] of Object.entries(saved.sessionPreset || {}))
+        if (isPresetId(preset)) presets[id] = preset;
+      setSessionPreset(presets);
       setConfigNotice(t('已恢复上次玩家配置'));
     } catch {
       setConfigNotice(t('无法读取上次配置'));
@@ -241,11 +251,24 @@ export function GroupGames({
   const total = game === 'undercover' ? seatCount : 12;
   const limit = mode === 'play' ? total - 1 : total;
   const chosen = members.filter((m) => selected.includes(m.id)).slice(0, limit);
-  const roster: Seat[] = [
-    ...(mode === 'play' ? [{ id: 'human', name: '你', color: '#9177ac', role: '村民' }] : []),
+  const others: Seat[] = [
     ...chosen.map((m) => ({ ...m, role: '' })),
     ...guests.slice(0, filled ? limit - chosen.length : 0).map((m) => ({ ...m, temporary: true, role: '' })),
   ];
+  // Seats in table order: you sit where you chose, everyone else fills the other seats from the front, and seats
+  // nobody has filled yet stay open.
+  const slots: (Seat | undefined)[] = Array.from({ length: total }, () => undefined);
+  const mine = Math.min(humanSeat, total - 1);
+  if (mode === 'play') slots[mine] = { id: 'human', name: '你', color: '#9177ac', role: '村民' };
+  {
+    let next = 0;
+    for (const seat of others) {
+      while (slots[next]) next++;
+      if (next >= total) break;
+      slots[next] = seat;
+    }
+  }
+  const roster = slots.filter((seat): seat is Seat => !!seat);
   const personalityPicker = (s: Member) =>
     members.some((member) => member.id === s.id) ? (
       <button className="gg-link" onClick={() => openPersona(s.id, 'room')}>
@@ -310,6 +333,7 @@ export function GroupGames({
           human: p.id === 'human',
           model: p.id === 'human' ? undefined : resolved(p),
           mbti: p.id === 'human' ? undefined : resolvedMbti(p.id),
+          ...(p.id !== 'human' && sessionPreset[p.id] ? { preset: sessionPreset[p.id] } : {}),
         })),
       });
       updateMatch(next);
@@ -321,6 +345,8 @@ export function GroupGames({
           filled,
           overrides,
           sessionMbti,
+          sessionPreset,
+          humanSeat,
           ...(game === 'werewolf' ? { board } : { seatCount, blank }),
         };
         localStorage.setItem(
@@ -420,7 +446,11 @@ export function GroupGames({
             <span className="gg-chat-card-seats" aria-hidden="true">
               {match.seats.map((seat) => (
                 <span key={seat.id} className={seat.alive ? '' : 'is-dead'}>
-                  {seat.human ? <span className="gg-human-avatar gg-dot-human" /> : <Avatar bot={seat} size={20} />}
+                  {seat.human ? (
+                    <span className="gg-human-avatar gg-dot-human" />
+                  ) : (
+                    <Avatar bot={seatBot(seat)} size={20} />
+                  )}
                 </span>
               ))}
             </span>
@@ -790,7 +820,7 @@ export function GroupGames({
                       ? t(
                           '每轮存活玩家依次描述自己的词，然后同时投票，得票最多的人出局并公布身份。第一次平票时，平票的人各补一句描述后在他们之中重投，再平票本轮无人出局。卧底全部出局平民胜；存活卧底不少于平民，或只剩 3 人时仍有卧底，卧底胜。白板出局时可以猜一次平民的词，猜中则白板单独获胜。',
                         )
-                      : TWELVE_RULES}
+                      : twelveRules(board)}
                   </p>
                 </details>
                 <p className="gg-muted gg-room-note">
@@ -857,12 +887,38 @@ export function GroupGames({
                   >
                     {t('随机补位性格')}
                   </button>
+                  {mode === 'play' && (
+                    <button className="gg-back" onClick={() => setHumanSeat(Math.floor(Math.random() * total))}>
+                      {t('随机座位')}
+                    </button>
+                  )}
                   <button className="gg-back" onClick={restore}>
                     {t('沿用上次')}
                   </button>
                 </div>
                 <div className="gg-seat-grid">
-                  {roster.map((s, i) => {
+                  {slots.map((s, i) => {
+                    if (!s)
+                      return (
+                        <div key={'empty' + i} className="gg-seat-card is-empty">
+                          <span className="gg-seat-card-number">{i + 1}</span>
+                          {mode === 'play' && (
+                            <button type="button" className="gg-seat-take" onClick={() => setHumanSeat(i)}>
+                              {t('坐这里')}
+                            </button>
+                          )}
+                          <button
+                            type="button"
+                            className="gg-seat-add"
+                            onClick={() => {
+                              setEditing('');
+                              setAdding(true);
+                            }}
+                          >
+                            {t('＋ 补一位')}
+                          </button>
+                        </div>
+                      );
                     const model = s.id === 'human' ? undefined : resolved(s),
                       type = s.id === 'human' ? undefined : resolvedMbti(s.id);
                     return (
@@ -887,6 +943,8 @@ export function GroupGames({
                         <span className="gg-chip-row">
                           {s.id === 'human' ? (
                             <span className="gg-tag is-accent">{t('参与')}</span>
+                          ) : sessionPreset[s.id] ? (
+                            <span className="gg-tag is-accent">{PRESETS[sessionPreset[s.id]].name}</span>
                           ) : !s.temporary ? (
                             <span className="gg-tag">{t('沿用人格档案')}</span>
                           ) : type ? (
@@ -895,26 +953,13 @@ export function GroupGames({
                             <span className="gg-tag">{t('随机性格')}</span>
                           )}
                           {s.temporary && <span className="gg-tag">{t('临时')}</span>}
-                          {(overrides[s.id] || (s.temporary && sessionMbti[s.id])) && (
+                          {(overrides[s.id] || sessionPreset[s.id] || (s.temporary && sessionMbti[s.id])) && (
                             <span className="gg-tag">{t('本局修改')}</span>
                           )}
                         </span>
                       </button>
                     );
                   })}
-                  {Array.from({ length: Math.max(0, total - roster.length) }, (_, i) => (
-                    <button
-                      type="button"
-                      key={'empty' + i}
-                      className="gg-seat-card is-empty"
-                      onClick={() => {
-                        setEditing('');
-                        setAdding(true);
-                      }}
-                    >
-                      {t('＋ 空位')}
-                    </button>
-                  ))}
                   {editSeat && editSeat.id !== 'human' && (
                     <div
                       className="gg-seat-pop"
@@ -922,7 +967,7 @@ export function GroupGames({
                       aria-label={t('{name} 的本局设置', { name: editSeat.name })}
                     >
                       <div className="gg-card-head">
-                        <b>{t('{seat} 号 · {name}', { seat: roster.indexOf(editSeat) + 1, name: editSeat.name })}</b>
+                        <b>{t('{seat} 号 · {name}', { seat: slots.indexOf(editSeat) + 1, name: editSeat.name })}</b>
                         <button className="icon-button" aria-label={t('关闭')} onClick={() => setEditing('')}>
                           <Icon name="close" size={14} />
                         </button>
@@ -949,12 +994,40 @@ export function GroupGames({
                         </select>
                       </label>
                       <label>
-                        {t(editSeat.temporary ? '本局性格' : '人格档案')}
-                        {personalityPicker(editSeat)}
+                        {t('本局人格')}
+                        <select
+                          aria-label={t('{name} 的本局人格', { name: editSeat.name })}
+                          value={sessionPreset[editSeat.id] || ''}
+                          onChange={(e) => {
+                            const preset = e.target.value;
+                            setSessionPreset(({ [editSeat.id]: _old, ...rest }) =>
+                              isPresetId(preset) ? { ...rest, [editSeat.id]: preset } : rest,
+                            );
+                          }}
+                        >
+                          <option value="">{t(editSeat.temporary ? '不用预设' : '沿用人格档案')}</option>
+                          {PRESET_IDS.map((id) => (
+                            <option key={id} value={id}>
+                              {PRESETS[id].name}
+                            </option>
+                          ))}
+                        </select>
                       </label>
+                      {sessionPreset[editSeat.id] ? (
+                        <p className="gg-muted gg-pop-note">{t(PRESETS[sessionPreset[editSeat.id]].summary)}</p>
+                      ) : (
+                        <label>
+                          {t(editSeat.temporary ? '本局性格' : '人格档案')}
+                          {personalityPicker(editSeat)}
+                        </label>
+                      )}
                       <div className="gg-pop-actions">
                         <span className="gg-muted">
-                          {t(editSeat.temporary ? '只影响这一局' : '模型只影响这一局；人格沿用 Bot 档案。')}
+                          {t(
+                            editSeat.temporary || sessionPreset[editSeat.id]
+                              ? '只影响这一局'
+                              : '模型只影响这一局；人格沿用 Bot 档案。',
+                          )}
                         </span>
                         <span className="gg-spacer" />
                         <button
@@ -962,10 +1035,22 @@ export function GroupGames({
                           onClick={() => {
                             setOverrides(({ [editSeat.id]: _model, ...rest }) => rest);
                             setSessionMbti(({ [editSeat.id]: _type, ...rest }) => rest);
+                            setSessionPreset(({ [editSeat.id]: _preset, ...rest }) => rest);
                           }}
                         >
                           {t('恢复预设')}
                         </button>
+                        {mode === 'play' && (
+                          <button
+                            className="secondary-button"
+                            onClick={() => {
+                              setHumanSeat(slots.indexOf(editSeat));
+                              setEditing('');
+                            }}
+                          >
+                            {t('和我换座')}
+                          </button>
+                        )}
                         {!editSeat.temporary && (
                           <button
                             className="secondary-button"
