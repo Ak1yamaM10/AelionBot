@@ -7,6 +7,7 @@ import { soulSummary } from '../../shared/chat/bot-soul';
 import { ContextUsageIndicator } from '../app/ContextUsageIndicator';
 import type { ContextOverview } from '../../shared/chat/context-overview';
 import type { RequestMetrics } from '../../shared/chat/request-metrics';
+import type { ModelRequestStatus } from '../../shared/types/model-request-status';
 import { LiveTps } from './LiveTps';
 import { PermissionModePicker } from '../settings/PermissionModePicker';
 import type { HostPermissionMode } from '../../shared/types/permission-types';
@@ -162,6 +163,7 @@ export function BotComposer({
   contextOverview,
   contextCapacity,
   requestMetrics,
+  liveRequest,
   contextControl,
   fixedDesignWorkspace = false,
   designSessionId,
@@ -176,6 +178,8 @@ export function BotComposer({
   contextOverview?: ContextOverview;
   contextCapacity?: number;
   requestMetrics?: RequestMetrics;
+  /** The model request now streaming, for the live speed beside the context ring. */
+  liveRequest?: ModelRequestStatus;
   bot: Pick<Bot, 'id' | 'name'>;
   bots: Bot[];
   draft?: ComposerDraft;
@@ -808,7 +812,7 @@ export function BotComposer({
         {scope.kind === 'bot' && (
           <>
             <span className="context-usage-slot">
-              <LiveTps botId={bot.id} sessionId={scope.sessionId} running={running} />
+              <LiveTps request={liveRequest} running={running} />
               <ContextUsageIndicator
                 overview={contextOverview}
                 capacity={contextCapacity}

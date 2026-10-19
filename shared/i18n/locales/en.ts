@@ -1,7 +1,7 @@
 // en translations keyed by the zh-CN source string.
 export const en: Record<string, string> = {
-  '实时估算：当前可见文字的输出速度；结束后以实际用量为准':
-    'Live estimate: output speed of the visible text; final usage replaces it when the stream ends.',
+  '实时估算：模型当前的输出速度，含思考和工具参数；结束后以实际用量为准':
+    "Live estimate: the model's current output speed, including reasoning and tool arguments; final usage replaces it when the stream ends.",
   '实时输出速度约 {tps} Token 每秒': 'Live output speed: about {tps} tokens per second',
   'TTFT：从模型请求发出到首个输出 Token。TPS：输出 Token ÷ 首 Token 到最后一个流事件的时间。':
     'TTFT: from the model request to the first output token. TPS: output tokens ÷ time from the first token to the last stream event.',

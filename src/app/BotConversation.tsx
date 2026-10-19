@@ -304,6 +304,7 @@ export function BotConversation({
               : undefined
           }
           requestMetrics={requestMetrics}
+          liveRequest={running ? latestRun?.modelRequest : undefined}
           contextCapacity={currentModel?.contextTokens}
           permissionMode={state.hostPermissionModes?.[scope] ?? state.hostPermissionModes?.[botScope]}
           permissionLocked={Boolean(session?.connector)}

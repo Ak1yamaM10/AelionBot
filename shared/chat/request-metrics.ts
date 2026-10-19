@@ -44,7 +44,10 @@ const emoji = (code: number) => (code >= 0x1f000 && code <= 0x1faff) || (code >=
  * and Korean characters average about 1.5 per token, other text about 4 characters per token.
  */
 export function estimateLiveTokens(text: string) {
-  if (!text) return 0;
+  return text ? Math.max(1, Math.round(liveTokenWeight(text))) : 0;
+}
+/** The same estimate unrounded, so stream deltas can be added up. */
+export function liveTokenWeight(text: string) {
   let han = 0,
     symbols = 0,
     other = 0;
@@ -54,5 +57,5 @@ export function estimateLiveTokens(text: string) {
     else if (emoji(code)) symbols++;
     else other++;
   }
-  return Math.max(1, Math.round(han / 1.5 + symbols + other / 4));
+  return han / 1.5 + symbols + other / 4;
 }

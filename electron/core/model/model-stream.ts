@@ -2,32 +2,41 @@ import type { ModelProtocol } from '../../../shared/types/model-types';
 export interface ModelActivity {
   kind: 'text' | 'tool' | 'reasoning' | 'response';
   argumentChars?: number;
+  /** The generated text of this event (reply, reasoning or tool arguments), for the live speed estimate. */
+  text?: string;
 }
 const nonempty = (s: unknown) => typeof s === 'string' && s.length > 0;
+const texts = (...values: unknown[]) => values.filter(nonempty).join('');
 /** Only semantic output counts as progress; role-only frames and pings do not. */
 export function modelEventActivity(protocol: ModelProtocol, event: any): ModelActivity | undefined {
   if (protocol === 'chat') {
     const d = event.choices?.[0]?.delta || event.choices?.[0]?.message;
     if (d?.tool_calls?.length) {
-      const argumentChars = d.tool_calls.reduce(
-        (n: number, c: any) => n + (typeof c.function?.arguments === 'string' ? c.function.arguments.length : 0),
-        0,
-      );
-      if (argumentChars || d.tool_calls.some((c: any) => nonempty(c.function?.name) || nonempty(c.id)))
-        return { kind: 'tool', argumentChars };
+      const text = texts(...d.tool_calls.map((c: any) => c.function?.arguments));
+      if (text || d.tool_calls.some((c: any) => nonempty(c.function?.name) || nonempty(c.id)))
+        return { kind: 'tool', argumentChars: text.length, text };
     }
-    if (nonempty(d?.content)) return { kind: 'text' };
+    if (nonempty(d?.content)) return { kind: 'text', text: d.content };
     if (
       ['reasoning_content', 'reasoning', 'reasoning_details'].some(
         (k) => nonempty(d?.[k]) || (Array.isArray(d?.[k]) && d[k].length),
       )
     )
-      return { kind: 'reasoning' };
+      return {
+        kind: 'reasoning',
+        text: texts(
+          d.reasoning_content,
+          d.reasoning,
+          ...(Array.isArray(d.reasoning_details) ? d.reasoning_details.map((item: any) => item?.text) : []),
+        ),
+      };
   } else if (protocol === 'responses') {
     if (event.type === 'response.function_call_arguments.delta' && nonempty(event.delta))
-      return { kind: 'tool', argumentChars: event.delta.length };
-    if (event.type === 'response.output_text.delta' && nonempty(event.delta)) return { kind: 'text' };
-    if (/reasoning.*delta$/.test(event.type || '') && nonempty(event.delta)) return { kind: 'reasoning' };
+      return { kind: 'tool', argumentChars: event.delta.length, text: event.delta };
+    if (event.type === 'response.output_text.delta' && nonempty(event.delta))
+      return { kind: 'text', text: event.delta };
+    if (/reasoning.*delta$/.test(event.type || '') && nonempty(event.delta))
+      return { kind: 'reasoning', text: event.delta };
     if (event.type === 'response.output_item.added' && event.item?.type === 'function_call') return { kind: 'tool' };
     if (
       (event.type === 'response.output_item.added' &&
@@ -39,13 +48,13 @@ export function modelEventActivity(protocol: ModelProtocol, event: any): ModelAc
     const d = event.delta;
     if (event.type === 'content_block_delta') {
       if (d?.type === 'input_json_delta' && nonempty(d.partial_json))
-        return { kind: 'tool', argumentChars: d.partial_json.length };
-      if (d?.type === 'text_delta' && nonempty(d.text)) return { kind: 'text' };
+        return { kind: 'tool', argumentChars: d.partial_json.length, text: d.partial_json };
+      if (d?.type === 'text_delta' && nonempty(d.text)) return { kind: 'text', text: d.text };
       if (
         (d?.type === 'thinking_delta' && nonempty(d.thinking)) ||
         (d?.type === 'signature_delta' && nonempty(d.signature))
       )
-        return { kind: 'reasoning' };
+        return { kind: 'reasoning', text: texts(d.thinking) };
     }
     if (event.type === 'content_block_start' && event.content_block?.type === 'tool_use') return { kind: 'tool' };
     // Server tools (hosted web search) run on the provider; their blocks mean the turn is still progressing.
@@ -57,9 +66,14 @@ export function modelEventActivity(protocol: ModelProtocol, event: any): ModelAc
   } else if (protocol === 'gemini') {
     const parts = event.candidates?.[0]?.content?.parts || [];
     const call = parts.find((p: any) => p.functionCall);
-    if (call) return { kind: 'tool', argumentChars: JSON.stringify(call.functionCall.args || {}).length };
-    if (parts.some((p: any) => !p.thought && nonempty(p.text))) return { kind: 'text' };
-    if (parts.some((p: any) => p.thought && nonempty(p.text))) return { kind: 'reasoning' };
+    if (call) {
+      const text = JSON.stringify(call.functionCall.args || {});
+      return { kind: 'tool', argumentChars: text.length, text };
+    }
+    if (parts.some((p: any) => !p.thought && nonempty(p.text)))
+      return { kind: 'text', text: texts(...parts.filter((p: any) => !p.thought).map((p: any) => p.text)) };
+    if (parts.some((p: any) => p.thought && nonempty(p.text)))
+      return { kind: 'reasoning', text: texts(...parts.filter((p: any) => p.thought).map((p: any) => p.text)) };
   }
   return undefined;
 }

@@ -2,6 +2,7 @@ import { RequestIdleTimeout } from './request-idle-timeout';
 import { AppError } from '../../../shared/errors';
 import { readModelResponse, modelEventActivity } from './model-stream';
 import { readableContent } from '../../../shared/chat/activity';
+import { liveTokenWeight } from '../../../shared/chat/request-metrics';
 import { RequestTiming } from './request-timing';
 import { contextOverview, countedContextOverview } from '../context/context-overview';
 import type { ContextOverview } from '../../../shared/chat/context-overview';
@@ -545,7 +546,10 @@ export class ModelClient {
         let activityAt = 0,
           lastActivity = '',
           receivedBytes = 0,
-          toolArgumentChars = 0;
+          toolArgumentChars = 0,
+          outputTokens = 0,
+          firstOutputAt = 0,
+          lastOutputAt = 0;
         await readModelResponse(response, {
           signal: requestSignal,
           completed: () => accumulator!.ended,
@@ -578,6 +582,11 @@ export class ModelClient {
               toolArgumentChars += activity.argumentChars || 0;
               timing.activity(activity.kind, activity.argumentChars);
               const now = Date.now();
+              if (activity.text) {
+                outputTokens += liveTokenWeight(activity.text);
+                firstOutputAt ||= now;
+                lastOutputAt = now;
+              }
               if (activity.kind !== lastActivity || now - activityAt >= 250) {
                 lastActivity = activity.kind;
                 activityAt = now;
@@ -586,6 +595,13 @@ export class ModelClient {
                   activity: activity.kind,
                   receivedBytes,
                   toolArgumentChars,
+                  ...(firstOutputAt
+                    ? {
+                        outputTokens: Math.round(outputTokens),
+                        firstOutputAt: new Date(firstOutputAt).toISOString(),
+                        lastOutputAt: new Date(lastOutputAt).toISOString(),
+                      }
+                    : {}),
                   startedAt: new Date(start).toISOString(),
                   updatedAt: new Date(now).toISOString(),
                   attempt: Math.max(0, attempt),

@@ -701,3 +701,42 @@ test('designer timeout recovery changes a stalled large response into a smaller 
   assert.match(bodies[1].messages.at(-1).content, /split large code generation/);
   assert.equal(bodies[0].messages.length, 1);
 });
+test('the live speed estimate counts reasoning and tool arguments, not only reply text', async (t) => {
+  const statuses: ModelRequestStatus[] = [];
+  const baseUrl = await server(t, async (req, res) => {
+    for await (const _ of req) {
+    }
+    res.writeHead(200, { 'content-type': 'text/event-stream' });
+    const send = (delta: unknown) => res.write('data: ' + JSON.stringify({ choices: [{ delta }] }) + '\n\n');
+    send({ reasoning_content: 'a'.repeat(400) });
+    await new Promise((resolve) => setTimeout(resolve, 300));
+    send({
+      tool_calls: [{ index: 0, id: 'c1', type: 'function', function: { name: 'write', arguments: '{"text":"' } }],
+    });
+    await new Promise((resolve) => setTimeout(resolve, 300));
+    send({ tool_calls: [{ index: 0, function: { arguments: '你'.repeat(150) + '"}' } }] });
+    res.end('data: {"choices":[{"delta":{},"finish_reason":"tool_calls"}]}\n\n');
+  });
+  const model = new ModelClient(
+    () => ({ ...cfg, baseUrl }),
+    () => '',
+  );
+  t.after(() => model.dispose());
+  const result = await model.complete(
+    [{ role: 'user', content: 'test' }],
+    [],
+    new AbortController().signal,
+    undefined,
+    {
+      onStatus: (status) => statuses.push(status),
+    },
+  );
+  assert.equal(result.content, '');
+  assert.equal(result.calls.length, 1);
+  const last = statuses.filter((status) => status.phase === 'streaming').at(-1)!;
+  assert.equal(last.activity, 'tool');
+  // 400 reasoning characters ≈ 100 tokens; 150 Chinese characters ≈ 100 tokens; the JSON around them ≈ 3.
+  assert.ok(last.outputTokens! >= 200 && last.outputTokens! <= 205, String(last.outputTokens));
+  assert.ok(Date.parse(last.lastOutputAt!) - Date.parse(last.firstOutputAt!) >= 250);
+  assert.doesNotMatch(JSON.stringify(statuses), /aaaa|你你/);
+});

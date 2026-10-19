@@ -3,6 +3,11 @@ export interface ModelRequestStatus {
   activity?: 'text' | 'tool' | 'reasoning' | 'response';
   receivedBytes?: number;
   toolArgumentChars?: number;
+  /** Estimated output tokens so far (reply, reasoning and tool arguments), for the live speed beside the composer. */
+  outputTokens?: number;
+  /** When this attempt's first and latest counted output arrived. */
+  firstOutputAt?: string;
+  lastOutputAt?: string;
   phase: 'waiting' | 'streaming' | 'retrying';
   startedAt: string;
   updatedAt: string;
