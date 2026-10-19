@@ -85,7 +85,8 @@ export function GroupConversation({
     [loading, setLoading] = useState(false),
     // The match card: at the bottom while a match is live, at the point it ended once it is finished.
     [cardSlot, setCardSlot] = useState<HTMLDivElement | null>(null),
-    [cardEndedAt, setCardEndedAt] = useState<number>();
+    [cardEndedAt, setCardEndedAt] = useState<number>(),
+    [latestGame, setLatestGame] = useState<string>();
   const body = useRef<HTMLDivElement>(null),
     follow = useRef(true),
     stickLock = useRef(0),
@@ -428,6 +429,7 @@ export function GroupConversation({
                   laya={page?.laya}
                   sessions={state.designer?.sessions}
                   vmReady={state.vm.status === 'ready'}
+                  latestGame={latestGame}
                   actions={actions}
                 />
               ),
@@ -486,6 +488,7 @@ export function GroupConversation({
               defaultModel={state.defaultModel}
               cardContainer={cardSlot}
               onCardTime={setCardEndedAt}
+              onLatestMatch={setLatestGame}
             />
           }
           workspaceDir={
@@ -531,6 +534,7 @@ const GroupMessageRow = memo(function GroupMessageRow({
   laya,
   sessions,
   vmReady,
+  latestGame,
   actions,
 }: {
   message: GroupMessage;
@@ -545,6 +549,7 @@ const GroupMessageRow = memo(function GroupMessageRow({
   laya: GroupPage['laya'];
   sessions?: DesignSession[];
   vmReady: boolean;
+  latestGame?: string;
   actions: GroupRowActions;
 }) {
   const { t } = useI18n();
@@ -560,7 +565,21 @@ const GroupMessageRow = memo(function GroupMessageRow({
     );
   if (message.kind === 'reaction') return null;
   if (message.kind === 'system' && message.id.startsWith('game-result:'))
-    return <GameResultCard content={message.content} />;
+    return (
+      <GameResultCard
+        content={message.content}
+        onOpen={
+          message.id === `game-result:${latestGame}`
+            ? () =>
+                window.dispatchEvent(
+                  new CustomEvent('aelion:open-game', {
+                    detail: { groupId: message.groupId, matchId: latestGame },
+                  }),
+                )
+            : undefined
+        }
+      />
+    );
   if (message.kind === 'system' || message.kind === 'continue')
     return <div className="event-message group-system">{message.content}</div>;
   const bot =
@@ -638,7 +657,7 @@ const GroupMessageRow = memo(function GroupMessageRow({
  * A finished match's report as a card of its own, so several matches in a row read as several results instead of
  * one live card and a wall of text. The first line is the outcome; the rest folds away.
  */
-function GameResultCard({ content }: { content: string }) {
+function GameResultCard({ content, onOpen }: { content: string; onOpen?: () => void }) {
   const { t } = useI18n();
   const [first = '', ...rest] = content.split('\n');
   const match = /^(.+?)战报：(.+?)。?$/.exec(first);
@@ -652,6 +671,18 @@ function GameResultCard({ content }: { content: string }) {
           <strong>{match ? t('{game} · 战报', { game: t(match[1]) }) : t('对局战报')}</strong>
           <small>{match ? match[2] : first}</small>
         </span>
+        {onOpen && (
+          <button
+            type="button"
+            className="gg-result-open"
+            onClick={(event) => {
+              event.preventDefault();
+              onOpen();
+            }}
+          >
+            {t('查看对局')} ↗
+          </button>
+        )}
         <span className="gg-result-more">{t('详情')}</span>
       </summary>
       {rest.length > 0 && <p>{rest.join('\n')}</p>}

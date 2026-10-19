@@ -3003,4 +3003,5 @@ export const en: Record<string, string> = {
   和我换座: 'Swap seats with me',
   随机座位: 'Random seat',
   开局随机: 'Random each game',
+  查看对局: 'View match',
 };

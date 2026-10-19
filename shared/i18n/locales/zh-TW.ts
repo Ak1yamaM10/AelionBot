@@ -2947,4 +2947,5 @@ export const zhTW: Record<string, string> = {
   和我换座: '和我換座',
   随机座位: '隨機座位',
   开局随机: '開局隨機',
+  查看对局: '查看對局',
 };

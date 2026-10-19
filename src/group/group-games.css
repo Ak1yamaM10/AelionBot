@@ -2005,3 +2005,16 @@
   font-size: 12px;
   line-height: 1.5;
 }
+.gg-result-open {
+  flex: none;
+  padding: 3px 10px;
+  border: 1px solid light-dark(#e6e1ec, #3e3945);
+  border-radius: 999px;
+  background: none;
+  color: light-dark(#5e4f74, #d6cbe6);
+  font: inherit;
+  font-size: calc(12px * var(--appearance-text-scale, 1));
+}
+.gg-result-open:hover {
+  background: light-dark(#f3eff8, #2c2535);
+}
