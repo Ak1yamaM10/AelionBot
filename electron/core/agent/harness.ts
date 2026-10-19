@@ -1139,7 +1139,7 @@ export class Harness {
         const taskFrame = [
           new RunPolicy(this.store).frame(botId, run.id),
           work.frame(run),
-          reactionRestrictionContext(Boolean(work.forRun(run)), duplicateReaction),
+          reactionRestrictionContext(duplicateReaction),
           this.design?.frame(run),
         ]
           .filter(Boolean)
@@ -1714,11 +1714,7 @@ export class Harness {
                   availableTools.find((tool) => tool.function.name === job.call.function.name)!,
                   args,
                 );
-                const restriction = reactionRestriction(
-                  job.call.function.name,
-                  Boolean(work.forRun(run)),
-                  duplicateReaction,
-                );
+                const restriction = reactionRestriction(job.call.function.name, duplicateReaction);
                 if (restriction) throw new TemporarilyUnavailableTool(restriction);
                 job.dispatched = true;
                 job.output = await this.executeTool(bot, args, job.call.function.name, signal, run.id, options);
@@ -2307,7 +2303,7 @@ export class Harness {
       activeWork = activeRun && new WorkItems(this.store).forRun(activeRun);
     if (activeWork?.status === 'planning' && !PLANNING_TOOLS.has(name))
       throw new TemporarilyUnavailableTool('计划尚未获得用户确认，只能读取资料和完善计划。');
-    const restriction = reactionRestriction(name, Boolean(activeWork));
+    const restriction = reactionRestriction(name);
     if (restriction) throw new TemporarilyUnavailableTool(restriction);
     const workspace = activeRun?.workspaceDir;
     // A default page must fit the inline tool-result budget, or its middle would be elided.
