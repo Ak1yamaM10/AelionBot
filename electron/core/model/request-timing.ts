@@ -10,6 +10,7 @@ export class RequestTiming {
     this.marks.responseBytes = (this.marks.responseBytes || 0) + bytes;
   }
   activity(kind: string, argumentChars = 0) {
+    if (kind !== 'response') this.mark('firstTokenMs');
     this.marks.lastEventMs = Math.max(0, performance.now() - this.start);
     this.marks.outputEvents = (this.marks.outputEvents || 0) + 1;
     if (kind === 'tool') this.mark('firstToolMs');

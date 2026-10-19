@@ -131,6 +131,10 @@ export interface StreamingReply {
   sessionId?: string;
   content: string;
   time: string;
+  /** When the first non-empty content delta arrived, for the live TPS estimate. */
+  firstTokenAt?: string;
+  /** When the latest content delta arrived. */
+  lastTokenAt?: string;
   main: boolean;
   groupId?: string;
   peerThreadId?: string;

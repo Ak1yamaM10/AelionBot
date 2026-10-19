@@ -291,6 +291,7 @@ export class Diagnostics {
               'preparationMs',
               'responseMs',
               'firstEventMs',
+              'firstTokenMs',
               'firstTextMs',
               'firstToolMs',
               'lastEventMs',

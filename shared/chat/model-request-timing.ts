@@ -6,6 +6,7 @@ export interface ModelRequestTiming {
   preparationMs?: number; // First transport dispatch, including local serialization.
   responseMs?: number; // First response/headers, including connect, upload and server wait.
   firstEventMs?: number; // First parsed provider event (possibly reasoning or tool data).
+  firstTokenMs?: number; // First actual output token: text, reasoning or tool arguments.
   firstTextMs?: number; // First text delivered to the reply callback; not necessarily all output tokens.
   firstToolMs?: number;
   lastEventMs?: number;

@@ -369,6 +369,31 @@ textarea {
   gap: 10px;
   margin-top: 3px;
 }
+.context-usage-slot {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  flex-shrink: 0;
+}
+.composer-live-tps {
+  position: absolute;
+  right: calc(100% + 7px);
+  top: 50%;
+  z-index: 1;
+  display: inline-flex;
+  align-items: baseline;
+  gap: 2px;
+  color: light-dark(#7d7389, #c9bdd6);
+  font-size: calc(11px * var(--appearance-text-scale, 1));
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  pointer-events: none;
+  transform: translateY(-50%);
+}
+.composer-live-tps small {
+  font-size: 0.82em;
+  opacity: 0.7;
+}
 .target-badge {
   display: flex;
   gap: 6px;

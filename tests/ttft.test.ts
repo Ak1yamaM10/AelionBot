@@ -100,6 +100,7 @@ for (const toolOnly of [false, true])
       timing.preparationMs! >= 0 &&
         timing.responseMs! >= timing.preparationMs! &&
         timing.firstEventMs! >= timing.responseMs! &&
+        timing.firstTokenMs! >= timing.firstEventMs! &&
         timing.totalMs >= timing.firstEventMs!,
     );
     if (toolOnly) {

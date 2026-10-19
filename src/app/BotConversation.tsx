@@ -129,6 +129,7 @@ export function BotConversation({
     shown,
     timeline,
     lastContext,
+    requestMetrics,
     latestRun,
     running,
     greeting,
@@ -302,6 +303,7 @@ export function BotConversation({
               ? lastContext
               : undefined
           }
+          requestMetrics={requestMetrics}
           contextCapacity={currentModel?.contextTokens}
           permissionMode={state.hostPermissionModes?.[scope] ?? state.hostPermissionModes?.[botScope]}
           permissionLocked={Boolean(session?.connector)}

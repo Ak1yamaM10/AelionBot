@@ -65,6 +65,31 @@
   color: light-dark(#8b8297, #b7a9c6);
   font-variant-numeric: tabular-nums;
 }
+.context-usage-metrics {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  margin-top: 2px;
+  color: light-dark(#93889e, #b7a9c6);
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.context-usage-metrics b {
+  color: light-dark(#7d7389, #c9bdd6);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+}
+.context-usage-metrics strong {
+  color: light-dark(#5d5568, #ece5f3);
+  font-size: 12px;
+  font-weight: 600;
+}
+.context-usage-metrics .sep {
+  color: light-dark(#c5bccd, #5c5266);
+  font-size: 10px;
+}
 .context-usage-total {
   display: flex;
   align-items: center;

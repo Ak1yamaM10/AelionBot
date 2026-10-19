@@ -47,7 +47,16 @@ export class ReplyStreams {
         );
       const formatted = allowed ? botMentions(content, allowed, target.botId, false) : { content, mentions: [] };
       if (previous?.reply.content === formatted.content) return;
-      this.entries.set(target.id, { token, reply: { ...previous.reply, ...formatted } });
+      const at = new Date().toISOString();
+      this.entries.set(target.id, {
+        token,
+        reply: {
+          ...previous.reply,
+          ...formatted,
+          firstTokenAt: formatted.content ? previous.reply.firstTokenAt || at : previous.reply.firstTokenAt,
+          lastTokenAt: formatted.content ? at : previous.reply.lastTokenAt,
+        },
+      });
       if (!previous.reply.content && formatted.content) this.emit();
       else this.schedule();
     };

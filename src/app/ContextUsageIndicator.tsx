@@ -2,6 +2,7 @@ import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import type { ContextOverview, ContextPart } from '../../shared/chat/context-overview';
 import { CONTEXT_PARTS, foldContextParts } from '../../shared/chat/context-overview';
+import type { RequestMetrics } from '../../shared/chat/request-metrics';
 import { useI18n } from '../i18n';
 import './context-usage.css';
 
@@ -65,10 +66,12 @@ function CompactContext({ onCompact }: { onCompact: (focus: string) => Promise<C
 export function ContextUsageIndicator({
   overview,
   capacity,
+  metrics,
   onCompact,
 }: {
   overview?: ContextOverview;
   capacity?: number;
+  metrics?: RequestMetrics;
   onCompact?: (focus: string) => Promise<CompactResult>;
 }) {
   const { t, language } = useI18n(),
@@ -82,6 +85,8 @@ export function ContextUsageIndicator({
   const number = (value: number) => new Intl.NumberFormat(language).format(value);
   const percentage = (value: number) =>
     new Intl.NumberFormat(language, { maximumFractionDigits: 1 }).format(value) + '%';
+  const seconds = (value: number) => new Intl.NumberFormat(language, { maximumFractionDigits: 2 }).format(value / 1000);
+  const decimal = (value: number) => new Intl.NumberFormat(language, { maximumFractionDigits: 1 }).format(value);
   useLayoutEffect(() => {
     if (!open) return;
     const place = () => {
@@ -163,6 +168,24 @@ export function ContextUsageIndicator({
                 {overview ? `${number(overview.tokens)} / ${number(limit)}` : limit ? `— / ${number(limit)}` : '—'}
               </span>
             </header>
+            {metrics && (metrics.ttftMs !== undefined || metrics.tps !== undefined) && (
+              <div
+                className="context-usage-metrics"
+                title={t('TTFT：从模型请求发出到首个输出 Token。TPS：输出 Token ÷ 首 Token 到最后一个流事件的时间。')}
+              >
+                {metrics.ttftMs !== undefined && (
+                  <span>
+                    <b>TTFT</b> <strong>{seconds(metrics.ttftMs)}</strong> s
+                  </span>
+                )}
+                {metrics.ttftMs !== undefined && metrics.tps !== undefined && <span className="sep">·</span>}
+                {metrics.tps !== undefined && (
+                  <span>
+                    <b>TPS</b> <strong>{decimal(metrics.tps)}</strong> tok/s
+                  </span>
+                )}
+              </div>
+            )}
             <div className="context-usage-total">
               <div
                 className="context-usage-bar"

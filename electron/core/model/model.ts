@@ -524,6 +524,7 @@ export class ModelClient {
             if ('</think>'.startsWith(trimmed) && trimmed !== '</think>') return;
             const clean = streamed.replace(/^\s*<\/think>\s*/, '');
             if (clean.length > visible.length) {
+              timing.mark('firstTokenMs');
               timing.mark('firstTextMs');
               onText(clean.slice(visible.length));
               visible = clean;

@@ -84,6 +84,9 @@ test('stream previews hide fragmented control tokens and reasoning, resolve ment
   await until(() => seen.at(-1) === '你好，@伙伴 请核对');
   assert.equal(streams.snapshot()[0].mentions?.[0].id, 'b');
   assert.ok(seen.every((text) => !text.includes('hidden')));
+  const timed = streams.snapshot()[0];
+  assert.ok(timed.firstTokenAt && timed.lastTokenAt);
+  assert.ok(Date.parse(timed.lastTokenAt) >= Date.parse(timed.firstTokenAt));
   const snapshot = streams.snapshot();
   snapshot[0].content = 'mutated';
   assert.notEqual(streams.snapshot()[0].content, 'mutated');

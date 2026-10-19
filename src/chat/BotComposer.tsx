@@ -6,6 +6,8 @@ import type { Bot, BotMention } from '../../shared/types/core';
 import { soulSummary } from '../../shared/chat/bot-soul';
 import { ContextUsageIndicator } from '../app/ContextUsageIndicator';
 import type { ContextOverview } from '../../shared/chat/context-overview';
+import type { RequestMetrics } from '../../shared/chat/request-metrics';
+import { LiveTps } from './LiveTps';
 import { PermissionModePicker } from '../settings/PermissionModePicker';
 import type { HostPermissionMode } from '../../shared/types/permission-types';
 import { ComposerTools } from './ComposerTools';
@@ -159,6 +161,7 @@ export function BotComposer({
   permissionLocked = false,
   contextOverview,
   contextCapacity,
+  requestMetrics,
   contextControl,
   fixedDesignWorkspace = false,
   designSessionId,
@@ -172,6 +175,7 @@ export function BotComposer({
   contextControl?: ReactNode;
   contextOverview?: ContextOverview;
   contextCapacity?: number;
+  requestMetrics?: RequestMetrics;
   bot: Pick<Bot, 'id' | 'name'>;
   bots: Bot[];
   draft?: ComposerDraft;
@@ -803,20 +807,24 @@ export function BotComposer({
         {extraTools}
         {scope.kind === 'bot' && (
           <>
-            <ContextUsageIndicator
-              overview={contextOverview}
-              capacity={contextCapacity}
-              onCompact={
-                designSessionId || fixedDesignWorkspace
-                  ? undefined
-                  : (focus) =>
-                      window.aelion.compactContext({
-                        botId: bot.id,
-                        focus,
-                        ...(scope.sessionId ? { sessionId: scope.sessionId } : {}),
-                      })
-              }
-            />
+            <span className="context-usage-slot">
+              <LiveTps botId={bot.id} sessionId={scope.sessionId} running={running} />
+              <ContextUsageIndicator
+                overview={contextOverview}
+                capacity={contextCapacity}
+                metrics={requestMetrics}
+                onCompact={
+                  designSessionId || fixedDesignWorkspace
+                    ? undefined
+                    : (focus) =>
+                        window.aelion.compactContext({
+                          botId: bot.id,
+                          focus,
+                          ...(scope.sessionId ? { sessionId: scope.sessionId } : {}),
+                        })
+                }
+              />
+            </span>
             <PermissionModePicker scope={scope} mode={permissionMode} locked={permissionLocked} />
           </>
         )}

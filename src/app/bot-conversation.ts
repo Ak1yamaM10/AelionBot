@@ -1,5 +1,6 @@
 import type { Bot, ChatMessage, RunRecord, Snapshot } from '../../shared/types/core';
 import { conversationTimeline } from '../../shared/chat/activity';
+import { requestMetrics } from '../../shared/chat/request-metrics';
 import { firstDeliveries } from '../../shared/types/attachment-types';
 import { isPrivatePeerOrigin } from '../../shared/types/peer-types';
 
@@ -33,6 +34,11 @@ export function botConversation(state: Snapshot | undefined, bot: Bot | undefine
       run.botId === bot?.id && run.sessionId === sessionId && !isPrivatePeerOrigin(run.peerOrigin) && !run.groupOrigin,
   );
   const lastContext = botRuns.filter((run) => run.contextOverview).at(-1)?.contextOverview;
+  const runIds = new Set(botRuns.map((run) => run.id)),
+    latestRequest = (state?.modelUsage || [])
+      .filter((record) => record.runId && runIds.has(record.runId) && (record.purpose || 'foreground') === 'foreground')
+      .at(-1),
+    latestRequestMetrics = latestRequest && !latestRequest.error ? requestMetrics(latestRequest) : undefined;
   const latestRun = botRuns.at(-1);
   // Busy in this chat: running here, or input waiting here (also while the Bot finishes work in another chat).
   const running = Boolean(
@@ -61,6 +67,7 @@ export function botConversation(state: Snapshot | undefined, bot: Bot | undefine
     shown: firstDeliveries(messages),
     timeline,
     lastContext,
+    requestMetrics: latestRequestMetrics,
     latestRun,
     running,
     greeting,

@@ -1,5 +1,9 @@
 // zh-TW translations keyed by the zh-CN source string.
 export const zhTW: Record<string, string> = {
+  '实时估算：当前可见文字的输出速度；结束后以实际用量为准': '即時估算：目前可見文字的輸出速度；結束後以實際用量為準',
+  '实时输出速度约 {tps} Token 每秒': '即時輸出速度約 {tps} Token 每秒',
+  'TTFT：从模型请求发出到首个输出 Token。TPS：输出 Token ÷ 首 Token 到最后一个流事件的时间。':
+    'TTFT：從模型請求發出到首個輸出 Token。TPS：輸出 Token ÷ 首 Token 到最後一個流事件的時間。',
   不影响私聊: '不影響私聊',
   '私聊沿用原有 SOUL；游戏人格、成长和关系不会注入私聊。': '私聊沿用原有 SOUL；遊戲人格、成長和關係不會注入私聊。',
   已有经历记录: '已有經歷記錄',
