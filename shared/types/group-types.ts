@@ -47,7 +47,6 @@ const conversationTools = new Set([
   'user_input_wait',
   'view_image',
   'tool_search',
-  'web_search',
   'web_read',
   'mcp_list_resource_templates',
   'terminal_read',

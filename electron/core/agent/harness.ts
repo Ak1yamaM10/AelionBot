@@ -66,7 +66,7 @@ import { chatInputText, validateChatInput } from './chat-input';
 import { ReplyStreams, type StreamTarget } from './reply-streams';
 import { skillCatalog } from '../extensions/skill-catalog';
 import { Attachments } from '../attachments/attachments';
-import { hiddenClientTools, hostedGeneratedImages } from '../tools/hosted-tools';
+import { hostedGeneratedImages } from '../tools/hosted-tools';
 import { ContentPolicyError, quarantinePolicyContext } from '../model/model-content-policy';
 import { CodeOrchestrator } from '../tools/code-orchestrator';
 import { TerminalSessions } from '../tools/terminal-sessions';
@@ -2103,10 +2103,8 @@ export class Harness {
                 ) ||
                   this.integrations),
             );
-    const hiddenHosted = hiddenClientTools(this.store.modelFor(botId));
     const availableTools = baseTools.filter(
       (t) =>
-        !hiddenHosted.has(t.function.name) &&
         !this.disabledTools.has(t.function.name) &&
         (!this.headless || !HEADLESS_HIDDEN_TOOLS.has(t.function.name)) &&
         (t.function.name !== 'video_frames' || Boolean(this.video)) &&

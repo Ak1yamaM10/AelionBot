@@ -12,7 +12,7 @@ Scope the question, time window, and level of evidence. For a quick lookup, find
 
 ## Gather and verify
 
-Discover pages with the search that is actually available. If the provider runs the search itself (hosted Responses or Claude web search), use that; do not call or look up a separate client `web_search` tool. Otherwise use the client `web_search` tool. Treat those results as leads. Open the specific public page with `web_read` and follow its pagination; an excerpt is not the whole source. Prefer original documentation, data, papers, and first-hand announcements. Distinguish publication date from event date.
+Discover pages with the search that is actually available. If the provider runs the search itself (hosted Responses or Claude web search), use that; do not look for an in-app `web_search` tool because the app does not ship one. Otherwise use an enabled search MCP tool. Treat those results as leads. Open the specific public page with `web_read` and follow its pagination; an excerpt is not the whole source. Prefer original documentation, data, papers, and first-hand announcements. Distinguish publication date from event date.
 
 For a JavaScript-rendered page or user-authorized signed-in work, open the work-computer browser with `computer`. Do not use that browser for an ordinary static page that `web_read` can fetch. Observe the current screen before actions; use a browser MCP only if it is already enabled. Public `web_read` does not execute JavaScript or inherit browser cookies. Do not install an unrelated service or ask for a new API key just because an upstream workflow used it.
 

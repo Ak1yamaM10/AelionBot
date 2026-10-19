@@ -12,7 +12,7 @@
 | 用户提问 | `request_user_input`、`user_input_wait` | 一至三个问题，可选项或自由填写，显示在输入框上方并发出浮动通知。默认允许 Bot 继续独立工作；答案进入原会话。 |
 | 本机图片 | `view_image` | 经本机读取权限后读取图片，使用现有 Electron 图像解码与预览通道送给模型，保留图片来源及 hash。 |
 | 工具发现 | `tool_search`、`mcp_list_resource_templates` | 搜索当前可用内置工具和已启用 MCP；支持完整 MCP 工具集合与资源模板、资源列表分页。 |
-| 网页检索 | `web_search`、`web_read` | 搜索公开网页，提取正文、标题、链接；按 Bot 保存有期限的分页快照。默认 Bing RSS，失败后尝试 DuckDuckGo HTML。 |
+| 网页阅读 | `web_read` | 提取公开网页正文、标题、链接；按 Bot 保存有期限的分页快照。搜索使用模型服务端内置搜索或已启用的 MCP 搜索工具。 |
 
 ## 运行与权限
 

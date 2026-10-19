@@ -191,7 +191,6 @@ test('all new tools have strict argument schemas and no subagent creation is int
     'user_input_wait',
     'view_image',
     'tool_search',
-    'web_search',
     'web_read',
     'mcp_list_resource_templates',
   ])

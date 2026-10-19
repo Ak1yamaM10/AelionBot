@@ -91,7 +91,7 @@ test('stable builtin identities preserve per-Bot state across installation paths
 test('bundled skills follow the available search tool and do not default to a desktop app', () => {
   const research = readFileSync(join(bundled, 'web-research', 'SKILL.md'), 'utf8');
   assert.match(research, /hosted Responses or Claude web search/);
-  assert.match(research, /do not call or look up a separate client `web_search` tool/);
+  assert.match(research, /do not look for an in-app `web_search` tool/);
   assert.match(research, /Do not use that browser for an ordinary static page/);
   const ui = readFileSync(join(bundled, 'web-ui-design', 'SKILL.md'), 'utf8');
   assert.match(ui, /There is no separate host-browser tool/);

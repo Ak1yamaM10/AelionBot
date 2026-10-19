@@ -5,7 +5,6 @@ import { ModelClient } from '../electron/core/model/model';
 import { protocolRequest, StreamAccumulator, nativeKey } from '../electron/core/model/model-protocol';
 import { modelEventActivity } from '../electron/core/model/model-stream';
 import { modelParameters } from '../electron/core/model/model-providers';
-import { hiddenClientTools } from '../electron/core/tools/hosted-tools';
 import type { ModelConfig } from '../shared/types/core';
 import type { ToolDefinition } from '../electron/core/model/model';
 
@@ -31,8 +30,8 @@ async function server(t: test.TestContext, handler: RequestListener) {
 }
 const sse = (events: unknown[]) => events.map((event) => 'data: ' + JSON.stringify(event) + '\n\n').join('');
 
-test('Claude hosted web search replaces the client web_search tool in the request', () => {
-  const tools = [tool('web_search'), tool('web_read')];
+test('Claude hosted web search is added to the request', () => {
+  const tools = [tool('web_read')];
   const hosted = protocolRequest(
     { ...claude, hostedWebSearch: true },
     [{ role: 'user', content: 'q' }],
@@ -51,8 +50,6 @@ test('Claude hosted web search replaces the client web_search tool in the reques
   assert.equal(body.tools.filter((item: any) => item.input_schema).length, 1);
   const plain = protocolRequest(claude, [{ role: 'user', content: 'q' }], tools, 4096, 'k', () => '').body as any;
   assert.ok(plain.tools.every((item: any) => item.input_schema));
-  assert.deepEqual(hiddenClientTools({ protocol: 'anthropic', hostedWebSearch: true }), new Set(['web_search']));
-  assert.deepEqual(hiddenClientTools({ protocol: 'chat', hostedWebSearch: true }), new Set());
 });
 
 test('provider parameters keep hosted search for Claude and Responses only', () => {

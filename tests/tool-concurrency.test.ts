@@ -22,7 +22,7 @@ test('computer stays exclusive; file writes lock by path instead of globally', (
   assert.equal(isSerialTool('file_write'), true);
   assert.equal(isExclusiveTool('file_write'), false);
   assert.equal(isSerialTool('file_read'), false);
-  assert.equal(isSerialTool('web_search'), false);
+  assert.equal(isSerialTool('web_read'), false);
   assert.deepEqual(writeLockPaths('file_write', { path: 'a/note.md' }), ['host:a/note.md']);
   assert.deepEqual(writeLockPaths('file_write', { path: 'a/note.md', location: 'vm' }), ['vm:a/note.md']);
   assert.deepEqual(writeLockPaths('file_write', { path: 'C:\\Users\\example\\a.ts' }), ['host:C:/Users/example/a.ts']);

@@ -25,7 +25,6 @@ const operations: Record<string, { label: string; active: string; icon: string }
   view_image: { label: '查看图片', active: '正在查看图片', icon: 'file' },
   generate_image: { label: '生成图片', active: '正在生成图片', icon: 'file' },
   tool_search: { label: '查找工具', active: '正在查找工具', icon: 'search' },
-  web_search: { label: '搜索网页', active: '正在搜索网页', icon: 'globe' },
   web_read: { label: '阅读网页', active: '正在阅读网页', icon: 'globe' },
   mcp_list_resource_templates: { label: '查找资源模板', active: '正在查找资源模板', icon: 'search' },
   python_session: { label: '处理 Python 数据', active: '正在处理 Python 数据', icon: 'terminal' },

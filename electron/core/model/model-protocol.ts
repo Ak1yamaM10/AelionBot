@@ -7,7 +7,7 @@ import { modelUsage } from './model-usage';
 import { anthropicHistoryEndpoints } from '../context/anthropic-cache';
 import { anthropicReasoning } from './anthropic-thinking';
 import { repairToolHistory } from '../tools/tool-history';
-import { hiddenClientTools, hostedAnthropicTools, hostedResponseTools } from '../tools/hosted-tools';
+import { hostedAnthropicTools, hostedResponseTools } from '../tools/hosted-tools';
 import { taggedReasoning } from '../../../shared/chat/activity';
 
 export const nativeKey = (cfg: ModelConfig) => `${cfg.providerId || ''}:${cfg.baseUrl.replace(/\/$/, '')}:${cfg.model}`;
@@ -127,11 +127,8 @@ function buildProtocolRequest(
           arguments: call.function.arguments,
         });
     }
-    const hidden = hiddenClientTools(cfg),
-      hosted = hostedResponseTools(cfg),
-      functionTools = tools
-        .filter((tool) => !hidden.has(tool.function.name))
-        .map((t) => ({ type: 'function', ...t.function, strict: false })),
+    const hosted = hostedResponseTools(cfg),
+      functionTools = tools.map((t) => ({ type: 'function', ...t.function, strict: false })),
       responseTools = [...hosted, ...functionTools];
     return {
       url: base + '/responses',
@@ -241,17 +238,14 @@ function buildProtocolRequest(
     }));
     for (const part of [...new Set(cacheCandidates)].slice(-2)) part.cache_control = { type: 'ephemeral' };
     const reasoning = anthropicReasoning(cfg, output);
-    const hidden = hiddenClientTools(cfg),
-      anthropicTools = [
-        ...hostedAnthropicTools(cfg),
-        ...tools
-          .filter((t) => !hidden.has(t.function.name))
-          .map((t) => ({
-            name: t.function.name,
-            description: t.function.description,
-            input_schema: t.function.parameters,
-          })),
-      ];
+    const anthropicTools = [
+      ...hostedAnthropicTools(cfg),
+      ...tools.map((t) => ({
+        name: t.function.name,
+        description: t.function.description,
+        input_schema: t.function.parameters,
+      })),
+    ];
     return {
       url: base + '/messages',
       headers,

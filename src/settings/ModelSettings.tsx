@@ -670,7 +670,7 @@ function ProviderEditor({
                 checked={Boolean(parameters.hostedWebSearch)}
                 disabled={disabled || pending}
                 onChange={(event) => setParameters({ ...parameters, hostedWebSearch: event.target.checked })}
-                aria-label={t('使用服务端内置搜索，不再提供应用内 web_search')}
+                aria-label={t('使用服务端内置搜索；应用内不再提供内置搜索工具')}
               />
             </label>
             {responses && (

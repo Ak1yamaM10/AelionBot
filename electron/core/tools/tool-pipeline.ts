@@ -3,7 +3,6 @@ export const READ_TOOLS = new Set([
   'view_image',
   'tool_search',
   'web_read',
-  'web_search',
   'mcp_list_resource_templates',
   'file_read',
   'list_directory',

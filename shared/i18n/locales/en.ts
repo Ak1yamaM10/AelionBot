@@ -1455,8 +1455,8 @@ export const en: Record<string, string> = {
   模型目录已更新: 'Model catalog updated',
   对话默认: 'Chat default',
   'Responses 工具': 'Responses tools',
-  '使用服务端内置搜索，不再提供应用内 web_search':
-    "Use the provider's built-in search instead of the in-app web_search",
+  '使用服务端内置搜索；应用内不再提供内置搜索工具':
+    "Use the provider's built-in search; the app no longer ships a built-in search tool",
   '使用服务端内置生图，由 Responses 直接出图': "Use the provider's built-in image generation through Responses",
   筛选模型: 'Filter models',
   自定义模型名称: 'Custom model name',

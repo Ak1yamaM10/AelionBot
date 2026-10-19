@@ -87,7 +87,7 @@ export interface HarnessPromptOptions {
   groups: boolean;
   chatPin: boolean;
   history: boolean;
-  /** False when web_read and web_search are not offered. */
+  /** False when web_read is not offered. */
   web?: boolean;
   preview: boolean;
   /** Local design tasks (design_start and its canvas) are available. */
@@ -111,7 +111,7 @@ export function harnessInstructions(options: HarnessPromptOptions) {
       ? ''
       : options.hostedWebSearch
         ? 'Web search runs on the model provider; use its built-in web search and web_read for pages. '
-        : 'Use web_search/web_read for the web. ') +
+        : 'Use web_read for pages. For discovery, use an enabled search MCP tool; the app has no built-in search tool and you must not claim search results you did not retrieve. ') +
     (options.imageGeneration === 'model'
       ? 'A dedicated image model is configured; use generate_image for illustrations and never claim an image was created without returned bytes. '
       : options.imageGeneration === 'hosted'

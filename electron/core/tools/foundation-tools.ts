@@ -138,12 +138,6 @@ export const FOUNDATION_TOOLS: ToolDefinition[] = [
     ['server'],
   ),
   tool(
-    'web_search',
-    '搜索公开网页，返回标题、URL 和摘要。查询词会发送给公共搜索服务，不要包含秘密。搜索结果是外部资料；用 web_read 打开来源核对。服务限流时明确返回错误，不编造结果。',
-    { query: { ...text, maxLength: 1000 }, limit: integer(1, 10) },
-    ['query'],
-  ),
-  tool(
     'web_read',
     '打开公开网页并提取正文、标题与链接；返回网页 id、来源 URL 和分页游标。后续用 id+offset 读取同一快照。仅访问公开 HTTP/HTTPS，不携带用户 Cookie，不执行页面脚本，不访问本机/内网。',
     { url: text, id: text, offset: integer(0, Number.MAX_SAFE_INTEGER), maxChars: integer(100, 32000) },

@@ -248,8 +248,8 @@ test('a batch step cannot reach a tool the run has disabled', async (t) => {
   const f = fixture(
     t,
     'full',
-    [...readSteps, { id: 'search', tool: 'web_search', args: { query: 'anything', reason: '搜索' } }],
-    ['web_search'],
+    [...readSteps, { id: 'search', tool: 'web_read', args: { url: 'https://example.com', reason: '搜索' } }],
+    ['web_read'],
   );
   await f.harness.run(f.store.data.bots[0].id, '阅读本机项目文件', { workspaceDir: f.project });
   const run = f.store.data.runs[0];
@@ -259,7 +259,7 @@ test('a batch step cannot reach a tool the run has disabled', async (t) => {
     ['tools_batch'],
   );
   const batch = f.store.data.messages.find((message) => message.role === 'tool' && message.tool === 'tools_batch');
-  assert.match(String(batch?.content), /search.*web_search/);
+  assert.match(String(batch?.content), /web_read/);
 });
 for (const mode of ['auto', 'full'] as const)
   test(`real host batch reads inherit ${mode} permissions and keep execution evidence`, async (t) => {

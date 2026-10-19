@@ -25,7 +25,7 @@ import { groupPending } from '../shared/types/group-types';
 import type { VmController } from '../electron/core/vm/vm';
 import type { WireMessage } from '../shared/types/core';
 import { protocolRequest } from '../electron/core/model/model-protocol';
-import { hiddenClientTools, hostedGeneratedImages } from '../electron/core/tools/hosted-tools';
+import { hostedGeneratedImages } from '../electron/core/tools/hosted-tools';
 import { TOOLS } from '../electron/core/agent/harness';
 
 test('provider reasoning migrates once to independent Bot settings and the default reviewer', (t) => {
@@ -59,7 +59,7 @@ test('provider reasoning migrates once to independent Bot settings and the defau
   reopened.dispose();
 });
 
-test('responses hosted web search is marked on the provider and replaces the client search tool', (t) => {
+test('responses hosted web search is marked on the provider and sent with function tools', (t) => {
   const f = fixture(t),
     providers = f.router(),
     bot = f.store.data.bots[0];
@@ -77,18 +77,16 @@ test('responses hosted web search is marked on the provider and replaces the cli
   assert.equal(config.reasoningEffort, 'high');
   assert.equal(config.hostedWebSearch, true);
   assert.equal(config.hostedImageGeneration, true);
-  assert.deepEqual(hiddenClientTools(config), new Set(['web_search']));
   const body = protocolRequest(
     config,
     [{ role: 'user', content: 'search' }],
-    TOOLS.filter((tool) => tool.function.name === 'web_search' || tool.function.name === 'web_read'),
+    TOOLS.filter((tool) => tool.function.name === 'web_read'),
     1024,
     '',
     () => '',
   ).body as any;
   assert.ok(body.tools.some((tool: any) => tool.type === 'web_search'));
   assert.ok(body.tools.some((tool: any) => tool.type === 'image_generation'));
-  assert.ok(!body.tools.some((tool: any) => tool.type === 'function' && tool.name === 'web_search'));
   assert.ok(body.tools.some((tool: any) => tool.type === 'function' && tool.name === 'web_read'));
   providers.updateModel(provider.id, { id: 'gpt-test', contextTokens: 128000, hostedWebSearch: true } as any);
   assert.equal((providers.list()[0].models[0] as any).hostedWebSearch, undefined);

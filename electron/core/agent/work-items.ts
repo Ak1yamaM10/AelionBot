@@ -18,7 +18,6 @@ export const PLANNING_TOOLS = new Set([
   'view_image',
   'video_frames',
   'tool_search',
-  'web_search',
   'web_read',
   'request_user_input',
   'user_input_wait',
