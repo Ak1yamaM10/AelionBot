@@ -75,6 +75,23 @@ test('sent controls stay before generated output, and reference changes append a
   assert.deepEqual(d.slice(0, b.length), b);
   assert.equal(d.at(-1)?.content, 'memory v1', 'reverting a preference appends its current value');
 });
+test('a summary resent after the latest user input is a system message, not a reply of this turn', (t) => {
+  const f = fixture(t);
+  f.input.reference = [{ role: 'assistant', content: 'summary v1' }];
+  const first = new ContextView(f.storage, f.bot.id, 'main'),
+    a = first.compose(f.input, f.input.history);
+  first.persist();
+  assert.equal(a.find((message) => message.content === 'summary v1')?.role, 'assistant');
+  f.input.reference = [
+    { role: 'system', content: 'design rules' },
+    { role: 'assistant', content: 'summary v1' },
+  ];
+  const b = new ContextView(f.storage, f.bot.id, 'main').compose(f.input, f.input.history);
+  const user = b.findIndex((message) => message.role === 'user');
+  assert.deepEqual(b.slice(0, a.length), a);
+  assert.ok(b.slice(user + 1).some((message) => message.content === 'summary v1'));
+  assert.ok(b.slice(user + 1).every((message) => message.role === 'system'));
+});
 test('views reset at compaction, isolate scopes, and Bot removal clears persisted context', (t) => {
   const f = fixture(t),
     view = new ContextView(f.storage, f.bot.id, 'main');

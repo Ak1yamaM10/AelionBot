@@ -2,6 +2,16 @@ import type { WireMessage } from '../../../shared/types/core';
 import type { CognitiveStore } from '../memory/cognitive-store';
 import { historySourceHash, messageSourceHash, sourceHash } from './context-budget';
 
+/**
+ * Reference copies re-sent mid-conversation carry the summary and snapshots as system messages. As assistant
+ * messages after the latest user input they read as replies of this turn, and a thinking-mode provider such as
+ * DeepSeek then requires their reasoning and rejects the request.
+ */
+const midConversation = (message: WireMessage): WireMessage =>
+  message.role === 'assistant' && !message.tool_calls?.length && !message.native
+    ? { ...message, role: 'system' }
+    : message;
+
 interface Event {
   at: number;
   messages: WireMessage[];
@@ -101,7 +111,7 @@ export class ContextView {
     }
     const result: WireMessage[] = [system, ...state.reference];
     for (let index = 0; index <= visible.length; index++) {
-      result.push(...(events.get(through + index) || []));
+      result.push(...(events.get(through + index) || []).map(midConversation));
       if (index < visible.length) {
         const message = visible[index];
         if (message.images?.length)

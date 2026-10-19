@@ -39,7 +39,7 @@ export function contextOverview(
           : 'conversation';
     if (
       (message.role === 'system' && message.content?.startsWith('当前可用技能清单：')) ||
-      (message.role === 'assistant' && message.content?.startsWith('已使用技能的参考快照（'))
+      (message.role !== 'tool' && message.content?.startsWith('已使用技能的参考快照（'))
     )
       kind = 'skills';
     parts[kind] += messageTokens(message);
