@@ -27,6 +27,8 @@ export interface AppConnector {
   tokenUrl?: string;
   /** Runs on this computer, inside another app. */
   local?: boolean;
+  /** Served inside this app over the service's own API; `url` names the API and keys the stored token. */
+  builtin?: boolean;
 }
 
 export const APP_CONNECTOR_GROUPS: Array<{ id: AppConnectorGroup; name: string }> = [
@@ -334,6 +336,16 @@ export const APP_CONNECTORS: AppConnector[] = [
   app('mercury', 'Mercury', '查询 Mercury 的账户和交易', 'commerce', 'https://mcp.mercury.com/mcp'),
   app('context7', 'Context7', '查最新的库和框架文档', 'reference', 'https://mcp.context7.com/mcp', 'none'),
   app('deepwiki', 'DeepWiki', '了解 GitHub 开源仓库的结构和用法', 'reference', 'https://mcp.deepwiki.com/mcp', 'none'),
+  {
+    id: 'deepseek',
+    name: 'DeepSeek',
+    description: '用 DeepSeek 搜索网页和读取网页正文',
+    group: 'reference',
+    url: 'https://api.deepseek.com/v1/tools',
+    auth: 'token',
+    tokenUrl: 'https://platform.deepseek.com/api_keys',
+    builtin: true,
+  },
   app('exa', 'Exa', '用 Exa 搜索网页和抓取内容', 'reference', 'https://mcp.exa.ai/mcp', 'none'),
   app(
     'microsoft-learn',

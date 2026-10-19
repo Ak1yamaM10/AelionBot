@@ -2839,6 +2839,7 @@ export const en: Record<string, string> = {
   '查询 Mercury 的账户和交易': 'Look up Mercury accounts and transactions',
   查最新的库和框架文档: 'Look up current library and framework docs',
   '了解 GitHub 开源仓库的结构和用法': 'Learn how GitHub repositories are built and used',
+  '用 DeepSeek 搜索网页和读取网页正文': 'Search the web and read pages with DeepSeek',
   '用 Exa 搜索网页和抓取内容': 'Search the web and fetch pages with Exa',
   搜索微软官方文档和代码示例: 'Search Microsoft docs and code samples',
   '搜索 AWS 官方文档和区域信息': 'Search AWS docs and regional availability',

@@ -3,6 +3,7 @@ import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js';
 import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
 import { SSEClientTransport } from '@modelcontextprotocol/sdk/client/sse.js';
+import type { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
 import { ToolListChangedNotificationSchema, type Tool } from '@modelcontextprotocol/sdk/types.js';
 import type { HostPermissionDetails, McpServerView, ScreenReference } from '../../../shared/types/core';
 import { publicEndpoint, redactMcp, type McpConfig } from './mcp-config';
@@ -12,8 +13,9 @@ import { UnauthorizedError } from '@modelcontextprotocol/sdk/client/auth.js';
 import { appConnectorFor } from '../../../shared/app-connectors';
 import { backgroundProvider, type McpAuthStore, type OwnClient } from './mcp-auth';
 import { mcpContext, type McpContextOptions, type McpServerState, type NativeRoute } from './mcp-native';
+import { deepseekTransport } from './deepseek-tools';
 
-type Transport = StdioClientTransport | StreamableHTTPClientTransport | SSEClientTransport;
+type Transport = StdioClientTransport | StreamableHTTPClientTransport | SSEClientTransport | InMemoryTransport;
 interface Connection {
   client: Client;
   transport: Transport;
@@ -239,7 +241,11 @@ export class McpRuntime {
             : undefined;
       const requestInit = { headers };
       let transport: Transport;
-      if (mode === 'stdio') {
+      if (signIn && appConnectorFor(config.url)?.builtin) {
+        // Served in this app; without a key it asks for one, like a remote server refusing the connection.
+        if (!pasted) throw new UnauthorizedError();
+        transport = await deepseekTransport(pasted);
+      } else if (mode === 'stdio') {
         const stdio = new StdioClientTransport({
           command: config.command!,
           args: config.args,
