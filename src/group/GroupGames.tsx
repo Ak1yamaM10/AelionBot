@@ -92,6 +92,7 @@ export function GroupGames({
   const [match, setMatch] = useState<GameView | null>(null);
   const [open, setOpen] = useState(initialOpen),
     [screen, setScreen] = useState<'select' | 'presets' | 'persona' | 'room' | 'table'>(match ? 'table' : 'select');
+  const [shuffleSeats, setShuffleSeats] = useState(true);
   const [mode, setMode] = useState<'play' | 'watch'>('play'),
     [selected, setSelected] = useState<string[]>(members.slice(0, 11).map((m) => m.id));
   const [omniscient, setOmniscient] = useState(false),
@@ -153,6 +154,7 @@ export function GroupGames({
         setSeatCount(saved.seatCount);
         setBlank(saved.blank === true);
       }
+      if (typeof saved.shuffleSeats === 'boolean') setShuffleSeats(saved.shuffleSeats);
       if (['play', 'watch'].includes(saved.mode) && Array.isArray(saved.selected)) {
         setMode(saved.mode);
         setSelected(
@@ -310,6 +312,7 @@ export function GroupGames({
         groupId,
         mode: game,
         ...(game === 'werewolf' ? { board } : { blank: blank && seatCount >= 7 }),
+        shuffleSeats,
         players: roster.map((p) => ({
           id: p.id,
           name: p.name,
@@ -330,6 +333,7 @@ export function GroupGames({
           overrides,
           sessionMbti,
           sessionPreset,
+          shuffleSeats,
           ...(game === 'werewolf' ? { board } : { seatCount, blank }),
         };
         localStorage.setItem(
@@ -795,6 +799,30 @@ export function GroupGames({
                     </button>
                   </div>
                   <p className="gg-muted">{t('旁观时可以随时切换「全知视角」看所有身份。')}</p>
+                  <div className="gg-label">{t('座位')}</div>
+                  <div className="gg-seg" role="radiogroup">
+                    <button
+                      type="button"
+                      role="radio"
+                      aria-checked={shuffleSeats}
+                      className={shuffleSeats ? 'is-on' : ''}
+                      onClick={() => setShuffleSeats(true)}
+                    >
+                      {t('开局随机')}
+                    </button>
+                    <button
+                      type="button"
+                      role="radio"
+                      aria-checked={!shuffleSeats}
+                      className={!shuffleSeats ? 'is-on' : ''}
+                      onClick={() => setShuffleSeats(false)}
+                    >
+                      {t('按列表顺序')}
+                    </button>
+                  </div>
+                  <p className="gg-muted">
+                    {t(shuffleSeats ? '开局时打乱座位，谁先发言每局不同。' : '按右边列表的顺序入座，你坐 1 号。')}
+                  </p>
                 </div>
                 <details className="gg-rule-details">
                   <summary>{t('完整规则')}</summary>

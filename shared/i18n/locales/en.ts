@@ -2997,4 +2997,8 @@ export const en: Record<string, string> = {
   本局人格: 'Personality this match',
   '{name} 的本局人格': "{name}'s personality this match",
   不用预设: 'No preset',
+  座位: 'Seats',
+  按列表顺序: 'In list order',
+  '开局时打乱座位，谁先发言每局不同。': 'Seats are shuffled at the start, so who speaks first changes every match.',
+  '按右边列表的顺序入座，你坐 1 号。': 'Players sit in the order of the list on the right, and you take seat 1.',
 };
