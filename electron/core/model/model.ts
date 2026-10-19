@@ -33,6 +33,7 @@ import {
   omitToolResultBodies,
 } from './model-content-policy';
 import { ResponsesTransport, websocketEnabled, type TransportStats } from './responses-transport';
+import { recoverTextToolCalls } from './text-tool-calls';
 export interface ToolDefinition {
   type: 'function';
   function: { name: string; description: string; parameters: Record<string, unknown> };
@@ -227,7 +228,7 @@ export class ModelClient {
       const next = await this.request([...messages, assistantMessage(result)], tools, signal, onText, options);
       result = mergePausedTurn(result, next);
     }
-    return result;
+    return recoverTextToolCalls(result, tools);
   }
   private async request(
     messages: WireMessage[],
