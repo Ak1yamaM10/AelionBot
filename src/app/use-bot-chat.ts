@@ -62,8 +62,8 @@ export function useBotChat(input: {
     }
     const saved = draft,
       botId = bot.id,
-      // While the canvas shows a design task of this chat, the message continues that task.
-      designSessionId = activeDesignId({ kind: 'bot', id: botId, ...(sessionId ? { sessionId } : {}) });
+      // The design task on this chat's canvas; the Bot continues it only when the message asks for design work.
+      openDesignSessionId = activeDesignId({ kind: 'bot', id: botId, ...(sessionId ? { sessionId } : {}) });
     sending.current.add(key);
     drafts.update((value) => ({ ...value, [key]: { text: '', mentions: [] } }));
     follow.current = true;
@@ -82,7 +82,7 @@ export function useBotChat(input: {
         await window.aelion.send({
           botId,
           ...(sessionId ? { sessionId } : {}),
-          ...(designSessionId ? { designSessionId } : {}),
+          ...(openDesignSessionId ? { openDesignSessionId } : {}),
           message: saved.text,
           mentions: saved.mentions,
           replyToMessageId: saved.reply?.messageId,

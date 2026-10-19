@@ -169,6 +169,8 @@ export interface ArtifactPreview {
 }
 export interface ChatMessage {
   designSessionId?: string;
+  /** The design task the canvas showed when this was sent; see HarnessRunOptions.openDesignSessionId. */
+  openDesignSessionId?: string;
   /** The work session it belongs to; absent in the Bot's main chat. */
   sessionId?: string;
   /** Sent from a connector chat rather than from this app. */
@@ -642,6 +644,7 @@ export interface AelionAPI {
   updatePersona(input: import('./persona-types').PersonaUpdate): Promise<import('./persona-types').PersonaView>;
   send(input: {
     designSessionId?: string;
+    openDesignSessionId?: string;
     botId: string;
     /** A work session of this Bot; absent for its main chat. */
     sessionId?: string;

@@ -61,6 +61,33 @@ test('without a request for design work the run ends normally and only the entry
   assert.deepEqual(design.sort(), ['design_font_library', 'design_start', 'design_tasks', 'design_use']);
 });
 
+test('a message beside an open canvas binds the task only when the Bot continues it with design_use', async (t) => {
+  const f = designHarness(t);
+  const id = f.current().id,
+    before = f.current().status;
+  const code = await f.run('Build this design into the settings page', [{ content: 'Done in the code project.' }], {
+    openDesignSessionId: id,
+  });
+  assert.equal(code.status, 'completed');
+  assert.equal(code.designSessionId, undefined);
+  assert.equal(f.current().status, before);
+  assert.deepEqual(f.current().runIds, []);
+  assert.ok(f.requests[0].messages.some((m) => String(m.content).includes(`design_use with that id`)));
+  assert.ok(!f.requests[0].tools.includes('design_file_create'));
+
+  const revision = await f.run(
+    'Make the header blue',
+    (turn, requests) => {
+      if (turn === 0) return { calls: [call('design_use', { id })] };
+      assert.ok(requests[1].tools.includes('design_file_create'));
+      return { content: 'Updated.' };
+    },
+    { openDesignSessionId: id },
+  );
+  assert.equal(revision.designSessionId, id);
+  assert.deepEqual(f.current().runIds, [revision.id]);
+});
+
 test('design_start without a system leaves the choice to the Bot', async (t) => {
   const f = designHarness(t, { catalog: {} });
   const run = await f.run('Make a deck', [

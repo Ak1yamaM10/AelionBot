@@ -145,6 +145,15 @@ export function BotConversation({
   useLayoutEffect(followLive, [liveSignature]);
   const keys = useMemo(() => timeline.map((item) => itemKey(chatKey, item)), [timeline, chatKey]);
   const timelineWindow = useTimelineWindow({ botId: chatKey, timeline, keys, pane: messagesPane, follow });
+  // Follow-ups on an open canvas run in the same design task; its card shows once, under the latest of those runs.
+  const designCardAt = useMemo(() => {
+    const at = new Map<string, number>();
+    timeline.forEach((item, index) => {
+      const id = item.kind === 'run' ? runsById.get(item.id)?.designSessionId : undefined;
+      if (id) at.set(id, index);
+    });
+    return at;
+  }, [timeline, runsById]);
   const previewEntries = useMemo(
     () => (state.previewHistory || []).filter((entry) => entry.scope.kind === 'bot' && entry.scope.id === bot.id),
     [state.previewHistory, bot.id],
@@ -248,7 +257,11 @@ export function BotConversation({
                     }
                     previewEntries={previewEntries}
                     filesDisabled={busy || !vmReady}
-                    designSession={designSessionOf(state, runsById.get(item.id))}
+                    designSession={
+                      designCardAt.get(runsById.get(item.id)?.designSessionId || '') === timelineWindow.start + index
+                        ? designSessionOf(state, runsById.get(item.id))
+                        : undefined
+                    }
                     actions={actions}
                   />
                 );

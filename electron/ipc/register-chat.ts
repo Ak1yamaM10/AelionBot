@@ -15,8 +15,8 @@ export function registerChat(ctx: IpcContext) {
   });
   handle('send', (input) => {
     if (!input || typeof input.botId !== 'string' || typeof input.message !== 'string') throw new Error('无效消息');
-    if (input.designSessionId)
-      ctx.designStore.get(String(input.designSessionId), input.botId, { kind: 'bot', id: input.botId });
+    for (const id of [input.designSessionId, input.openDesignSessionId])
+      if (id) ctx.designStore.get(String(id), input.botId, { kind: 'bot', id: input.botId });
     return ctx.chatPins!.send(input);
   });
   handle('resumeChat', (input) => {

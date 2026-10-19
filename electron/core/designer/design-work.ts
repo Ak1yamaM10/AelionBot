@@ -55,6 +55,8 @@ export interface DesignToolHost {
 
 interface RunDesign {
   origin?: DesignOrigin;
+  /** The task on the conversation's canvas, offered to an unbound run. */
+  open?: { id: string; title: string };
   notes: string[];
   previewed: Set<string>;
   mutated: boolean;
@@ -153,6 +155,14 @@ export class DesignWork {
       reference: new Map(),
     });
     const id = options.designSessionId || carry?.designSessionId;
+    // A message sent beside an open canvas only names the task; the Bot binds it with design_use for design work.
+    if (!id && options.openDesignSessionId && origin)
+      try {
+        const open = this.designs.get(options.openDesignSessionId, run.botId, origin);
+        this.runs.get(run.id)!.open = { id: open.id, title: open.title };
+      } catch {
+        /* the canvas may still show a task that is gone */
+      }
     if (!id || !origin) return;
     let session: DesignSession;
     try {
@@ -200,6 +210,13 @@ export class DesignWork {
   prefix(run: RunRecord): WireMessage[] {
     const session = this.session(run),
       state = this.runs.get(run.id);
+    if (!session && state?.open)
+      return [
+        {
+          role: 'system',
+          content: `The canvas shows design task "${state.open.title}" (id ${state.open.id}). If the user asks to change this design, call design_use with that id first and continue the task. For other work, such as building the design into a code project or answering questions, do not call design_use.`,
+        },
+      ];
     if (!session || !state) return [];
     const playbook = designerPlaybookName(session.kind);
     if (!state.craft.has(playbook)) {

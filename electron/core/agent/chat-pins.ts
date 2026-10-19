@@ -119,6 +119,7 @@ export class ChatPinQueue {
   send(
     input: {
       designSessionId?: string;
+      openDesignSessionId?: string;
       botId: string;
       sessionId?: string;
       message: string;
@@ -160,6 +161,7 @@ export class ChatPinQueue {
       mentions,
       attachments,
       designSessionId: input.designSessionId,
+      ...(input.openDesignSessionId ? { openDesignSessionId: input.openDesignSessionId } : {}),
       ...(input.previewPrompt !== undefined ? { previewPrompt: input.previewPrompt } : {}),
       ...(previewMarks?.length ? { previewMarks } : {}),
       ...(reply ? { reply } : {}),
@@ -239,6 +241,7 @@ export class ChatPinQueue {
         void this.runner
           .run(botId, chatInputText(latest, false), {
             designSessionId: latest.designSessionId,
+            ...(latest.openDesignSessionId ? { openDesignSessionId: latest.openDesignSessionId } : {}),
             ...(latest.sessionId ? { sessionId: latest.sessionId } : {}),
             inputMessageIds: batch.map((message) => message.id),
             reactionMessageId: latest.reaction ? latest.id : undefined,
