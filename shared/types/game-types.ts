@@ -144,8 +144,6 @@ export interface GameCreate {
   board?: 'standard12' | 'guard12';
   /** Who's the Spy: add a blank (a player with no word); only with seven or more players. */
   blank?: boolean;
-  /** Seat the players in a random order, so the human is not always seat 1 and first to speak. */
-  shuffleSeats?: boolean;
   players: GamePlayer[];
 }
 export interface GameAPI {

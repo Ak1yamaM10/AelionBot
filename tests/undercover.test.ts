@@ -344,38 +344,3 @@ test('a preset chosen for one match plays for that match only, for member Bots a
   assert.deepEqual(persona.view('bot0').profile.traits, before.traits, "the member's own profile is untouched");
   assert.equal(collectGrowthObservations(match).length, 0, 'nothing from a borrowed personality is learned');
 });
-
-test('seats are shuffled at the start unless the list order is kept', (t) => {
-  const firsts = new Set<boolean>();
-  for (let i = 0; i < 12; i++) {
-    const dir = tempDir(t);
-    const runtime = new GameRuntime(
-      dir,
-      async () => ({ text: '一个常见的东西' }),
-      () => {},
-    );
-    const view = runtime.create({
-      groupId: 'g' + i,
-      mode: 'undercover',
-      shuffleSeats: true,
-      players: players(6).map((p, j) => ({ ...p, human: j === 0 })),
-    });
-    firsts.add(view.seats[0].human);
-    runtime.dispose();
-  }
-  assert.ok(firsts.has(false), 'the human is not always seat 1');
-  const dir = tempDir(t);
-  const runtime = new GameRuntime(
-    dir,
-    async () => ({ text: '一个常见的东西' }),
-    () => {},
-  );
-  t.after(() => runtime.dispose());
-  const kept = runtime.create({
-    groupId: 'kept',
-    mode: 'undercover',
-    shuffleSeats: false,
-    players: players(6).map((p, j) => ({ ...p, human: j === 0 })),
-  });
-  assert.equal(kept.seats[0].human, true, 'list order keeps the human in seat 1');
-});

@@ -1,7 +1,7 @@
 import type { ResponseMetrics, GameModelConfig } from '../../../shared/types/game-types';
 import { settleLimited } from './request-pool';
 import { existsSync, mkdirSync, readFileSync, writeFileSync, renameSync } from 'node:fs';
-import { randomInt, randomUUID } from 'node:crypto';
+import { randomUUID } from 'node:crypto';
 import { join } from 'node:path';
 import type {
   GameCreate,
@@ -16,7 +16,6 @@ import { gameMode, type AnyMatch } from './modes';
 import { GameModelError } from './model-player';
 import type { PersonaSeed } from './persona-play';
 import { PRESETS, isPresetId, presetSeed } from '../../../shared/persona/presets';
-import { seededRandom, shuffle } from '../../../shared/games/seeded-random';
 import { mbtiOf } from '../../../shared/persona/persona-model';
 import { gameBehaviorPolicy, gamePersonality, type GameMbti } from '../../../shared/games/game-personality';
 import { AppError } from '../../../shared/errors';
@@ -293,14 +292,12 @@ export class GameRuntime {
     const s = mode.create({
       groupId: input.groupId,
       // Seat ids are random per match; the Bot a seat belongs to is kept as botId for post-match settlement.
-      players: (input.shuffleSeats ? shuffle([...input.players], seededRandom(randomInt(2 ** 31))) : input.players).map(
-        ({ botId, preset, ...p }) => ({
-          ...p,
-          id: randomUUID(),
-          ...(botId ? { botId } : {}),
-          ...(isPresetId(preset) ? { preset } : {}),
-        }),
-      ),
+      players: input.players.map(({ botId, preset, ...p }) => ({
+        ...p,
+        id: randomUUID(),
+        ...(botId ? { botId } : {}),
+        ...(isPresetId(preset) ? { preset } : {}),
+      })),
       board: input.board,
       blank: input.blank === true,
     });

@@ -92,7 +92,8 @@ export function GroupGames({
   const [match, setMatch] = useState<GameView | null>(null);
   const [open, setOpen] = useState(initialOpen),
     [screen, setScreen] = useState<'select' | 'presets' | 'persona' | 'room' | 'table'>(match ? 'table' : 'select');
-  const [shuffleSeats, setShuffleSeats] = useState(true);
+  // The seat you take, by index; the other players fill the remaining seats in order.
+  const [humanSeat, setHumanSeat] = useState(0);
   const [mode, setMode] = useState<'play' | 'watch'>('play'),
     [selected, setSelected] = useState<string[]>(members.slice(0, 11).map((m) => m.id));
   const [omniscient, setOmniscient] = useState(false),
@@ -154,7 +155,7 @@ export function GroupGames({
         setSeatCount(saved.seatCount);
         setBlank(saved.blank === true);
       }
-      if (typeof saved.shuffleSeats === 'boolean') setShuffleSeats(saved.shuffleSeats);
+      if (Number.isInteger(saved.humanSeat) && saved.humanSeat >= 0) setHumanSeat(saved.humanSeat);
       if (['play', 'watch'].includes(saved.mode) && Array.isArray(saved.selected)) {
         setMode(saved.mode);
         setSelected(
@@ -250,11 +251,24 @@ export function GroupGames({
   const total = game === 'undercover' ? seatCount : 12;
   const limit = mode === 'play' ? total - 1 : total;
   const chosen = members.filter((m) => selected.includes(m.id)).slice(0, limit);
-  const roster: Seat[] = [
-    ...(mode === 'play' ? [{ id: 'human', name: '你', color: '#9177ac', role: '村民' }] : []),
+  const others: Seat[] = [
     ...chosen.map((m) => ({ ...m, role: '' })),
     ...guests.slice(0, filled ? limit - chosen.length : 0).map((m) => ({ ...m, temporary: true, role: '' })),
   ];
+  // Seats in table order: you sit where you chose, everyone else fills the other seats from the front, and seats
+  // nobody has filled yet stay open.
+  const slots: (Seat | undefined)[] = Array.from({ length: total }, () => undefined);
+  const mine = Math.min(humanSeat, total - 1);
+  if (mode === 'play') slots[mine] = { id: 'human', name: '你', color: '#9177ac', role: '村民' };
+  {
+    let next = 0;
+    for (const seat of others) {
+      while (slots[next]) next++;
+      if (next >= total) break;
+      slots[next] = seat;
+    }
+  }
+  const roster = slots.filter((seat): seat is Seat => !!seat);
   const personalityPicker = (s: Member) =>
     members.some((member) => member.id === s.id) ? (
       <button className="gg-link" onClick={() => openPersona(s.id, 'room')}>
@@ -312,7 +326,6 @@ export function GroupGames({
         groupId,
         mode: game,
         ...(game === 'werewolf' ? { board } : { blank: blank && seatCount >= 7 }),
-        shuffleSeats,
         players: roster.map((p) => ({
           id: p.id,
           name: p.name,
@@ -333,7 +346,7 @@ export function GroupGames({
           overrides,
           sessionMbti,
           sessionPreset,
-          shuffleSeats,
+          humanSeat,
           ...(game === 'werewolf' ? { board } : { seatCount, blank }),
         };
         localStorage.setItem(
@@ -799,30 +812,6 @@ export function GroupGames({
                     </button>
                   </div>
                   <p className="gg-muted">{t('旁观时可以随时切换「全知视角」看所有身份。')}</p>
-                  <div className="gg-label">{t('座位')}</div>
-                  <div className="gg-seg" role="radiogroup">
-                    <button
-                      type="button"
-                      role="radio"
-                      aria-checked={shuffleSeats}
-                      className={shuffleSeats ? 'is-on' : ''}
-                      onClick={() => setShuffleSeats(true)}
-                    >
-                      {t('开局随机')}
-                    </button>
-                    <button
-                      type="button"
-                      role="radio"
-                      aria-checked={!shuffleSeats}
-                      className={!shuffleSeats ? 'is-on' : ''}
-                      onClick={() => setShuffleSeats(false)}
-                    >
-                      {t('按列表顺序')}
-                    </button>
-                  </div>
-                  <p className="gg-muted">
-                    {t(shuffleSeats ? '开局时打乱座位，谁先发言每局不同。' : '按右边列表的顺序入座，你坐 1 号。')}
-                  </p>
                 </div>
                 <details className="gg-rule-details">
                   <summary>{t('完整规则')}</summary>
@@ -898,12 +887,38 @@ export function GroupGames({
                   >
                     {t('随机补位性格')}
                   </button>
+                  {mode === 'play' && (
+                    <button className="gg-back" onClick={() => setHumanSeat(Math.floor(Math.random() * total))}>
+                      {t('随机座位')}
+                    </button>
+                  )}
                   <button className="gg-back" onClick={restore}>
                     {t('沿用上次')}
                   </button>
                 </div>
                 <div className="gg-seat-grid">
-                  {roster.map((s, i) => {
+                  {slots.map((s, i) => {
+                    if (!s)
+                      return (
+                        <div key={'empty' + i} className="gg-seat-card is-empty">
+                          <span className="gg-seat-card-number">{i + 1}</span>
+                          {mode === 'play' && (
+                            <button type="button" className="gg-seat-take" onClick={() => setHumanSeat(i)}>
+                              {t('坐这里')}
+                            </button>
+                          )}
+                          <button
+                            type="button"
+                            className="gg-seat-add"
+                            onClick={() => {
+                              setEditing('');
+                              setAdding(true);
+                            }}
+                          >
+                            {t('＋ 补一位')}
+                          </button>
+                        </div>
+                      );
                     const model = s.id === 'human' ? undefined : resolved(s),
                       type = s.id === 'human' ? undefined : resolvedMbti(s.id);
                     return (
@@ -945,19 +960,6 @@ export function GroupGames({
                       </button>
                     );
                   })}
-                  {Array.from({ length: Math.max(0, total - roster.length) }, (_, i) => (
-                    <button
-                      type="button"
-                      key={'empty' + i}
-                      className="gg-seat-card is-empty"
-                      onClick={() => {
-                        setEditing('');
-                        setAdding(true);
-                      }}
-                    >
-                      {t('＋ 空位')}
-                    </button>
-                  ))}
                   {editSeat && editSeat.id !== 'human' && (
                     <div
                       className="gg-seat-pop"
@@ -965,7 +967,7 @@ export function GroupGames({
                       aria-label={t('{name} 的本局设置', { name: editSeat.name })}
                     >
                       <div className="gg-card-head">
-                        <b>{t('{seat} 号 · {name}', { seat: roster.indexOf(editSeat) + 1, name: editSeat.name })}</b>
+                        <b>{t('{seat} 号 · {name}', { seat: slots.indexOf(editSeat) + 1, name: editSeat.name })}</b>
                         <button className="icon-button" aria-label={t('关闭')} onClick={() => setEditing('')}>
                           <Icon name="close" size={14} />
                         </button>
@@ -1038,6 +1040,17 @@ export function GroupGames({
                         >
                           {t('恢复预设')}
                         </button>
+                        {mode === 'play' && (
+                          <button
+                            className="secondary-button"
+                            onClick={() => {
+                              setHumanSeat(slots.indexOf(editSeat));
+                              setEditing('');
+                            }}
+                          >
+                            {t('和我换座')}
+                          </button>
+                        )}
                         {!editSeat.temporary && (
                           <button
                             className="secondary-button"
