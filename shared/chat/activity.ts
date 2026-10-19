@@ -17,7 +17,7 @@ const operations: Record<string, { label: string; active: string; icon: string }
   terminal_input: { label: '输入终端内容', active: '正在操作终端', icon: 'terminal' },
   terminal_read: { label: '读取终端输出', active: '正在读取终端输出', icon: 'terminal' },
   terminal_stop: { label: '停止终端', active: '正在停止终端', icon: 'terminal' },
-  apply_patch: { label: '应用文件补丁', active: '正在修改文件', icon: 'file' },
+  apply_patch: { label: '修改文件', active: '正在修改文件', icon: 'file' },
   code_exec: { label: '运行工具编排', active: '正在运行工具', icon: 'terminal' },
   request_user_input: { label: '向你提问', active: '等待你的回答', icon: 'message' },
   user_input_wait: { label: '等待回答', active: '等待你的回答', icon: 'message' },
@@ -212,7 +212,8 @@ export function toolDisplay(message: ChatMessage) {
   return message.activity
     ? {
         ...message.activity,
-        label: translate(message.activity.label),
+        // Stored runs from before the rename keep their old label in history.
+        label: translate(message.tool === 'apply_patch' ? '修改文件' : message.activity.label),
         ...(message.activity.detail ? { detail: activityDetail(message.activity.detail) } : {}),
       }
     : describeTool(message.tool || '', {}, toolResult(message));

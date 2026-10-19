@@ -25,6 +25,7 @@ import {
 } from './tool-details-model';
 import { currentLanguage, useI18n } from '../i18n';
 import { highlightMessageCode } from './code-highlight';
+import { ScreenshotImage } from './ScreenshotImage';
 import './tool-details.css';
 
 function CopyText({ value, label }: { value: string; label: string }) {
@@ -603,6 +604,12 @@ function ResultBody({ message, value }: { message: ChatMessage; value: unknown }
       </>
     );
   }
+  if (tool === 'view_image' && message.screenshotId)
+    return (
+      <figure className="detail-image">
+        <ScreenshotImage id={message.screenshotId} alt={display.detail || t('查看图片')} />
+      </figure>
+    );
   if (tool === 'history_search' || tool === 'history_read')
     return (
       <>

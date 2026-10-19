@@ -122,6 +122,23 @@
   font-size: calc(12px * var(--appearance-text-scale, 1));
   font-variant-numeric: tabular-nums;
 }
+.run-step-image {
+  display: inline-flex;
+  flex: 0 0 auto;
+  width: 44px;
+  height: 30px;
+  margin-left: 6px;
+  overflow: hidden;
+  border: 1px solid light-dark(#ddd9d2, #3a373f);
+  border-radius: 6px;
+  background: light-dark(#f3f0ea, #232127);
+}
+.run-step-image img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
 .run-step-tool.is-command .run-step-detail {
   font-family: var(--font-code);
   font-variant-ligatures: none;

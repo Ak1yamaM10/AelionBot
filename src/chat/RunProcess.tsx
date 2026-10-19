@@ -7,6 +7,7 @@ import { Icon } from '../ui/Icon';
 import { MentionContent } from '../ui/MentionContent';
 import { MessageReasoning, useReasoningDisplay } from './MessageReasoning';
 import { ToolDetails } from './ToolDetails';
+import { ScreenshotImage } from './ScreenshotImage';
 import { useI18n } from '../i18n';
 import { shallowEqual } from '../ui/equality';
 import { REVEAL_MESSAGE_EVENT } from './reveal-message';
@@ -39,6 +40,7 @@ function ToolStep({ message }: { message: ChatMessage }) {
   const display = toolDisplay(message),
     status = message.status || 'done',
     running = status === 'running',
+    image = message.tool === 'view_image' ? message.screenshotId : undefined,
     meta = running ? undefined : stepMeta(toolResult(message));
   return (
     <li
@@ -56,11 +58,15 @@ function ToolStep({ message }: { message: ChatMessage }) {
           <Icon name={toolIcon(message.tool)} size={13} />
         </span>
         <span className="run-step-label">{display.label}</span>
-        {display.detail && (
+        {image ? (
+          <span className="run-step-image" title={display.detail}>
+            <ScreenshotImage id={image} alt={display.detail || t('查看图片')} />
+          </span>
+        ) : display.detail ? (
           <span className="run-step-detail" title={display.detail}>
             {display.detail}
           </span>
-        )}
+        ) : null}
         {message.diff && (
           <span
             className="run-step-diff"
