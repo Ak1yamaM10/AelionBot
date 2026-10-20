@@ -727,6 +727,8 @@ export const en: Record<string, string> = {
   '复制失败，请重试': 'Copy failed; retry',
   重试复制: 'Retry copy',
   已复制: 'Copied',
+  复制结果: 'Copy result',
+  '按 {column} 排序': 'Sort by {column}',
   代码: 'code',
   '无法打开浏览器，请复制链接后打开。': 'Unable to open the browser. Copy the link and open it manually.',
   表格: 'Table',

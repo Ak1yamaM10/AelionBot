@@ -220,6 +220,8 @@ export interface RunRecord {
   /** The work session it ran in; absent in the Bot's main chat. */
   sessionId?: string;
   contextOverview?: import('../chat/context-overview').ContextOverview;
+  /** Structured blocks the Bot put in this answer, in creation order. */
+  blocks?: import('../chat/message-blocks').MessageBlock[];
   modelRequest?: import('./model-request-status').ModelRequestStatus;
   resumedFromRunId?: string;
   contextIssue?: import('../chat/context-issue').ContextIssue;

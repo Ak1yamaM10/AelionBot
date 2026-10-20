@@ -133,6 +133,7 @@ const HEADLESS_HIDDEN_TOOLS = new Set([
   'attachment_save',
   'request_user_input',
   'user_input_wait',
+  'message_block',
 ]);
 const privateTools = new Set([
   'bots_list',
@@ -2114,6 +2115,7 @@ export class Harness {
         (!['request_user_input', 'user_input_wait'].includes(t.function.name) || Boolean(this.interactions)) &&
         (work.forRun(run)?.status !== 'planning' || PLANNING_TOOLS.has(t.function.name)) &&
         (t.function.name !== 'chat_pin' || (!options.groupOrigin && !options.peerOrigin)) &&
+        (t.function.name !== 'message_block' || (!options.groupOrigin && !options.peerOrigin)) &&
         (!t.function.name.startsWith('design_') ||
           (Boolean(this.host && this.interactions) &&
             !this.headless &&

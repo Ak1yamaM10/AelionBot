@@ -8,6 +8,7 @@ import type { Store } from '../storage/store';
 import type { ConnectorAdapter, ConnectorCard, InboundAction, InboundMessage } from './connector-adapter';
 import type { StoredConnector } from './connector-store';
 import { permissionSummary } from './format';
+import { stripBlockMarkers } from '../../../shared/chat/message-blocks';
 
 export interface OutboxHost {
   store: Store;
@@ -143,13 +144,15 @@ export class ConnectorOutbox {
       await adapter.typing(tracked.chatId, false).catch(() => {});
     // A run stopped by new input is followed by the run that answers it; one the person stopped needs no reply.
     if (run?.status === 'cancelled') return;
+    // Blocks are app-only; a connector chat gets their plain-text fallbacks instead of placement markers.
+    const answerText = answers
+      .map((message) => stripBlockMarkers(message.content))
+      // An answer that is only files carries a placeholder line; the files speak for themselves.
+      .filter((content, index) => content && !(content === '已附上文件。' && answers[index].attachments?.length))
+      .join('\n\n');
     const text =
       run?.status === 'completed'
-        ? answers
-            .map((message) => message.content.trim())
-            // An answer that is only files carries a placeholder line; the files speak for themselves.
-            .filter((content, index) => !(content === '已附上文件。' && answers[index].attachments?.length))
-            .join('\n\n')
+        ? [answerText, ...(run?.blocks || []).map((block) => block.fallback)].filter(Boolean).join('\n\n')
         : '这次没有完成：' + (run?.error || '出现了错误').slice(0, 500);
     try {
       if (text) await adapter.sendText(tracked.chatId, text);

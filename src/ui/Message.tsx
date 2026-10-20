@@ -16,12 +16,17 @@ import { Avatar } from './Avatar';
 import { MentionContent } from './MentionContent';
 import { usePinRefs } from '../preview/pin-thread';
 import { MessageReasoning } from '../chat/MessageReasoning';
-import { shallowEqual } from './equality';
+import { shallowEqual, sameItems } from './equality';
 import { useI18n } from '../i18n';
+import type { MessageBlock } from '../../shared/chat/message-blocks';
+import { stripBlockMarkers } from '../../shared/chat/message-blocks';
+import { MessageBlockContent, MessageBlocks, hasBlockMarkers } from '../chat/MessageBlocks';
 import '../chat/message-surfaces.css';
 
 type MessageProps = {
   message: ChatMessage;
+  /** Structured blocks this answer placed after or between its paragraphs. */
+  blocks?: MessageBlock[];
   allowPins?: boolean;
   onReply?: (message: ChatMessage) => void;
   /** False when the reasoning is already shown elsewhere, e.g. inside the folded run process. */
@@ -35,6 +40,7 @@ const MemoMessage = memo(
     a.allowPins === b.allowPins &&
     a.showReasoning === b.showReasoning &&
     Boolean(a.onReply) === Boolean(b.onReply) &&
+    sameItems(a.blocks, b.blocks) &&
     shallowEqual(a.message, b.message),
 );
 type ReplyRef = { current?: (message: ChatMessage) => void };
@@ -49,6 +55,7 @@ export function Message(props: MessageProps) {
 }
 function MessageView({
   message,
+  blocks,
   allowPins = true,
   onReply: hasReply,
   showReasoning = true,
@@ -71,7 +78,13 @@ function MessageView({
   if (message.reaction) return null;
   if (message.role === 'event') return <div className="event-message">{message.content}</div>;
   if (message.role === 'tool') return null;
-  if (!message.content && !message.attachments?.length && message.status !== 'running' && !message.reasoning?.text)
+  if (
+    !message.content &&
+    !message.attachments?.length &&
+    !blocks?.length &&
+    message.status !== 'running' &&
+    !message.reasoning?.text
+  )
     return null;
   const presentation = previewFeedbackDisplay(message);
   const answer =
@@ -82,12 +95,16 @@ function MessageView({
         ? t('发现校验问题，继续检查并修正。')
         : readableContent(message.content)
       : readableQuestionAnswer(presentation.content);
+  const hasBlocks = Boolean(blocks?.length),
+    displayContent = hasBlocks ? stripBlockMarkers(content) : content,
+    splitBlocks = hasBlocks && message.role === 'assistant' && hasBlockMarkers(content);
   // A model call that only reasoned before its tool calls leaves a single disclosure line, no bubble.
   if (
     message.role === 'assistant' &&
     message.reasoning?.text &&
     !content &&
     !message.attachments?.length &&
+    !hasBlocks &&
     message.status !== 'running'
   )
     return (
@@ -98,8 +115,8 @@ function MessageView({
   const images = (message.attachments || []).filter((file) => file.image || file.mime.startsWith('image/')),
     // Images sit above the bubble and other files below it. A message that is only attachments puts them in a
     // see-through bubble so hover actions (reply, pin) still have a target.
-    bare = Boolean(message.attachments?.length) && !content && !answer && !message.reply,
-    clock = bare || message.status === 'running' || !(content || answer) ? '' : clockTime(message.time);
+    bare = Boolean(message.attachments?.length) && !content && !answer && !message.reply && !hasBlocks,
+    clock = bare || message.status === 'running' || !(content || answer || hasBlocks) ? '' : clockTime(message.time);
   return (
     <>
       <MessageTime id={message.id} time={message.time} />
@@ -118,19 +135,21 @@ function MessageView({
         {!bare && <AttachmentList files={images} only="images" />}
         <MessageActions
           messageId={message.id}
-          content={content || attachmentSummary(message.attachments)}
+          content={displayContent || attachmentSummary(message.attachments)}
           pins={message.pins}
           onReply={
             onReply &&
             !['running', 'cancelled'].includes(message.status || 'done') &&
-            (content || message.attachments?.length)
-              ? () => onReply({ ...message, content })
+            (displayContent || message.attachments?.length)
+              ? () => onReply({ ...message, content: displayContent })
               : undefined
           }
           bubbleClassName={`bubble ${answer ? 'question-answer-bubble' : ''} ${message.status === 'failed' ? 'failed' : ''} ${bare ? 'is-media' : ''} ${clock ? 'has-time' : ''}`}
           after={bare ? undefined : <AttachmentList files={message.attachments} only="files" />}
           onPin={
-            allowPins && (content || message.attachments?.length) && (!message.status || message.status === 'done')
+            allowPins &&
+            (displayContent || message.attachments?.length) &&
+            (!message.status || message.status === 'done')
               ? (input) => window.aelion.pinChat({ ...input, botId: message.botId })
               : undefined
           }
@@ -138,11 +157,20 @@ function MessageView({
           {message.reply && <MessageQuote reply={message.reply} />}
           {answer ? (
             <QuestionAnswerMessage answer={answer} />
-          ) : content ? (
+          ) : content || hasBlocks ? (
             message.role === 'assistant' ? (
-              <div className="markdown">
-                <MentionContent content={content} mentions={presentation.mentions} markdown pins={pins} />
-              </div>
+              splitBlocks ? (
+                <MessageBlockContent content={content} blocks={blocks!} />
+              ) : (
+                <>
+                  {content && (
+                    <div className="markdown">
+                      <MentionContent content={content} mentions={presentation.mentions} markdown pins={pins} />
+                    </div>
+                  )}
+                  {hasBlocks && <MessageBlocks blocks={blocks!} />}
+                </>
+              )
             ) : (
               <>
                 <MentionContent content={content} mentions={presentation.mentions} />

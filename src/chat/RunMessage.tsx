@@ -120,7 +120,15 @@ export function RunMessage({
         </div>
       )}
       {stream && running && <StreamingReply reply={stream} />}
-      {final && <Message message={final} allowPins={!run?.groupOrigin} onReply={onReply} showReasoning={false} />}
+      {final && (
+        <Message
+          message={final}
+          blocks={run?.blocks}
+          allowPins={!run?.groupOrigin}
+          onReply={onReply}
+          showReasoning={false}
+        />
+      )}
     </div>
   );
 }
